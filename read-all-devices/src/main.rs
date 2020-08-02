@@ -11,8 +11,7 @@ const SCAN_DURATION: Duration = Duration::from_millis(5000);
 
 const MIJIA_SERVICE_DATA_UUID: &str = "0000fe95-0000-1000-8000-00805f9b34fb";
 
-fn main() {
-    let bt_session = &BluetoothSession::create_session(None).unwrap();
+fn find_sensors<'a>(bt_session: &'a BluetoothSession) -> Vec<BluetoothDevice<'a>> {
     let adapter: BluetoothAdapter = BluetoothAdapter::init(bt_session).unwrap();
     if let Err(_error) = adapter.set_powered(true) {
         panic!("Failed to power adapter");
@@ -63,8 +62,12 @@ fn main() {
         );
     }
 
+    sensors
+}
+
+fn connect_sensors<'a>(sensors: &'a [BluetoothDevice<'a>]) -> Vec<&'a BluetoothDevice<'a>> {
     let mut connected_sensors = vec![];
-    for device in &sensors {
+    for device in sensors {
         if let Err(e) = device.connect(10000) {
             println!("Failed to connect {:?}: {:?}", device.get_id(), e);
         } else {
@@ -73,6 +76,14 @@ fn main() {
     }
 
     println!("Connected to {} sensors.", connected_sensors.len());
+
+    connected_sensors
+}
+
+fn main() {
+    let bt_session = &BluetoothSession::create_session(None).unwrap();
+    let mut sensors = find_sensors(&bt_session);
+    let connected_sensors = connect_sensors(&sensors);
 
     // We need to wait a bit after calling connect to safely
     // get the gatt services
