@@ -7,7 +7,7 @@ mod explore_device;
 
 fn main() {
     let bt_session = &BluetoothSession::create_session(None).unwrap();
-    let device_list = scan(&bt_session);
+    let device_list = scan(&bt_session).unwrap();
     let sensors = find_sensors(&bt_session, &device_list);
     print_sensors(&sensors);
     let connected_sensors = connect_sensors(&sensors);

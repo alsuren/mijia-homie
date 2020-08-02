@@ -1,4 +1,5 @@
 use blurz::{BluetoothAdapter, BluetoothDevice, BluetoothDiscoverySession, BluetoothSession};
+use std::error::Error;
 use std::thread;
 use std::time::Duration;
 
@@ -6,27 +7,23 @@ const SCAN_DURATION: Duration = Duration::from_millis(5000);
 
 const MIJIA_SERVICE_DATA_UUID: &str = "0000fe95-0000-1000-8000-00805f9b34fb";
 
-pub fn scan<'a>(bt_session: &'a BluetoothSession) -> Vec<String> {
-    let adapter: BluetoothAdapter = BluetoothAdapter::init(bt_session).unwrap();
-    if let Err(_error) = adapter.set_powered(true) {
-        panic!("Failed to power adapter");
-    }
+pub fn scan<'a>(bt_session: &'a BluetoothSession) -> Result<Vec<String>, Box<dyn Error>> {
+    let adapter: BluetoothAdapter = BluetoothAdapter::init(bt_session)?;
+    adapter.set_powered(true)?;
 
     let discover_session =
-        BluetoothDiscoverySession::create_session(&bt_session, adapter.get_id()).unwrap();
-    if let Err(_error) = discover_session.start_discovery() {
-        panic!("Failed to start discovery");
-    }
+        BluetoothDiscoverySession::create_session(&bt_session, adapter.get_id())?;
+    discover_session.start_discovery()?;
     println!("Scanning");
     // Wait for the adapter to scan for a while.
     thread::sleep(SCAN_DURATION);
-    let device_list = adapter.get_device_list().unwrap();
+    let device_list = adapter.get_device_list()?;
 
-    discover_session.stop_discovery().unwrap();
+    discover_session.stop_discovery()?;
 
     println!("{:?} devices found", device_list.len());
 
-    device_list
+    Ok(device_list)
 }
 
 pub fn find_sensors<'a>(
