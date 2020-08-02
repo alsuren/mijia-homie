@@ -1,5 +1,5 @@
 use blurz::{BluetoothEvent, BluetoothGATTCharacteristic, BluetoothSession};
-use mijia::{connect_sensors, decode_value, find_sensors};
+use mijia::{connect_sensors, decode_value, find_sensors, print_sensors, scan};
 use std::thread;
 use std::time::Duration;
 
@@ -7,7 +7,9 @@ mod explore_device;
 
 fn main() {
     let bt_session = &BluetoothSession::create_session(None).unwrap();
-    let sensors = find_sensors(&bt_session);
+    let device_list = scan(&bt_session);
+    let sensors = find_sensors(&bt_session, &device_list);
+    print_sensors(&sensors);
     let connected_sensors = connect_sensors(&sensors);
 
     // We need to wait a bit after calling connect to safely

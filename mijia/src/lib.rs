@@ -6,7 +6,7 @@ const SCAN_DURATION: Duration = Duration::from_millis(5000);
 
 const MIJIA_SERVICE_DATA_UUID: &str = "0000fe95-0000-1000-8000-00805f9b34fb";
 
-pub fn find_sensors<'a>(bt_session: &'a BluetoothSession) -> Vec<BluetoothDevice<'a>> {
+pub fn scan<'a>(bt_session: &'a BluetoothSession) -> Vec<String> {
     let adapter: BluetoothAdapter = BluetoothAdapter::init(bt_session).unwrap();
     if let Err(_error) = adapter.set_powered(true) {
         panic!("Failed to power adapter");
@@ -26,6 +26,13 @@ pub fn find_sensors<'a>(bt_session: &'a BluetoothSession) -> Vec<BluetoothDevice
 
     println!("{:?} devices found", device_list.len());
 
+    device_list
+}
+
+pub fn find_sensors<'a>(
+    bt_session: &'a BluetoothSession,
+    device_list: &[String],
+) -> Vec<BluetoothDevice<'a>> {
     let mut sensors = vec![];
     for device_path in device_list {
         let device = BluetoothDevice::new(bt_session, device_path.to_string());
@@ -46,9 +53,13 @@ pub fn find_sensors<'a>(bt_session: &'a BluetoothSession) -> Vec<BluetoothDevice
         }
     }
 
+    sensors
+}
+
+pub fn print_sensors(sensors: &[BluetoothDevice]) {
     println!();
     println!("{} sensors:", sensors.len());
-    for device in &sensors {
+    for device in sensors {
         println!(
             "{:?}, {} services, {} service data",
             device.get_name(),
@@ -56,8 +67,6 @@ pub fn find_sensors<'a>(bt_session: &'a BluetoothSession) -> Vec<BluetoothDevice
             device.get_service_data().map_or(0, |s| s.len())
         );
     }
-
-    sensors
 }
 
 pub fn connect_sensors<'a>(sensors: &'a [BluetoothDevice<'a>]) -> Vec<&'a BluetoothDevice<'a>> {
