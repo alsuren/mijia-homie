@@ -80,12 +80,16 @@ fn connect_sensors<'a>(sensors: &'a [BluetoothDevice<'a>]) -> Vec<&'a BluetoothD
     connected_sensors
 }
 
-fn decode_value(value: &[u8]) -> (f32, u8) {
+fn decode_value(value: &[u8]) -> Option<(f32, u8)> {
+    if value.len() != 5 {
+        return None
+    }
+
     let mut temperature_array = [0; 2];
     temperature_array.clone_from_slice(&value[..2]);
     let temperature = u16::from_le_bytes(temperature_array) as f32 * 0.01;
     let humidity = value[2];
-    (temperature, humidity)
+    Some((temperature, humidity))
 }
 
 fn main() {
@@ -121,11 +125,12 @@ fn main() {
                 _ => continue,
             };
 
-            let (temperature, humidity) = decode_value(&value);
-            println!(
-                "{} Temperature: {:.2}ºC Humidity: {:?}%",
-                object_path, temperature, humidity
-            );
+            if let Some((temperature, humidity)) = decode_value(&value) {
+                println!(
+                    "{} Temperature: {:.2}ºC Humidity: {:?}%",
+                    object_path, temperature, humidity
+                );
+            }
         }
     }
 }
