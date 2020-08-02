@@ -97,20 +97,27 @@ async fn requests(requests_tx: Sender<Request>) -> Result<(), Box<dyn Error>> {
                             humidity
                         );
 
-                        let device_base =
-                            format!("{}/{}", MQTT_PREFIX, device.get_address()?);
-                        let publish = Publish::new(
-                            format!("{}/temperature", device_base),
-                            QoS::AtLeastOnce,
-                            temperature.to_string(),
-                        );
-                        requests_tx.send(Request::Publish(publish)).await?;
-                        let publish = Publish::new(
-                            format!("{}/humidity", device_base),
-                            QoS::AtLeastOnce,
-                            humidity.to_string(),
-                        );
-                        requests_tx.send(Request::Publish(publish)).await?;
+                        let device_base = format!("{}/{}", MQTT_PREFIX, device.get_address()?);
+                        requests_tx
+                            .send(
+                                Publish::new(
+                                    format!("{}/temperature", device_base),
+                                    QoS::AtLeastOnce,
+                                    temperature.to_string(),
+                                )
+                                .into(),
+                            )
+                            .await?;
+                        requests_tx
+                            .send(
+                                Publish::new(
+                                    format!("{}/humidity", device_base),
+                                    QoS::AtLeastOnce,
+                                    humidity.to_string(),
+                                )
+                                .into(),
+                            )
+                            .await?;
                     } else {
                         println!("Invalid value from {}", device.get_id());
                     }
