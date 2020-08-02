@@ -4,7 +4,7 @@ use blurz::{
 };
 use futures::FutureExt;
 use mijia::{connect_sensors, decode_value, find_sensors, print_sensors};
-use rumqttc::{self, EventLoop, MqttOptions, Publish, QoS, Request};
+use rumqttc::{self, EventLoop, LastWill, MqttOptions, Publish, QoS, Request};
 use std::error::Error;
 use std::time::Duration;
 use tokio::task::JoinHandle;
@@ -41,6 +41,13 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
 
     let mut mqttoptions = MqttOptions::new("rumqtt-async", "test.mosquitto.org", 1883);
     mqttoptions.set_keep_alive(5);
+    let device_base = format!("{}/{}", MQTT_PREFIX, DEVICE_NAME);
+    mqttoptions.set_last_will(LastWill {
+        topic: format!("{}/$state", device_base),
+        message: "lost".to_string(),
+        qos: QoS::AtLeastOnce,
+        retain: true,
+    });
 
     let local = task::LocalSet::new();
 
@@ -93,7 +100,6 @@ async fn requests(requests_tx: Sender<Request>) -> Result<(), Box<dyn Error>> {
     )
     .await?;
     publish_retained(&requests_tx, format!("{}/$state", device_base), "init").await?;
-    // TODO: Set LWT for $state to "lost"
 
     let bt_session = &BluetoothSession::create_session(None)?;
     let device_list = scan(&bt_session).await?;
