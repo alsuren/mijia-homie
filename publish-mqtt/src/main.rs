@@ -47,7 +47,6 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     let requests_tx = eventloop.handle();
     let bluetooth_handle = local.spawn_local(async move {
         requests(requests_tx).await.unwrap();
-        time::delay_for(Duration::from_secs(3)).await;
     });
 
     let mqtt_handle: JoinHandle<Result<(), Box<dyn Error + Send + Sync>>> =
