@@ -45,19 +45,30 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
 
     let mut eventloop = EventLoop::new(mqttoptions, 10).await;
     let requests_tx = eventloop.handle();
-    local.spawn_local(async move {
+    let bluetooth_handle = local.spawn_local(async move {
         requests(requests_tx).await.unwrap();
         time::delay_for(Duration::from_secs(3)).await;
     });
 
-    let x: JoinHandle<Result<(), Box<dyn Error + Send + Sync>>> = task::spawn(async move {
-        loop {
-            let (incoming, outgoing) = eventloop.poll().await?;
-            println!("Incoming = {:?}, Outgoing = {:?}", incoming, outgoing);
-        }
-    });
+    let mqtt_handle: JoinHandle<Result<(), Box<dyn Error + Send + Sync>>> =
+        task::spawn(async move {
+            loop {
+                let (incoming, outgoing) = eventloop.poll().await?;
+                println!("Incoming = {:?}, Outgoing = {:?}", incoming, outgoing);
+            }
+        });
 
-    try_join!(local.map(Ok), x)?.1?;
+    // Poll everything to completion, until the first one bombs out.
+    let res: Result<_, Box<dyn Error + Send + Sync>> = try_join! {
+        // LocalSet finished first. Colour me confused.
+        local.map(|()| Ok(println!("WTF?"))),
+        // Bluetooth finished first. Convert error and get on with your life.
+        bluetooth_handle.map(|res| Ok(res?)),
+        // MQTT event loop finished first.
+        // Unwrap the JoinHandle Result to get to the real Result.
+        mqtt_handle.map(|res| Ok(res??)),
+    };
+    res?;
     Ok(())
 }
 
