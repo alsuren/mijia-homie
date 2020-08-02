@@ -10,7 +10,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     pretty_env_logger::init();
     color_backtrace::install();
 
-    let mut mqttoptions = MqttOptions::new("test-1", "localhost", 1883);
+    let mut mqttoptions = MqttOptions::new("rumqtt-async", "test.mosquitto.org", 1883);
     mqttoptions.set_keep_alive(5);
 
     let mut eventloop = EventLoop::new(mqttoptions, 10).await;
