@@ -81,7 +81,9 @@ fn main() {
         explore_device::explore_gatt_profile(bt_session, &device);
         let temp_humidity =
             BluetoothGATTCharacteristic::new(bt_session, device.get_id() + "/service0021/char0035");
-        temp_humidity.start_notify().unwrap();
+        if let Err(e) = temp_humidity.start_notify() {
+            println!("Failed to start notify on {}: {:?}", device.get_id(), e);
+        }
     }
 
     println!("READINGS");
