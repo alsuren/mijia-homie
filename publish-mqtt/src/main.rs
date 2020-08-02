@@ -1,4 +1,4 @@
-use async_channel::Sender;
+use async_channel::{SendError, Sender};
 use blurz::{
     BluetoothAdapter, BluetoothDiscoverySession, BluetoothGATTCharacteristic, BluetoothSession,
 };
@@ -10,7 +10,8 @@ use std::time::Duration;
 use tokio::task::JoinHandle;
 use tokio::{task, time, try_join};
 
-const MQTT_PREFIX: &str = "mijia";
+const MQTT_PREFIX: &str = "homie";
+const DEVICE_NAME: &str = "mijia-bridge";
 const SCAN_DURATION: Duration = Duration::from_secs(5);
 const UPDATE_PERIOD: Duration = Duration::from_secs(20);
 
@@ -71,12 +72,93 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     Ok(())
 }
 
+async fn publish_retained(
+    requests_tx: &Sender<Request>,
+    name: String,
+    value: &str,
+) -> Result<(), SendError<Request>> {
+    let mut publish = Publish::new(name, QoS::AtLeastOnce, value);
+    publish.set_retain(true);
+    requests_tx.send(publish.into()).await
+}
+
 async fn requests(requests_tx: Sender<Request>) -> Result<(), Box<dyn Error>> {
+    let device_base = format!("{}/{}", MQTT_PREFIX, DEVICE_NAME);
+    publish_retained(&requests_tx, format!("{}/$homie", device_base), "4.0").await?;
+    publish_retained(&requests_tx, format!("{}/$extensions", device_base), "").await?;
+    publish_retained(
+        &requests_tx,
+        format!("{}/$name", device_base),
+        "Mijia bridge",
+    )
+    .await?;
+    publish_retained(&requests_tx, format!("{}/$state", device_base), "init").await?;
+    // TODO: Set LWT for $state to "lost"
+
     let bt_session = &BluetoothSession::create_session(None)?;
     let device_list = scan(&bt_session).await?;
     let sensors = find_sensors(&bt_session, &device_list);
     print_sensors(&sensors);
     let connected_sensors = connect_sensors(&sensors);
+
+    let mut nodes = vec![];
+    for sensor in &connected_sensors {
+        let mac_address = sensor.get_address()?;
+        let node_id = mac_address.replace(":", "-");
+        let node_base = format!("{}/{}", device_base, node_id);
+        nodes.push(node_id);
+        publish_retained(&requests_tx, format!("{}/$name", node_base), &mac_address).await?;
+        publish_retained(&requests_tx, format!("{}/$type", node_base), "Mijia sensor").await?;
+        publish_retained(
+            &requests_tx,
+            format!("{}/$properties", node_base),
+            "temperature,humidity",
+        )
+        .await?;
+        publish_retained(
+            &requests_tx,
+            format!("{}/temperature/$name", node_base),
+            "Temperature",
+        )
+        .await?;
+        publish_retained(
+            &requests_tx,
+            format!("{}/temperature/$datatype", node_base),
+            "float",
+        )
+        .await?;
+        publish_retained(
+            &requests_tx,
+            format!("{}/temperature/$unit", node_base),
+            "ºC",
+        )
+        .await?;
+        publish_retained(
+            &requests_tx,
+            format!("{}/humidity/$name", node_base),
+            "Humidity",
+        )
+        .await?;
+        publish_retained(
+            &requests_tx,
+            format!("{}/humidity/$datatype", node_base),
+            "float",
+        )
+        .await?;
+        publish_retained(
+            &requests_tx,
+            format!("{}/humidity/$unit", node_base),
+            "%",
+        )
+        .await?;
+    }
+    publish_retained(
+        &requests_tx,
+        format!("{}/$nodes", device_base),
+        &nodes.join(","),
+    )
+    .await?;
+    publish_retained(&requests_tx, format!("{}/$state", device_base), "ready").await?;
 
     loop {
         println!();
@@ -97,27 +179,21 @@ async fn requests(requests_tx: Sender<Request>) -> Result<(), Box<dyn Error>> {
                             humidity
                         );
 
-                        let device_base = format!("{}/{}", MQTT_PREFIX, device.get_address()?);
-                        requests_tx
-                            .send(
-                                Publish::new(
-                                    format!("{}/temperature", device_base),
-                                    QoS::AtLeastOnce,
-                                    temperature.to_string(),
-                                )
-                                .into(),
-                            )
-                            .await?;
-                        requests_tx
-                            .send(
-                                Publish::new(
-                                    format!("{}/humidity", device_base),
-                                    QoS::AtLeastOnce,
-                                    humidity.to_string(),
-                                )
-                                .into(),
-                            )
-                            .await?;
+                        let mac_address = device.get_address()?;
+                        let node_id = mac_address.replace(":", "-");
+                        let node_base = format!("{}/{}", device_base, node_id);
+                        publish_retained(
+                            &requests_tx,
+                            format!("{}/temperature", node_base),
+                            &temperature.to_string(),
+                        )
+                        .await?;
+                        publish_retained(
+                            &requests_tx,
+                            format!("{}/humidity", node_base),
+                            &humidity.to_string(),
+                        )
+                        .await?;
                     } else {
                         println!("Invalid value from {}", device.get_id());
                     }
