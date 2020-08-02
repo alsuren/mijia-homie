@@ -2,4 +2,5 @@
 
 members = [
     "publish-mqtt",
+    "read-all-devices",
 ]

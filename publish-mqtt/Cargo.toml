@@ -1,5 +1,5 @@
 [package]
-name = "reading-xiaomi-temp"
+name = "publish-mqtt"
 version = "0.1.0"
 authors = ["David Laban <alsuren@gmail.com>"]
 edition = "2018"
