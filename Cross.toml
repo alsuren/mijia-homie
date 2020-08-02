@@ -1,0 +1,11 @@
+[target.armv7-unknown-linux-gnueabihf]
+# Based on https://www.collabora.com/news-and-blog/blog/2020/06/23/cross-building-rust-gstreamer-plugins-for-the-raspberry-pi/
+# but with `RUN apt-get install -y libdbus-1-dev:armhf` thrown in to get the dependency we need.
+# This image has been pushed to dockerhub.
+# image = "alsuren/xiaomi-temp-rpi-builder"
+
+
+# Once https://github.com/rust-embedded/cross/pull/446 gets somewhere, you
+# will be able to use `context` and `dockerfile` to achieve the same result.
+context = "./docker"
+dockerfile = "./docker/Dockerfile.buster-gst-armv7-unknown-linux-gnueabihf"
