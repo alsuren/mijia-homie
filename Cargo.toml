@@ -1,14 +1,5 @@
-[package]
-name = "reading-xiaomi-temp"
-version = "0.1.0"
-authors = ["David Laban <alsuren@gmail.com>"]
-edition = "2018"
+[workspace]
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[dependencies]
-rumqttc = "0.0.5"
-tokio = "0.2.22"
-async-channel = "1.4.0"
-pretty_env_logger = "0.4.0"
-color-backtrace = "0.4.2"
+members = [
+    "publish-mqtt",
+]
