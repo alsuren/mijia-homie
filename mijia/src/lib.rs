@@ -67,13 +67,13 @@ pub fn print_sensors(sensors: &[BluetoothDevice]) {
     }
 }
 
-pub fn connect_sensors<'a>(sensors: &'a [BluetoothDevice<'a>]) -> Vec<&'a BluetoothDevice<'a>> {
+pub fn connect_sensors<'a>(sensors: &'a [BluetoothDevice<'a>]) -> Vec<BluetoothDevice<'a>> {
     let mut connected_sensors = vec![];
     for device in sensors {
         if let Err(e) = device.connect(10000) {
             println!("Failed to connect {:?}: {:?}", device.get_id(), e);
         } else {
-            connected_sensors.push(device);
+            connected_sensors.push(device.clone());
         }
     }
 
