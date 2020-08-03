@@ -54,7 +54,6 @@ pub fn find_sensors<'a>(
 }
 
 pub fn print_sensors(sensors: &[BluetoothDevice]) {
-    println!();
     println!("{} sensors:", sensors.len());
     for device in sensors {
         println!(

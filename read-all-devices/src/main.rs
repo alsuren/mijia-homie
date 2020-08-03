@@ -9,8 +9,10 @@ fn main() {
     let bt_session = &BluetoothSession::create_session(None).unwrap();
     let device_list = scan(&bt_session).unwrap();
     let sensors = find_sensors(&bt_session, &device_list);
+    println!();
     print_sensors(&sensors);
     let connected_sensors = connect_sensors(&sensors);
+    print_sensors(&connected_sensors);
 
     // We need to wait a bit after calling connect to safely
     // get the gatt services
