@@ -88,7 +88,7 @@ pub fn decode_value(value: &[u8]) -> Option<(f32, u8)> {
 
     let mut temperature_array = [0; 2];
     temperature_array.clone_from_slice(&value[..2]);
-    let temperature = u16::from_le_bytes(temperature_array) as f32 * 0.01;
+    let temperature = i16::from_le_bytes(temperature_array) as f32 * 0.01;
     let humidity = value[2];
     Some((temperature, humidity))
 }
