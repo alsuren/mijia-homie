@@ -58,7 +58,8 @@ pub fn print_sensors(sensors: &[BluetoothDevice]) {
     println!("{} sensors:", sensors.len());
     for device in sensors {
         println!(
-            "{:?}, {} services, {} service data",
+            "{}: {:?}, {} services, {} service data",
+            device.get_address().unwrap(),
             device.get_name(),
             device.get_gatt_services().map_or(0, |s| s.len()),
             device.get_service_data().map_or(0, |s| s.len())
