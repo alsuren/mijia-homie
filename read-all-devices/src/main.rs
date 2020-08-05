@@ -1,13 +1,17 @@
-use blurz::{BluetoothEvent, BluetoothSession};
+use blurz::{BluetoothDevice, BluetoothEvent, BluetoothSession};
 use mijia::{
-    connect_sensors, decode_value, find_sensors, print_sensors, scan, start_notify_sensors,
+    connect_sensors, decode_value, find_sensors, hashmap_from_file, print_sensors, scan,
+    start_notify_sensors, SERVICE_CHARACTERISTIC_PATH,
 };
 use std::thread;
 use std::time::Duration;
 
 mod explore_device;
 
+const SENSOR_NAMES_FILENAME: &str = "sensor_names.conf";
+
 fn main() {
+    let sensor_names = hashmap_from_file(SENSOR_NAMES_FILENAME).unwrap();
     let bt_session = &BluetoothSession::create_session(None).unwrap();
     let device_list = scan(&bt_session).unwrap();
     let sensors = find_sensors(&bt_session, &device_list);
@@ -32,12 +36,21 @@ fn main() {
                 _ => continue,
             };
 
+            // TODO: Make this less hacky.
+            if !object_path.ends_with(SERVICE_CHARACTERISTIC_PATH) {
+                continue;
+            }
+            let device_path = &object_path[..object_path.len() - SERVICE_CHARACTERISTIC_PATH.len()];
+            let device = BluetoothDevice::new(bt_session, device_path.to_string());
+
             if let Some((temperature, humidity, battery_voltage, battery_percent)) =
                 decode_value(&value)
             {
+                let mac_address = device.get_address().unwrap();
+                let name = sensor_names.get(&mac_address).unwrap_or(&mac_address);
                 println!(
-                    "{} Temperature: {:.2}ºC Humidity: {:?}% Battery: {:?} mV ({:?}%)",
-                    object_path, temperature, humidity, battery_voltage, battery_percent
+                    "{} ({}) Temperature: {:.2}ºC Humidity: {:?}% Battery: {:?} mV ({:?}%)",
+                    object_path, name, temperature, humidity, battery_voltage, battery_percent
                 );
             }
         }

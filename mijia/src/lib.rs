@@ -3,14 +3,18 @@ use blurz::{
     BluetoothSession,
 };
 use std::cmp::max;
+use std::collections::HashMap;
 use std::convert::TryInto;
 use std::error::Error;
+use std::fs::File;
+use std::io::{self, BufRead, BufReader, ErrorKind};
 use std::thread;
 use std::time::Duration;
 
 const SCAN_DURATION: Duration = Duration::from_millis(5000);
 
 const MIJIA_SERVICE_DATA_UUID: &str = "0000fe95-0000-1000-8000-00805f9b34fb";
+pub const SERVICE_CHARACTERISTIC_PATH: &str = "/service0021/char0035";
 
 pub fn scan<'a>(bt_session: &'a BluetoothSession) -> Result<Vec<String>, Box<dyn Error>> {
     let adapter: BluetoothAdapter = BluetoothAdapter::init(bt_session)?;
@@ -91,8 +95,10 @@ pub fn start_notify_sensors<'a>(
     connected_sensors: &'a [BluetoothDevice<'a>],
 ) {
     for device in connected_sensors {
-        let temp_humidity =
-            BluetoothGATTCharacteristic::new(bt_session, device.get_id() + "/service0021/char0035");
+        let temp_humidity = BluetoothGATTCharacteristic::new(
+            bt_session,
+            device.get_id() + SERVICE_CHARACTERISTIC_PATH,
+        );
         if let Err(e) = temp_humidity.start_notify() {
             println!("Failed to start notify on {}: {:?}", device.get_id(), e);
         }
@@ -111,4 +117,24 @@ pub fn decode_value(value: &[u8]) -> Option<(f32, u8, u16, u16)> {
     let battery_voltage = u16::from_le_bytes(value[3..5].try_into().unwrap());
     let battery_percent = (max(battery_voltage, 2100) - 2100) / 10;
     Some((temperature, humidity, battery_voltage, battery_percent))
+}
+
+/// Read the given file of key-value pairs into a hashmap.
+/// Returns an empty hashmap if the file doesn't exist, or an error if it is malformed.
+pub fn hashmap_from_file(filename: &str) -> Result<HashMap<String, String>, io::Error> {
+    let mut map: HashMap<String, String> = HashMap::new();
+    if let Ok(file) = File::open(filename) {
+        for line in BufReader::new(file).lines() {
+            let line = line?;
+            let parts: Vec<&str> = line.splitn(2, '=').collect();
+            if parts.len() != 2 {
+                return Err(io::Error::new(
+                    ErrorKind::Other,
+                    format!("Invalid line '{}'", line),
+                ));
+            }
+            map.insert(parts[0].to_string(), parts[1].to_string());
+        }
+    }
+    Ok(map)
 }

@@ -3,7 +3,10 @@ use blurz::{
     BluetoothAdapter, BluetoothDevice, BluetoothDiscoverySession, BluetoothEvent, BluetoothSession,
 };
 use futures::FutureExt;
-use mijia::{connect_sensors, decode_value, find_sensors, print_sensors, start_notify_sensors};
+use mijia::{
+    connect_sensors, decode_value, find_sensors, hashmap_from_file, print_sensors,
+    start_notify_sensors, SERVICE_CHARACTERISTIC_PATH,
+};
 use rumqttc::{self, EventLoop, LastWill, MqttOptions, Publish, QoS, Request};
 use rustls::ClientConfig;
 use std::error::Error;
@@ -18,6 +21,7 @@ const DEFAULT_HOST: &str = "test.mosquitto.org";
 const DEFAULT_PORT: u16 = 1883;
 const SCAN_DURATION: Duration = Duration::from_secs(5);
 const INCOMING_TIMEOUT_MS: u32 = 1000;
+const SENSOR_NAMES_FILENAME: &str = "sensor_names.conf";
 
 async fn scan<'a>(bt_session: &'a BluetoothSession) -> Result<Vec<String>, Box<dyn Error>> {
     let adapter: BluetoothAdapter = BluetoothAdapter::init(bt_session)?;
@@ -128,6 +132,8 @@ async fn publish_retained(
 }
 
 async fn requests(requests_tx: Sender<Request>, device_base: &str) -> Result<(), Box<dyn Error>> {
+    let sensor_names = hashmap_from_file(SENSOR_NAMES_FILENAME)?;
+
     publish_retained(&requests_tx, format!("{}/$homie", device_base), "4.0").await?;
     publish_retained(&requests_tx, format!("{}/$extensions", device_base), "").await?;
     publish_retained(
@@ -149,8 +155,9 @@ async fn requests(requests_tx: Sender<Request>, device_base: &str) -> Result<(),
         let mac_address = sensor.get_address()?;
         let node_id = mac_address.replace(":", "");
         let node_base = format!("{}/{}", device_base, node_id);
+        let node_name = sensor_names.get(&mac_address).unwrap_or(&mac_address);
         nodes.push(node_id);
-        publish_retained(&requests_tx, format!("{}/$name", node_base), &mac_address).await?;
+        publish_retained(&requests_tx, format!("{}/$name", node_base), node_name).await?;
         publish_retained(&requests_tx, format!("{}/$type", node_base), "Mijia sensor").await?;
         publish_retained(
             &requests_tx,
@@ -224,11 +231,10 @@ async fn requests(requests_tx: Sender<Request>, device_base: &str) -> Result<(),
             };
 
             // TODO: Make this less hacky.
-            if &object_path[37..] != "/service0021/char0035" {
+            if !object_path.ends_with(SERVICE_CHARACTERISTIC_PATH) {
                 continue;
             }
-            let device_path = &object_path[0..37];
-
+            let device_path = &object_path[..object_path.len() - SERVICE_CHARACTERISTIC_PATH.len()];
             let device = BluetoothDevice::new(bt_session, device_path.to_string());
 
             if let Some((temperature, humidity, battery_voltage, battery_percent)) =
