@@ -5,13 +5,21 @@ use blurz::{
 use futures::FutureExt;
 use mijia::{connect_sensors, decode_value, find_sensors, print_sensors};
 use rumqttc::{self, EventLoop, LastWill, MqttOptions, Publish, QoS, Request};
+use rustls::ClientConfig;
 use std::error::Error;
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::task::JoinHandle;
 use tokio::{task, time, try_join};
 
 const MQTT_PREFIX: &str = "homie";
 const DEVICE_NAME: &str = "mijia-bridge";
+const CLIENT_NAME: &str = DEVICE_NAME;
+const HOST: &str = "test.mosquitto.org";
+const PORT: u16 = 1883;
+const USE_TLS: bool = false;
+const USERNAME: &str = "";
+const PASSWORD: &str = "";
 const SCAN_DURATION: Duration = Duration::from_secs(5);
 const UPDATE_PERIOD: Duration = Duration::from_secs(20);
 
@@ -39,8 +47,19 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     pretty_env_logger::init();
     color_backtrace::install();
 
-    let mut mqttoptions = MqttOptions::new("rumqtt-async", "test.mosquitto.org", 1883);
+    let mut mqttoptions = MqttOptions::new(CLIENT_NAME, HOST, PORT);
     mqttoptions.set_keep_alive(5);
+    if !USERNAME.is_empty() || !PASSWORD.is_empty() {
+        mqttoptions.set_credentials(USERNAME, PASSWORD);
+    }
+
+    if USE_TLS {
+        let mut client_config = ClientConfig::new();
+        client_config.root_store =
+            rustls_native_certs::load_native_certs().expect("could not load platform certs");
+        mqttoptions.set_tls_client_config(Arc::new(client_config));
+    }
+
     let device_base = format!("{}/{}", MQTT_PREFIX, DEVICE_NAME);
     mqttoptions.set_last_will(LastWill {
         topic: format!("{}/$state", device_base),
