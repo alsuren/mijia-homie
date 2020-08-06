@@ -110,7 +110,7 @@ async fn requests(requests_tx: Sender<Request>) -> Result<(), Box<dyn Error>> {
     let mut nodes = vec![];
     for sensor in &connected_sensors {
         let mac_address = sensor.get_address()?;
-        let node_id = mac_address.replace(":", "-");
+        let node_id = mac_address.replace(":", "");
         let node_base = format!("{}/{}", device_base, node_id);
         nodes.push(node_id);
         publish_retained(&requests_tx, format!("{}/$name", node_base), &mac_address).await?;
@@ -186,7 +186,7 @@ async fn requests(requests_tx: Sender<Request>) -> Result<(), Box<dyn Error>> {
                         );
 
                         let mac_address = device.get_address()?;
-                        let node_id = mac_address.replace(":", "-");
+                        let node_id = mac_address.replace(":", "");
                         let node_base = format!("{}/{}", device_base, node_id);
                         publish_retained(
                             &requests_tx,
