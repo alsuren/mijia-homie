@@ -13,5 +13,5 @@ color-backtrace = "0.4.2"
 futures = "*"
 mijia = { path = "../mijia" }
 pretty_env_logger = "0.4.0"
-rumqttc = "0.0.5"
+rumqttc = { git = "https://github.com/bytebeamio/rumqtt" }
 tokio = "0.2.22"
