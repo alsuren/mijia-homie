@@ -8,4 +8,6 @@ set -euxo pipefail
 time cross build --target armv7-unknown-linux-gnueabihf --release
 time rsync target/armv7-unknown-linux-gnueabihf/release/read-all-devices pi@raspberrypi.local:read-all-devices
 time rsync target/armv7-unknown-linux-gnueabihf/release/publish-mqtt pi@raspberrypi.local:publish-mqtt
-time ssh pi@raspberrypi.local ./publish-mqtt
+
+scp .env pi@raspberrypi.local:.env
+ssh pi@raspberrypi.local ./publish-mqtt

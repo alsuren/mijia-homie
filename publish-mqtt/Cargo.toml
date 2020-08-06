@@ -17,3 +17,4 @@ rumqttc = { git = "https://github.com/bytebeamio/rumqtt" }
 rustls = "0.17"
 rustls-native-certs = "0.3"
 tokio = "0.2.22"
+dotenv = "0.15.0"

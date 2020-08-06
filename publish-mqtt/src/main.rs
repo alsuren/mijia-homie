@@ -13,8 +13,7 @@ use tokio::task::JoinHandle;
 use tokio::{task, time, try_join};
 
 const MQTT_PREFIX: &str = "homie";
-const DEVICE_NAME: &str = "mijia-bridge";
-const CLIENT_NAME: &str = DEVICE_NAME;
+const DEFAULT_DEVICE_NAME: &str = "mijia-bridge";
 const HOST: &str = "test.mosquitto.org";
 const PORT: u16 = 1883;
 const USE_TLS: bool = false;
@@ -44,10 +43,15 @@ async fn scan<'a>(bt_session: &'a BluetoothSession) -> Result<Vec<String>, Box<d
 
 #[tokio::main(core_threads = 2)]
 async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
+    dotenv::dotenv()?;
     pretty_env_logger::init();
     color_backtrace::install();
 
-    let mut mqttoptions = MqttOptions::new(CLIENT_NAME, HOST, PORT);
+    let device_name =
+        std::env::var("DEVICE_NAME").unwrap_or_else(|_| DEFAULT_DEVICE_NAME.to_string());
+    let client_name = std::env::var("CLIENT_NAME").unwrap_or_else(|_| device_name.clone());
+
+    let mut mqttoptions = MqttOptions::new(client_name, HOST, PORT);
     mqttoptions.set_keep_alive(5);
     if !USERNAME.is_empty() || !PASSWORD.is_empty() {
         mqttoptions.set_credentials(USERNAME, PASSWORD);
@@ -60,7 +64,8 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
         mqttoptions.set_tls_client_config(Arc::new(client_config));
     }
 
-    let device_base = format!("{}/{}", MQTT_PREFIX, DEVICE_NAME);
+    let device_base = format!("{}/{}", MQTT_PREFIX, device_name);
+
     mqttoptions.set_last_will(LastWill {
         topic: format!("{}/$state", device_base),
         message: "lost".to_string(),
@@ -73,7 +78,7 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     let mut eventloop = EventLoop::new(mqttoptions, 10).await;
     let requests_tx = eventloop.handle();
     let bluetooth_handle = local.spawn_local(async move {
-        requests(requests_tx).await.unwrap();
+        requests(requests_tx, &device_base).await.unwrap();
     });
 
     let mqtt_handle: JoinHandle<Result<(), Box<dyn Error + Send + Sync>>> =
@@ -108,8 +113,7 @@ async fn publish_retained(
     requests_tx.send(publish.into()).await
 }
 
-async fn requests(requests_tx: Sender<Request>) -> Result<(), Box<dyn Error>> {
-    let device_base = format!("{}/{}", MQTT_PREFIX, DEVICE_NAME);
+async fn requests(requests_tx: Sender<Request>, device_base: &str) -> Result<(), Box<dyn Error>> {
     publish_retained(&requests_tx, format!("{}/$homie", device_base), "4.0").await?;
     publish_retained(&requests_tx, format!("{}/$extensions", device_base), "").await?;
     publish_retained(
