@@ -12,15 +12,12 @@ use std::time::Duration;
 use tokio::task::JoinHandle;
 use tokio::{task, time, try_join};
 
-const MQTT_PREFIX: &str = "homie";
+const DEFAULT_MQTT_PREFIX: &str = "homie";
 const DEFAULT_DEVICE_NAME: &str = "mijia-bridge";
-const HOST: &str = "test.mosquitto.org";
-const PORT: u16 = 1883;
-const USE_TLS: bool = false;
-const USERNAME: &str = "";
-const PASSWORD: &str = "";
+const DEFAULT_HOST: &str = "test.mosquitto.org";
+const DEFAULT_PORT: u16 = 1883;
 const SCAN_DURATION: Duration = Duration::from_secs(5);
-const UPDATE_PERIOD: Duration = Duration::from_secs(20);
+const DEFAULT_UPDATE_PERIOD: Duration = Duration::from_secs(20);
 
 async fn scan<'a>(bt_session: &'a BluetoothSession) -> Result<Vec<String>, Box<dyn Error>> {
     let adapter: BluetoothAdapter = BluetoothAdapter::init(bt_session)?;
@@ -51,20 +48,37 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
         std::env::var("DEVICE_NAME").unwrap_or_else(|_| DEFAULT_DEVICE_NAME.to_string());
     let client_name = std::env::var("CLIENT_NAME").unwrap_or_else(|_| device_name.clone());
 
-    let mut mqttoptions = MqttOptions::new(client_name, HOST, PORT);
+    let device_name =
+        std::env::var("DEVICE_NAME").unwrap_or_else(|_| DEFAULT_DEVICE_NAME.to_string());
+
+    let host = std::env::var("HOST").unwrap_or_else(|_| DEFAULT_HOST.to_string());
+
+    let port = std::env::var("HOST")
+        .ok()
+        .and_then(|val| val.parse::<u16>().ok())
+        .unwrap_or(DEFAULT_PORT);
+
+    let mut mqttoptions = MqttOptions::new(client_name, host, port);
+
+    let username = std::env::var("USERNAME").ok();
+    let password = std::env::var("PASSWORD").ok();
+
     mqttoptions.set_keep_alive(5);
-    if !USERNAME.is_empty() || !PASSWORD.is_empty() {
-        mqttoptions.set_credentials(USERNAME, PASSWORD);
+    if let (Some(u), Some(p)) = (username, password) {
+        mqttoptions.set_credentials(u, p);
     }
 
-    if USE_TLS {
+    // Use `env -u USE_TLS` to unset this variable if you need to clear it.
+    if std::env::var("USE_TLS").is_ok() {
         let mut client_config = ClientConfig::new();
         client_config.root_store =
             rustls_native_certs::load_native_certs().expect("could not load platform certs");
         mqttoptions.set_tls_client_config(Arc::new(client_config));
     }
 
-    let device_base = format!("{}/{}", MQTT_PREFIX, device_name);
+    let mqtt_prefix =
+        std::env::var("MQTT_PREFIX").unwrap_or_else(|_| DEFAULT_MQTT_PREFIX.to_string());
+    let device_base = format!("{}/{}", mqtt_prefix, device_name);
 
     mqttoptions.set_last_will(LastWill {
         topic: format!("{}/$state", device_base),
@@ -114,6 +128,12 @@ async fn publish_retained(
 }
 
 async fn requests(requests_tx: Sender<Request>, device_base: &str) -> Result<(), Box<dyn Error>> {
+    let update_period = std::env::var("UPDATE_PERIOD_SECONDS")
+        .ok()
+        .and_then(|val| val.parse::<u64>().ok())
+        .map(Duration::from_secs)
+        .unwrap_or(DEFAULT_UPDATE_PERIOD);
+
     publish_retained(&requests_tx, format!("{}/$homie", device_base), "4.0").await?;
     publish_retained(&requests_tx, format!("{}/$extensions", device_base), "").await?;
     publish_retained(
@@ -186,7 +206,7 @@ async fn requests(requests_tx: Sender<Request>, device_base: &str) -> Result<(),
 
     loop {
         println!();
-        time::delay_for(UPDATE_PERIOD).await;
+        time::delay_for(update_period).await;
         for device in &connected_sensors {
             let temp_humidity = BluetoothGATTCharacteristic::new(
                 bt_session,
