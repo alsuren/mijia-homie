@@ -170,12 +170,7 @@ async fn requests(requests_tx: Sender<Request>) -> Result<(), Box<dyn Error>> {
             "float",
         )
         .await?;
-        publish_retained(
-            &requests_tx,
-            format!("{}/humidity/$unit", node_base),
-            "%",
-        )
-        .await?;
+        publish_retained(&requests_tx, format!("{}/humidity/$unit", node_base), "%").await?;
     }
     publish_retained(
         &requests_tx,
