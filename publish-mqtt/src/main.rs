@@ -191,7 +191,7 @@ async fn requests(requests_tx: Sender<Request>, device_base: &str) -> Result<(),
         publish_retained(
             &requests_tx,
             format!("{}/humidity/$datatype", node_base),
-            "float",
+            "integer",
         )
         .await?;
         publish_retained(&requests_tx, format!("{}/humidity/$unit", node_base), "%").await?;
