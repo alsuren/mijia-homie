@@ -28,16 +28,9 @@ fn main() {
 
     println!("READINGS");
     loop {
-        for event in bt_session
-            .incoming(1000)
-            .map(BluetoothEvent::from)
-        {
-            if event.is_none() {
-                continue;
-            }
-
-            let (object_path, value) = match event.clone().unwrap() {
-                BluetoothEvent::Value { object_path, value } => (object_path, value),
+        for event in bt_session.incoming(1000).map(BluetoothEvent::from) {
+            let (object_path, value) = match event {
+                Some(BluetoothEvent::Value { object_path, value }) => (object_path, value),
                 _ => continue,
             };
 
