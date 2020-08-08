@@ -28,8 +28,7 @@ fn main() {
 
     println!("READINGS");
     loop {
-        for event in BluetoothSession::create_session(None)
-            .unwrap()
+        for event in bt_session
             .incoming(1000)
             .map(BluetoothEvent::from)
         {
