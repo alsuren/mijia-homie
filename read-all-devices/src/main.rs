@@ -1,5 +1,7 @@
-use blurz::{BluetoothEvent, BluetoothGATTCharacteristic, BluetoothSession};
-use mijia::{connect_sensors, decode_value, find_sensors, print_sensors, scan};
+use blurz::{BluetoothEvent, BluetoothSession};
+use mijia::{
+    connect_sensors, decode_value, find_sensors, print_sensors, scan, start_notify_sensors,
+};
 use std::thread;
 use std::time::Duration;
 
@@ -17,14 +19,10 @@ fn main() {
     // We need to wait a bit after calling connect to safely
     // get the gatt services
     thread::sleep(Duration::from_millis(5000));
-    for device in connected_sensors {
+    for device in &connected_sensors {
         explore_device::explore_gatt_profile(bt_session, &device);
-        let temp_humidity =
-            BluetoothGATTCharacteristic::new(bt_session, device.get_id() + "/service0021/char0035");
-        if let Err(e) = temp_humidity.start_notify() {
-            println!("Failed to start notify on {}: {:?}", device.get_id(), e);
-        }
     }
+    start_notify_sensors(bt_session, &connected_sensors);
 
     println!("READINGS");
     loop {

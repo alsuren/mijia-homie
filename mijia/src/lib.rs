@@ -1,4 +1,7 @@
-use blurz::{BluetoothAdapter, BluetoothDevice, BluetoothDiscoverySession, BluetoothSession};
+use blurz::{
+    BluetoothAdapter, BluetoothDevice, BluetoothDiscoverySession, BluetoothGATTCharacteristic,
+    BluetoothSession,
+};
 use std::cmp::max;
 use std::convert::TryInto;
 use std::error::Error;
@@ -81,6 +84,19 @@ pub fn connect_sensors<'a>(sensors: &'a [BluetoothDevice<'a>]) -> Vec<BluetoothD
     println!("Connected to {} sensors.", connected_sensors.len());
 
     connected_sensors
+}
+
+pub fn start_notify_sensors<'a>(
+    bt_session: &'a BluetoothSession,
+    connected_sensors: &'a [BluetoothDevice<'a>],
+) {
+    for device in connected_sensors {
+        let temp_humidity =
+            BluetoothGATTCharacteristic::new(bt_session, device.get_id() + "/service0021/char0035");
+        if let Err(e) = temp_humidity.start_notify() {
+            println!("Failed to start notify on {}: {:?}", device.get_id(), e);
+        }
+    }
 }
 
 pub fn decode_value(value: &[u8]) -> Option<(f32, u8, u16, u16)> {
