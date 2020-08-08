@@ -42,10 +42,12 @@ fn main() {
                 _ => continue,
             };
 
-            if let Some((temperature, humidity)) = decode_value(&value) {
+            if let Some((temperature, humidity, battery_voltage, battery_percent)) =
+                decode_value(&value)
+            {
                 println!(
-                    "{} Temperature: {:.2}ºC Humidity: {:?}%",
-                    object_path, temperature, humidity
+                    "{} Temperature: {:.2}ºC Humidity: {:?}% Battery: {:?} mV ({:?}%)",
+                    object_path, temperature, humidity, battery_voltage, battery_percent
                 );
             }
         }

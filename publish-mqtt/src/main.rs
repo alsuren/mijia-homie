@@ -161,7 +161,7 @@ async fn requests(requests_tx: Sender<Request>, device_base: &str) -> Result<(),
         publish_retained(
             &requests_tx,
             format!("{}/$properties", node_base),
-            "temperature,humidity",
+            "temperature,humidity,battery",
         )
         .await?;
         publish_retained(
@@ -195,6 +195,19 @@ async fn requests(requests_tx: Sender<Request>, device_base: &str) -> Result<(),
         )
         .await?;
         publish_retained(&requests_tx, format!("{}/humidity/$unit", node_base), "%").await?;
+        publish_retained(
+            &requests_tx,
+            format!("{}/battery/$name", node_base),
+            "Battery level",
+        )
+        .await?;
+        publish_retained(
+            &requests_tx,
+            format!("{}/battery/$datatype", node_base),
+            "integer",
+        )
+        .await?;
+        publish_retained(&requests_tx, format!("{}/battery/$unit", node_base), "%").await?;
     }
     publish_retained(
         &requests_tx,
@@ -215,12 +228,16 @@ async fn requests(requests_tx: Sender<Request>, device_base: &str) -> Result<(),
             match temp_humidity.get_value() {
                 Err(e) => println!("Failed to get value from {}: {:?}", device.get_id(), e),
                 Ok(value) => {
-                    if let Some((temperature, humidity)) = decode_value(&value) {
+                    if let Some((temperature, humidity, battery_voltage, battery_percent)) =
+                        decode_value(&value)
+                    {
                         println!(
-                            "{} Temperature: {:.2}ºC Humidity: {:?}%",
+                            "{} Temperature: {:.2}ºC Humidity: {:?}% Battery {} mV ({} %)",
                             device.get_id(),
                             temperature,
-                            humidity
+                            humidity,
+                            battery_voltage,
+                            battery_percent
                         );
 
                         let mac_address = device.get_address()?;
@@ -236,6 +253,12 @@ async fn requests(requests_tx: Sender<Request>, device_base: &str) -> Result<(),
                             &requests_tx,
                             format!("{}/humidity", node_base),
                             &humidity.to_string(),
+                        )
+                        .await?;
+                        publish_retained(
+                            &requests_tx,
+                            format!("{}/battery", node_base),
+                            &battery_percent.to_string(),
                         )
                         .await?;
                     } else {

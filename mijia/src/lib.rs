@@ -1,4 +1,5 @@
 use blurz::{BluetoothAdapter, BluetoothDevice, BluetoothDiscoverySession, BluetoothSession};
+use std::convert::TryInto;
 use std::error::Error;
 use std::thread;
 use std::time::Duration;
@@ -81,7 +82,7 @@ pub fn connect_sensors<'a>(sensors: &'a [BluetoothDevice<'a>]) -> Vec<BluetoothD
     connected_sensors
 }
 
-pub fn decode_value(value: &[u8]) -> Option<(f32, u8)> {
+pub fn decode_value(value: &[u8]) -> Option<(f32, u8, u16, u16)> {
     if value.len() != 5 {
         return None;
     }
@@ -90,5 +91,7 @@ pub fn decode_value(value: &[u8]) -> Option<(f32, u8)> {
     temperature_array.clone_from_slice(&value[..2]);
     let temperature = i16::from_le_bytes(temperature_array) as f32 * 0.01;
     let humidity = value[2];
-    Some((temperature, humidity))
+    let battery_voltage = u16::from_le_bytes(value[3..5].try_into().unwrap());
+    let battery_percent = (battery_voltage - 2100) / 10;
+    Some((temperature, humidity, battery_voltage, battery_percent))
 }
