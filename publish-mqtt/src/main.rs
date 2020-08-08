@@ -249,7 +249,7 @@ async fn requests(requests_tx: Sender<Request>, device_base: &str) -> Result<(),
                 publish_retained(
                     &requests_tx,
                     format!("{}/temperature", node_base),
-                    &temperature.to_string(),
+                    &format!("{:.2}", temperature),
                 )
                 .await?;
                 publish_retained(
