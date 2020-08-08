@@ -1,9 +1,9 @@
 use async_channel::{SendError, Sender};
 use blurz::{
-    BluetoothAdapter, BluetoothDiscoverySession, BluetoothGATTCharacteristic, BluetoothSession,
+    BluetoothAdapter, BluetoothDevice, BluetoothDiscoverySession, BluetoothEvent, BluetoothSession,
 };
 use futures::FutureExt;
-use mijia::{connect_sensors, decode_value, find_sensors, print_sensors};
+use mijia::{connect_sensors, decode_value, find_sensors, print_sensors, start_notify_sensors};
 use rumqttc::{self, EventLoop, LastWill, MqttOptions, Publish, QoS, Request};
 use rustls::ClientConfig;
 use std::error::Error;
@@ -17,7 +17,7 @@ const DEFAULT_DEVICE_NAME: &str = "mijia-bridge";
 const DEFAULT_HOST: &str = "test.mosquitto.org";
 const DEFAULT_PORT: u16 = 1883;
 const SCAN_DURATION: Duration = Duration::from_secs(5);
-const DEFAULT_UPDATE_PERIOD: Duration = Duration::from_secs(20);
+const INCOMING_TIMEOUT_MS: u32 = 1000;
 
 async fn scan<'a>(bt_session: &'a BluetoothSession) -> Result<Vec<String>, Box<dyn Error>> {
     let adapter: BluetoothAdapter = BluetoothAdapter::init(bt_session)?;
@@ -128,12 +128,6 @@ async fn publish_retained(
 }
 
 async fn requests(requests_tx: Sender<Request>, device_base: &str) -> Result<(), Box<dyn Error>> {
-    let update_period = std::env::var("UPDATE_PERIOD_SECONDS")
-        .ok()
-        .and_then(|val| val.parse::<u64>().ok())
-        .map(Duration::from_secs)
-        .unwrap_or(DEFAULT_UPDATE_PERIOD);
-
     publish_retained(&requests_tx, format!("{}/$homie", device_base), "4.0").await?;
     publish_retained(&requests_tx, format!("{}/$extensions", device_base), "").await?;
     publish_retained(
@@ -217,54 +211,61 @@ async fn requests(requests_tx: Sender<Request>, device_base: &str) -> Result<(),
     .await?;
     publish_retained(&requests_tx, format!("{}/$state", device_base), "ready").await?;
 
-    loop {
-        println!();
-        time::delay_for(update_period).await;
-        for device in &connected_sensors {
-            let temp_humidity = BluetoothGATTCharacteristic::new(
-                bt_session,
-                device.get_id() + "/service0021/char0035",
-            );
-            match temp_humidity.get_value() {
-                Err(e) => println!("Failed to get value from {}: {:?}", device.get_id(), e),
-                Ok(value) => {
-                    if let Some((temperature, humidity, battery_voltage, battery_percent)) =
-                        decode_value(&value)
-                    {
-                        println!(
-                            "{} Temperature: {:.2}ºC Humidity: {:?}% Battery {} mV ({} %)",
-                            device.get_id(),
-                            temperature,
-                            humidity,
-                            battery_voltage,
-                            battery_percent
-                        );
+    start_notify_sensors(bt_session, &connected_sensors);
 
-                        let mac_address = device.get_address()?;
-                        let node_id = mac_address.replace(":", "");
-                        let node_base = format!("{}/{}", device_base, node_id);
-                        publish_retained(
-                            &requests_tx,
-                            format!("{}/temperature", node_base),
-                            &temperature.to_string(),
-                        )
-                        .await?;
-                        publish_retained(
-                            &requests_tx,
-                            format!("{}/humidity", node_base),
-                            &humidity.to_string(),
-                        )
-                        .await?;
-                        publish_retained(
-                            &requests_tx,
-                            format!("{}/battery", node_base),
-                            &battery_percent.to_string(),
-                        )
-                        .await?;
-                    } else {
-                        println!("Invalid value from {}", device.get_id());
-                    }
-                }
+    loop {
+        for event in bt_session
+            .incoming(INCOMING_TIMEOUT_MS)
+            .map(BluetoothEvent::from)
+        {
+            let (object_path, value) = match event {
+                Some(BluetoothEvent::Value { object_path, value }) => (object_path, value),
+                _ => continue,
+            };
+
+            // TODO: Make this less hacky.
+            if &object_path[37..] != "/service0021/char0035" {
+                continue;
+            }
+            let device_path = &object_path[0..37];
+
+            let device = BluetoothDevice::new(bt_session, device_path.to_string());
+
+            if let Some((temperature, humidity, battery_voltage, battery_percent)) =
+                decode_value(&value)
+            {
+                println!(
+                    "{} Temperature: {:.2}ºC Humidity: {:?}% Battery {} mV ({} %)",
+                    device.get_id(),
+                    temperature,
+                    humidity,
+                    battery_voltage,
+                    battery_percent
+                );
+
+                let mac_address = device.get_address()?;
+                let node_id = mac_address.replace(":", "");
+                let node_base = format!("{}/{}", device_base, node_id);
+                publish_retained(
+                    &requests_tx,
+                    format!("{}/temperature", node_base),
+                    &temperature.to_string(),
+                )
+                .await?;
+                publish_retained(
+                    &requests_tx,
+                    format!("{}/humidity", node_base),
+                    &humidity.to_string(),
+                )
+                .await?;
+                publish_retained(
+                    &requests_tx,
+                    format!("{}/battery", node_base),
+                    &battery_percent.to_string(),
+                )
+                .await?;
+            } else {
+                println!("Invalid value from {}", device.get_id());
             }
         }
     }
