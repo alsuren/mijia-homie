@@ -11,6 +11,7 @@ async-channel = "1.4.0"
 blurz = "0.4.0"
 color-backtrace = "0.4.2"
 futures = "*"
+log = "*"
 mijia = { path = "../mijia" }
 pretty_env_logger = "0.4.0"
 rumqttc = { git = "https://github.com/bytebeamio/rumqtt" }

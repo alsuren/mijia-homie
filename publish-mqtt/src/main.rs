@@ -100,7 +100,7 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
         task::spawn(async move {
             loop {
                 let (incoming, outgoing) = eventloop.poll().await?;
-                println!("Incoming = {:?}, Outgoing = {:?}", incoming, outgoing);
+                log::trace!("Incoming = {:?}, Outgoing = {:?}", incoming, outgoing);
             }
         });
 

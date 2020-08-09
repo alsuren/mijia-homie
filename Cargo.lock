@@ -654,6 +654,7 @@ dependencies = [
  "color-backtrace",
  "dotenv",
  "futures",
+ "log",
  "mijia",
  "pretty_env_logger",
  "rumqttc",
