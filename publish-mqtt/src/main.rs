@@ -21,7 +21,7 @@ const DEFAULT_DEVICE_NAME: &str = "Mijia bridge";
 const DEFAULT_HOST: &str = "test.mosquitto.org";
 const DEFAULT_PORT: u16 = 1883;
 const SCAN_DURATION: Duration = Duration::from_secs(5);
-const INCOMING_TIMEOUT_MS: u32 = 1000;
+const INCOMING_TIMEOUT_MS: u32 = 10_000;
 const SENSOR_NAMES_FILENAME: &str = "sensor_names.conf";
 
 async fn scan<'a>(bt_session: &'a BluetoothSession) -> Result<Vec<String>, Box<dyn Error>> {
@@ -214,6 +214,10 @@ async fn requests(requests_tx: Sender<Request>, device_base: &str) -> Result<(),
 
     start_notify_sensors(bt_session, &connected_sensors);
 
+    // currently there is no way to set INCOMING_TIMEOUT_MS to -1 (which is how
+    // you specify "infinite" according to
+    // https://dbus.freedesktop.org/doc/api/html/group__DBusConnection.html#ga580d8766c23fe5f49418bc7d87b67dc6)
+    // so we wrap the event loop in an infinite loop.
     loop {
         for event in bt_session
             .incoming(INCOMING_TIMEOUT_MS)
