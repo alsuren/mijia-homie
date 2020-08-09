@@ -16,7 +16,8 @@ use tokio::task::JoinHandle;
 use tokio::{task, time, try_join};
 
 const DEFAULT_MQTT_PREFIX: &str = "homie";
-const DEFAULT_DEVICE_NAME: &str = "mijia-bridge";
+const DEFAULT_DEVICE_ID: &str = "mijia-bridge";
+const DEFAULT_DEVICE_NAME: &str = "Mijia bridge";
 const DEFAULT_HOST: &str = "test.mosquitto.org";
 const DEFAULT_PORT: u16 = 1883;
 const SCAN_DURATION: Duration = Duration::from_secs(5);
@@ -48,12 +49,8 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     pretty_env_logger::init();
     color_backtrace::install();
 
-    let device_name =
-        std::env::var("DEVICE_NAME").unwrap_or_else(|_| DEFAULT_DEVICE_NAME.to_string());
-    let client_name = std::env::var("CLIENT_NAME").unwrap_or_else(|_| device_name.clone());
-
-    let device_name =
-        std::env::var("DEVICE_NAME").unwrap_or_else(|_| DEFAULT_DEVICE_NAME.to_string());
+    let device_id = std::env::var("DEVICE_ID").unwrap_or_else(|_| DEFAULT_DEVICE_ID.to_string());
+    let client_name = std::env::var("CLIENT_NAME").unwrap_or_else(|_| device_id.clone());
 
     let host = std::env::var("HOST").unwrap_or_else(|_| DEFAULT_HOST.to_string());
 
@@ -82,7 +79,7 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
 
     let mqtt_prefix =
         std::env::var("MQTT_PREFIX").unwrap_or_else(|_| DEFAULT_MQTT_PREFIX.to_string());
-    let device_base = format!("{}/{}", mqtt_prefix, device_name);
+    let device_base = format!("{}/{}", mqtt_prefix, device_id);
 
     mqttoptions.set_last_will(LastWill {
         topic: format!("{}/$state", device_base),
@@ -132,16 +129,13 @@ async fn publish_retained(
 }
 
 async fn requests(requests_tx: Sender<Request>, device_base: &str) -> Result<(), Box<dyn Error>> {
+    let device_name =
+        std::env::var("DEVICE_NAME").unwrap_or_else(|_| DEFAULT_DEVICE_NAME.to_string());
     let sensor_names = hashmap_from_file(SENSOR_NAMES_FILENAME)?;
 
     publish_retained(&requests_tx, format!("{}/$homie", device_base), "4.0").await?;
     publish_retained(&requests_tx, format!("{}/$extensions", device_base), "").await?;
-    publish_retained(
-        &requests_tx,
-        format!("{}/$name", device_base),
-        "Mijia bridge",
-    )
-    .await?;
+    publish_retained(&requests_tx, format!("{}/$name", device_base), &device_name).await?;
     publish_retained(&requests_tx, format!("{}/$state", device_base), "init").await?;
 
     let bt_session = &BluetoothSession::create_session(None)?;
