@@ -49,11 +49,7 @@ pub fn find_sensors<'a>(
         );
         if let Ok(service_data) = device.get_service_data() {
             println!("Service data: {:?}", service_data);
-            // If there are no services advertised here then trying to connect below will fail, so
-            // no point trying.
-            if service_data.contains_key(MIJIA_SERVICE_DATA_UUID)
-                && device.get_gatt_services().map_or(0, |s| s.len()) > 0
-            {
+            if service_data.contains_key(MIJIA_SERVICE_DATA_UUID) {
                 sensors.push(device);
             }
         }
