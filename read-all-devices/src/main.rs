@@ -16,9 +16,9 @@ fn main() {
     let device_list = scan(&bt_session).unwrap();
     let sensors = find_sensors(&bt_session, &device_list);
     println!();
-    print_sensors(&sensors);
+    print_sensors(&sensors, &sensor_names);
     let connected_sensors = connect_sensors(&sensors);
-    print_sensors(&connected_sensors);
+    print_sensors(&connected_sensors, &sensor_names);
 
     // We need to wait a bit after calling connect to safely
     // get the gatt services

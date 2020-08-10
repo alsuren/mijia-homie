@@ -141,7 +141,7 @@ async fn requests(requests_tx: Sender<Request>, device_base: &str) -> Result<(),
     let bt_session = &BluetoothSession::create_session(None)?;
     let device_list = scan(&bt_session).await?;
     let sensors = find_sensors(&bt_session, &device_list);
-    print_sensors(&sensors);
+    print_sensors(&sensors, &sensor_names);
     let connected_sensors = connect_sensors(&sensors);
 
     let mut nodes = vec![];

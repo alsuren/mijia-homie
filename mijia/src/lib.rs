@@ -58,15 +58,20 @@ pub fn find_sensors<'a>(
     sensors
 }
 
-pub fn print_sensors(sensors: &[BluetoothDevice]) {
+pub fn print_sensors(sensors: &[BluetoothDevice], sensor_names: &HashMap<String, String>) {
     println!("{} sensors:", sensors.len());
     for device in sensors {
+        let mac_address = device.get_address().unwrap();
+        // TODO: Find a less ugly way to do this.
+        let empty = "".to_string();
+        let name = sensor_names.get(&mac_address).unwrap_or(&empty);
         println!(
-            "{}: {:?}, {} services, {} service data",
-            device.get_address().unwrap(),
+            "{}: {:?}, {} services, {} service data, '{}'",
+            mac_address,
             device.get_name(),
             device.get_gatt_services().map_or(0, |s| s.len()),
-            device.get_service_data().map_or(0, |s| s.len())
+            device.get_service_data().map_or(0, |s| s.len()),
+            name
         );
     }
 }
