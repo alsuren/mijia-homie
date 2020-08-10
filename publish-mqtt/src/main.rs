@@ -238,16 +238,18 @@ async fn requests(requests_tx: Sender<Request>, device_base: &str) -> Result<(),
             if let Some((temperature, humidity, battery_voltage, battery_percent)) =
                 decode_value(&value)
             {
+                let mac_address = device.get_address()?;
+                let name = sensor_names.get(&mac_address).unwrap_or(&mac_address);
                 println!(
-                    "{} Temperature: {:.2}ºC Humidity: {:?}% Battery {} mV ({} %)",
+                    "{} ({}) Temperature: {:.2}ºC Humidity: {:?}% Battery {} mV ({} %)",
                     device.get_id(),
+                    name,
                     temperature,
                     humidity,
                     battery_voltage,
                     battery_percent
                 );
 
-                let mac_address = device.get_address()?;
                 let node_id = mac_address.replace(":", "");
                 let node_base = format!("{}/{}", device_base, node_id);
                 publish_retained(
