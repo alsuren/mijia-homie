@@ -16,7 +16,7 @@ const SCAN_DURATION: Duration = Duration::from_millis(5000);
 const MIJIA_SERVICE_DATA_UUID: &str = "0000fe95-0000-1000-8000-00805f9b34fb";
 pub const SERVICE_CHARACTERISTIC_PATH: &str = "/service0021/char0035";
 
-pub fn scan<'a>(bt_session: &'a BluetoothSession) -> Result<Vec<String>, Box<dyn Error>> {
+pub fn scan(bt_session: &BluetoothSession) -> Result<Vec<String>, Box<dyn Error>> {
     let adapter: BluetoothAdapter = BluetoothAdapter::init(bt_session)?;
     adapter.set_powered(true)?;
 

@@ -24,7 +24,7 @@ const SCAN_DURATION: Duration = Duration::from_secs(15);
 const INCOMING_TIMEOUT_MS: u32 = 10_000;
 const SENSOR_NAMES_FILENAME: &str = "sensor_names.conf";
 
-async fn scan<'a>(bt_session: &'a BluetoothSession) -> Result<Vec<String>, Box<dyn Error>> {
+async fn scan(bt_session: &BluetoothSession) -> Result<Vec<String>, Box<dyn Error>> {
     let adapter: BluetoothAdapter = BluetoothAdapter::init(bt_session)?;
     adapter.set_powered(true)?;
 
