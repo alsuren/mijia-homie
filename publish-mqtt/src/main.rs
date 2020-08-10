@@ -20,7 +20,7 @@ const DEFAULT_DEVICE_ID: &str = "mijia-bridge";
 const DEFAULT_DEVICE_NAME: &str = "Mijia bridge";
 const DEFAULT_HOST: &str = "test.mosquitto.org";
 const DEFAULT_PORT: u16 = 1883;
-const SCAN_DURATION: Duration = Duration::from_secs(5);
+const SCAN_DURATION: Duration = Duration::from_secs(15);
 const INCOMING_TIMEOUT_MS: u32 = 10_000;
 const SENSOR_NAMES_FILENAME: &str = "sensor_names.conf";
 
