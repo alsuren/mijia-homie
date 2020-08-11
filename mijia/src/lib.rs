@@ -82,6 +82,7 @@ pub fn connect_sensors<'a>(sensors: &'a [BluetoothDevice<'a>]) -> Vec<BluetoothD
         if let Err(e) = device.connect(10000) {
             println!("Failed to connect {:?}: {:?}", device.get_id(), e);
         } else {
+            println!("Connected to {:?}", device.get_id());
             connected_sensors.push(device.clone());
         }
     }
