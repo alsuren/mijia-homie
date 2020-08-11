@@ -1,4 +1,3 @@
-use async_channel::{SendError, Sender};
 use blurz::{
     BluetoothAdapter, BluetoothDevice, BluetoothDiscoverySession, BluetoothEvent, BluetoothSession,
 };
@@ -7,13 +6,16 @@ use mijia::{
     connect_sensors, decode_value, find_sensors, hashmap_from_file, print_sensors,
     start_notify_sensors, SERVICE_CHARACTERISTIC_PATH,
 };
-use rumqttc::{self, EventLoop, LastWill, MqttOptions, Publish, QoS, Request};
+use rumqttc::{self, MqttOptions};
 use rustls::ClientConfig;
 use std::error::Error;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::task::JoinHandle;
 use tokio::{task, time, try_join};
+
+mod homie;
+
+use homie::{HomieDevice, Sensor};
 
 const DEFAULT_MQTT_PREFIX: &str = "homie";
 const DEFAULT_DEVICE_ID: &str = "mijia-bridge";
@@ -50,6 +52,8 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     color_backtrace::install();
 
     let device_id = std::env::var("DEVICE_ID").unwrap_or_else(|_| DEFAULT_DEVICE_ID.to_string());
+    let device_name =
+        std::env::var("DEVICE_NAME").unwrap_or_else(|_| DEFAULT_DEVICE_NAME.to_string());
     let client_name = std::env::var("CLIENT_NAME").unwrap_or_else(|_| device_id.clone());
 
     let host = std::env::var("HOST").unwrap_or_else(|_| DEFAULT_HOST.to_string());
@@ -80,29 +84,13 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     let mqtt_prefix =
         std::env::var("MQTT_PREFIX").unwrap_or_else(|_| DEFAULT_MQTT_PREFIX.to_string());
     let device_base = format!("{}/{}", mqtt_prefix, device_id);
-
-    mqttoptions.set_last_will(LastWill {
-        topic: format!("{}/$state", device_base),
-        message: "lost".to_string(),
-        qos: QoS::AtLeastOnce,
-        retain: true,
-    });
+    let (homie, mqtt_handle) = HomieDevice::new(&device_base, &device_name, mqttoptions).await;
 
     let local = task::LocalSet::new();
 
-    let mut eventloop = EventLoop::new(mqttoptions, 10).await;
-    let requests_tx = eventloop.handle();
     let bluetooth_handle = local.spawn_local(async move {
-        requests(requests_tx, &device_base).await.unwrap();
+        requests(homie).await.unwrap();
     });
-
-    let mqtt_handle: JoinHandle<Result<(), Box<dyn Error + Send + Sync>>> =
-        task::spawn(async move {
-            loop {
-                let (incoming, outgoing) = eventloop.poll().await?;
-                log::trace!("Incoming = {:?}, Outgoing = {:?}", incoming, outgoing);
-            }
-        });
 
     // Poll everything to completion, until the first one bombs out.
     let res: Result<_, Box<dyn Error + Send + Sync>> = try_join! {
@@ -118,25 +106,10 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     Ok(())
 }
 
-async fn publish_retained(
-    requests_tx: &Sender<Request>,
-    name: String,
-    value: &str,
-) -> Result<(), SendError<Request>> {
-    let mut publish = Publish::new(name, QoS::AtLeastOnce, value);
-    publish.set_retain(true);
-    requests_tx.send(publish.into()).await
-}
-
-async fn requests(requests_tx: Sender<Request>, device_base: &str) -> Result<(), Box<dyn Error>> {
-    let device_name =
-        std::env::var("DEVICE_NAME").unwrap_or_else(|_| DEFAULT_DEVICE_NAME.to_string());
+async fn requests(mut homie: HomieDevice) -> Result<(), Box<dyn Error>> {
     let sensor_names = hashmap_from_file(SENSOR_NAMES_FILENAME)?;
 
-    publish_retained(&requests_tx, format!("{}/$homie", device_base), "4.0").await?;
-    publish_retained(&requests_tx, format!("{}/$extensions", device_base), "").await?;
-    publish_retained(&requests_tx, format!("{}/$name", device_base), &device_name).await?;
-    publish_retained(&requests_tx, format!("{}/$state", device_base), "init").await?;
+    homie.start().await?;
 
     let bt_session = &BluetoothSession::create_session(None)?;
     let device_list = scan(&bt_session).await?;
@@ -150,73 +123,13 @@ async fn requests(requests_tx: Sender<Request>, device_base: &str) -> Result<(),
     println!("Connecting to unnamed sensors");
     connected_sensors.extend(connect_sensors(&unnamed_sensors));
 
-    let mut nodes = vec![];
     for sensor in &connected_sensors {
         let mac_address = sensor.get_address()?;
         let node_id = mac_address.replace(":", "");
-        let node_base = format!("{}/{}", device_base, node_id);
         let node_name = sensor_names.get(&mac_address).unwrap_or(&mac_address);
-        nodes.push(node_id);
-        publish_retained(&requests_tx, format!("{}/$name", node_base), node_name).await?;
-        publish_retained(&requests_tx, format!("{}/$type", node_base), "Mijia sensor").await?;
-        publish_retained(
-            &requests_tx,
-            format!("{}/$properties", node_base),
-            "temperature,humidity,battery",
-        )
-        .await?;
-        publish_retained(
-            &requests_tx,
-            format!("{}/temperature/$name", node_base),
-            "Temperature",
-        )
-        .await?;
-        publish_retained(
-            &requests_tx,
-            format!("{}/temperature/$datatype", node_base),
-            "float",
-        )
-        .await?;
-        publish_retained(
-            &requests_tx,
-            format!("{}/temperature/$unit", node_base),
-            "ºC",
-        )
-        .await?;
-        publish_retained(
-            &requests_tx,
-            format!("{}/humidity/$name", node_base),
-            "Humidity",
-        )
-        .await?;
-        publish_retained(
-            &requests_tx,
-            format!("{}/humidity/$datatype", node_base),
-            "integer",
-        )
-        .await?;
-        publish_retained(&requests_tx, format!("{}/humidity/$unit", node_base), "%").await?;
-        publish_retained(
-            &requests_tx,
-            format!("{}/battery/$name", node_base),
-            "Battery level",
-        )
-        .await?;
-        publish_retained(
-            &requests_tx,
-            format!("{}/battery/$datatype", node_base),
-            "integer",
-        )
-        .await?;
-        publish_retained(&requests_tx, format!("{}/battery/$unit", node_base), "%").await?;
+        homie.add_node(Sensor::new(node_id, node_name.clone()));
     }
-    publish_retained(
-        &requests_tx,
-        format!("{}/$nodes", device_base),
-        &nodes.join(","),
-    )
-    .await?;
-    publish_retained(&requests_tx, format!("{}/$state", device_base), "ready").await?;
+    homie.publish_nodes().await?;
 
     start_notify_sensors(bt_session, &connected_sensors);
 
@@ -257,25 +170,9 @@ async fn requests(requests_tx: Sender<Request>, device_base: &str) -> Result<(),
                 );
 
                 let node_id = mac_address.replace(":", "");
-                let node_base = format!("{}/{}", device_base, node_id);
-                publish_retained(
-                    &requests_tx,
-                    format!("{}/temperature", node_base),
-                    &format!("{:.2}", temperature),
-                )
-                .await?;
-                publish_retained(
-                    &requests_tx,
-                    format!("{}/humidity", node_base),
-                    &humidity.to_string(),
-                )
-                .await?;
-                publish_retained(
-                    &requests_tx,
-                    format!("{}/battery", node_base),
-                    &battery_percent.to_string(),
-                )
-                .await?;
+                homie
+                    .publish_values(&node_id, temperature, humidity, battery_percent)
+                    .await?;
             } else {
                 println!("Invalid value from {}", device.get_id());
             }
