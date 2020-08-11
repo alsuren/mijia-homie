@@ -5,14 +5,41 @@ use tokio::task::{self, JoinHandle};
 
 const HOMIE_VERSION: &str = "4.0";
 
-pub struct Sensor {
+#[derive(Clone, Debug)]
+pub struct Property {
     id: String,
     name: String,
+    datatype: String,
+    unit: String,
 }
 
-impl Sensor {
-    pub fn new(id: String, name: String) -> Sensor {
-        Sensor { id, name }
+impl Property {
+    pub fn new(id: &str, name: &str, datatype: &str, unit: &str) -> Property {
+        Property {
+            id: id.to_string(),
+            name: name.to_string(),
+            datatype: datatype.to_string(),
+            unit: unit.to_string(),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Node {
+    id: String,
+    name: String,
+    node_type: String,
+    properties: Vec<Property>,
+}
+
+impl Node {
+    pub fn new(id: String, name: String, node_type: String, properties: Vec<Property>) -> Node {
+        Node {
+            id,
+            name,
+            node_type,
+            properties,
+        }
     }
 }
 
@@ -20,7 +47,7 @@ pub(crate) struct HomieDevice {
     requests_tx: Sender<Request>,
     device_base: String,
     device_name: String,
-    sensors: Vec<Sensor>,
+    nodes: Vec<Node>,
 }
 
 impl HomieDevice {
@@ -44,7 +71,7 @@ impl HomieDevice {
             requests_tx: event_loop.handle(),
             device_base: device_base.to_string(),
             device_name: device_name.to_string(),
-            sensors: vec![],
+            nodes: vec![],
         };
 
         let join_handle: JoinHandle<Result<(), Box<dyn Error + Send + Sync>>> =
@@ -86,92 +113,60 @@ impl HomieDevice {
         Ok(())
     }
 
-    pub fn add_node(&mut self, sensor: Sensor) {
-        self.sensors.push(sensor);
+    pub fn add_node(&mut self, node: Node) {
+        self.nodes.push(node);
     }
 
     pub async fn publish_nodes(&self) -> Result<(), SendError<Request>> {
-        let mut nodes: Vec<&str> = vec![];
-        for sensor in &self.sensors {
-            let node_base = format!("{}/{}", self.device_base, sensor.id);
-            nodes.push(&sensor.id);
+        let mut node_ids: Vec<&str> = vec![];
+        for node in &self.nodes {
+            let node_base = format!("{}/{}", self.device_base, node.id);
+            node_ids.push(&node.id);
             publish_retained(
                 &self.requests_tx,
                 format!("{}/$name", node_base),
-                &sensor.name,
+                &node.name,
             )
             .await?;
             publish_retained(
                 &self.requests_tx,
                 format!("{}/$type", node_base),
-                "Mijia sensor",
+                &node.node_type,
             )
             .await?;
+            let mut property_ids: Vec<&str> = vec![];
+            for property in &node.properties {
+                property_ids.push(&property.id);
+                publish_retained(
+                    &self.requests_tx,
+                    format!("{}/{}/$name", node_base, property.id),
+                    &property.name,
+                )
+                .await?;
+                publish_retained(
+                    &self.requests_tx,
+                    format!("{}/{}/$datatype", node_base, property.id),
+                    &property.datatype,
+                )
+                .await?;
+                publish_retained(
+                    &self.requests_tx,
+                    format!("{}/{}/$unit", node_base, property.id),
+                    &property.unit,
+                )
+                .await?;
+            }
             publish_retained(
                 &self.requests_tx,
                 format!("{}/$properties", node_base),
-                "temperature,humidity,battery",
-            )
-            .await?;
-            publish_retained(
-                &self.requests_tx,
-                format!("{}/temperature/$name", node_base),
-                "Temperature",
-            )
-            .await?;
-            publish_retained(
-                &self.requests_tx,
-                format!("{}/temperature/$datatype", node_base),
-                "float",
-            )
-            .await?;
-            publish_retained(
-                &self.requests_tx,
-                format!("{}/temperature/$unit", node_base),
-                "ºC",
-            )
-            .await?;
-            publish_retained(
-                &self.requests_tx,
-                format!("{}/humidity/$name", node_base),
-                "Humidity",
-            )
-            .await?;
-            publish_retained(
-                &self.requests_tx,
-                format!("{}/humidity/$datatype", node_base),
-                "integer",
-            )
-            .await?;
-            publish_retained(
-                &self.requests_tx,
-                format!("{}/humidity/$unit", node_base),
-                "%",
-            )
-            .await?;
-            publish_retained(
-                &self.requests_tx,
-                format!("{}/battery/$name", node_base),
-                "Battery level",
-            )
-            .await?;
-            publish_retained(
-                &self.requests_tx,
-                format!("{}/battery/$datatype", node_base),
-                "integer",
-            )
-            .await?;
-            publish_retained(
-                &self.requests_tx,
-                format!("{}/battery/$unit", node_base),
-                "%",
+                &property_ids.join(","),
             )
             .await?;
         }
         publish_retained(
             &self.requests_tx,
             format!("{}/$nodes", self.device_base),
-            &nodes.join(","),
+            &node_ids.join(","),
         )
         .await?;
         publish_retained(
@@ -183,33 +178,18 @@ impl HomieDevice {
         Ok(())
     }
 
-    pub async fn publish_values(
+    pub async fn publish_value(
         &self,
         node_id: &str,
-        temperature: f32,
-        humidity: u8,
-        battery_percent: u16,
+        property_id: &str,
+        value: &str,
     ) -> Result<(), SendError<Request>> {
-        let node_base = format!("{}/{}", self.device_base, node_id);
         publish_retained(
             &self.requests_tx,
-            format!("{}/temperature", node_base),
-            &format!("{:.2}", temperature),
+            format!("{}/{}/{}", self.device_base, node_id, property_id),
+            value,
         )
-        .await?;
-        publish_retained(
-            &self.requests_tx,
-            format!("{}/humidity", node_base),
-            &humidity.to_string(),
-        )
-        .await?;
-        publish_retained(
-            &self.requests_tx,
-            format!("{}/battery", node_base),
-            &battery_percent.to_string(),
-        )
-        .await?;
-        Ok(())
+        .await
     }
 }
 

@@ -15,7 +15,7 @@ use tokio::{task, time, try_join};
 
 mod homie;
 
-use homie::{HomieDevice, Sensor};
+use homie::{HomieDevice, Node, Property};
 
 const DEFAULT_MQTT_PREFIX: &str = "homie";
 const DEFAULT_DEVICE_ID: &str = "mijia-bridge";
@@ -123,11 +123,21 @@ async fn requests(mut homie: HomieDevice) -> Result<(), Box<dyn Error>> {
     println!("Connecting to unnamed sensors");
     connected_sensors.extend(connect_sensors(&unnamed_sensors));
 
+    let properties = vec![
+        Property::new("temperature", "Temperature", "float", "ºC"),
+        Property::new("humidity", "Humidity", "integer", "%"),
+        Property::new("battery", "Battery level", "integer", "%"),
+    ];
     for sensor in &connected_sensors {
         let mac_address = sensor.get_address()?;
         let node_id = mac_address.replace(":", "");
         let node_name = sensor_names.get(&mac_address).unwrap_or(&mac_address);
-        homie.add_node(Sensor::new(node_id, node_name.clone()));
+        homie.add_node(Node::new(
+            node_id,
+            node_name.clone(),
+            "Mijia sensor".to_string(),
+            properties.clone(),
+        ));
     }
     homie.publish_nodes().await?;
 
@@ -171,7 +181,13 @@ async fn requests(mut homie: HomieDevice) -> Result<(), Box<dyn Error>> {
 
                 let node_id = mac_address.replace(":", "");
                 homie
-                    .publish_values(&node_id, temperature, humidity, battery_percent)
+                    .publish_value(&node_id, "temperature", &format!("{:.2}", temperature))
+                    .await?;
+                homie
+                    .publish_value(&node_id, "humidity", &humidity.to_string())
+                    .await?;
+                homie
+                    .publish_value(&node_id, "battery", &battery_percent.to_string())
                     .await?;
             } else {
                 println!("Invalid value from {}", device.get_id());
