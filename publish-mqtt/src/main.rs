@@ -142,7 +142,13 @@ async fn requests(requests_tx: Sender<Request>, device_base: &str) -> Result<(),
     let device_list = scan(&bt_session).await?;
     let sensors = find_sensors(&bt_session, &device_list);
     print_sensors(&sensors, &sensor_names);
-    let connected_sensors = connect_sensors(&sensors);
+    let (named_sensors, unnamed_sensors): (Vec<_>, Vec<_>) = sensors
+        .into_iter()
+        .partition(|sensor| sensor_names.contains_key(&sensor.get_address().unwrap()));
+    println!("Connecting to named sensors first");
+    let mut connected_sensors = connect_sensors(&named_sensors);
+    println!("Connecting to unnamed sensors");
+    connected_sensors.extend(connect_sensors(&unnamed_sensors));
 
     let mut nodes = vec![];
     for sensor in &connected_sensors {
