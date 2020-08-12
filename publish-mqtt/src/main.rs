@@ -170,13 +170,13 @@ async fn requests(mut homie: HomieDevice) -> Result<(), Box<dyn Error>> {
                 let mac_address = device.get_address()?;
                 let name = sensor_names.get(&mac_address).unwrap_or(&mac_address);
                 println!(
-                    "{} ({}) Temperature: {:.2}ºC Humidity: {:?}% Battery {} mV ({} %)",
+                    "{} Temperature: {:.2}ºC Humidity: {:?}% Battery {} mV ({} %) ({})",
                     device.get_id(),
-                    name,
                     temperature,
                     humidity,
                     battery_voltage,
-                    battery_percent
+                    battery_percent,
+                    name
                 );
 
                 let node_id = mac_address.replace(":", "");
