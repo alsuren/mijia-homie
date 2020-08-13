@@ -128,12 +128,11 @@ impl HomieDevice {
         });
         let mut event_loop = EventLoop::new(mqtt_options, 10).await;
 
-        let homie = HomieDevice {
-            requests_tx: event_loop.handle(),
-            device_base: device_base.to_string(),
-            device_name: device_name.to_string(),
-            nodes: vec![],
-        };
+        let homie = HomieDevice::new(
+            event_loop.handle(),
+            device_base.to_string(),
+            device_name.to_string(),
+        );
 
         let join_handle = task::spawn(async move {
             loop {
@@ -143,6 +142,15 @@ impl HomieDevice {
         });
 
         (homie, join_handle)
+    }
+
+    fn new(requests_tx: Sender<Request>, device_base: String, device_name: String) -> HomieDevice {
+        HomieDevice {
+            requests_tx,
+            device_base,
+            device_name,
+            nodes: vec![],
+        }
     }
 
     pub async fn start(&self) -> Result<(), SendError<Request>> {
@@ -174,6 +182,10 @@ impl HomieDevice {
     }
 
     pub fn add_node(&mut self, node: Node) {
+        // First check that there isn't already a node with the same ID.
+        if self.nodes.iter().any(|n| n.id == node.id) {
+            panic!("Tried to add node with duplicate ID: {:?}", node);
+        }
         self.nodes.push(node);
     }
 
@@ -263,4 +275,33 @@ async fn publish_retained(
     let mut publish = Publish::new(name, QoS::AtLeastOnce, value);
     publish.set_retain(true);
     requests_tx.send(publish.into()).await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[should_panic]
+    fn test_duplicate_node() {
+        let (tx, _) = async_channel::unbounded();
+        let mut device = HomieDevice::new(
+            tx,
+            "homie/test-device".to_string(),
+            "Test device".to_string(),
+        );
+
+        device.add_node(Node::new(
+            "id".to_string(),
+            "Name".to_string(),
+            "type".to_string(),
+            vec![],
+        ));
+        device.add_node(Node::new(
+            "id".to_string(),
+            "Name 2".to_string(),
+            "type2".to_string(),
+            vec![],
+        ));
+    }
 }
