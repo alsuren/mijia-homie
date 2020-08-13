@@ -124,9 +124,9 @@ async fn requests(mut homie: HomieDevice) -> Result<(), Box<dyn Error>> {
     connected_sensors.extend(connect_sensors(&unnamed_sensors));
 
     let properties = vec![
-        Property::new("temperature", "Temperature", Datatype::Float, "ºC"),
-        Property::new("humidity", "Humidity", Datatype::Integer, "%"),
-        Property::new("battery", "Battery level", Datatype::Integer, "%"),
+        Property::new("temperature", "Temperature", Datatype::Float, Some("ºC")),
+        Property::new("humidity", "Humidity", Datatype::Integer, Some("%")),
+        Property::new("battery", "Battery level", Datatype::Integer, Some("%")),
     ];
     for sensor in &connected_sensors {
         let mac_address = sensor.get_address()?;

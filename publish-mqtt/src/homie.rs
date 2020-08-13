@@ -33,16 +33,16 @@ pub struct Property {
     id: String,
     name: String,
     datatype: Datatype,
-    unit: String,
+    unit: Option<String>,
 }
 
 impl Property {
-    pub fn new(id: &str, name: &str, datatype: Datatype, unit: &str) -> Property {
+    pub fn new(id: &str, name: &str, datatype: Datatype, unit: Option<&str>) -> Property {
         Property {
             id: id.to_string(),
             name: name.to_string(),
             datatype: datatype,
-            unit: unit.to_string(),
+            unit: unit.map(|s| s.to_string()),
         }
     }
 }
@@ -172,12 +172,14 @@ impl HomieDevice {
                     property.datatype.as_str(),
                 )
                 .await?;
-                publish_retained(
-                    &self.requests_tx,
-                    format!("{}/{}/$unit", node_base, property.id),
-                    &property.unit,
-                )
-                .await?;
+                if let Some(unit) = &property.unit {
+                    publish_retained(
+                        &self.requests_tx,
+                        format!("{}/{}/$unit", node_base, property.id),
+                        &unit,
+                    )
+                    .await?;
+                }
             }
             publish_retained(
                 &self.requests_tx,
