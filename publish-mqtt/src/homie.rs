@@ -16,8 +16,8 @@ pub enum Datatype {
     Color,
 }
 
-impl Datatype {
-    fn as_str(&self) -> &'static str {
+impl Into<Vec<u8>> for Datatype {
+    fn into(self) -> Vec<u8> {
         match self {
             Self::Integer => "integer",
             Self::Float => "float",
@@ -26,6 +26,7 @@ impl Datatype {
             Self::Enum => "enum",
             Self::Color => "color",
         }
+        .into()
     }
 }
 
@@ -169,7 +170,7 @@ impl HomieDevice {
         publish_retained(
             &self.requests_tx,
             format!("{}/$name", self.device_base),
-            &self.device_name,
+            self.device_name.as_str(),
         )
         .await?;
         publish_retained(
@@ -197,13 +198,13 @@ impl HomieDevice {
             publish_retained(
                 &self.requests_tx,
                 format!("{}/$name", node_base),
-                &node.name,
+                node.name.as_str(),
             )
             .await?;
             publish_retained(
                 &self.requests_tx,
                 format!("{}/$type", node_base),
-                &node.node_type,
+                node.node_type.as_str(),
             )
             .await?;
             let mut property_ids: Vec<&str> = vec![];
@@ -212,20 +213,20 @@ impl HomieDevice {
                 publish_retained(
                     &self.requests_tx,
                     format!("{}/{}/$name", node_base, property.id),
-                    &property.name,
+                    property.name.as_str(),
                 )
                 .await?;
                 publish_retained(
                     &self.requests_tx,
                     format!("{}/{}/$datatype", node_base, property.id),
-                    property.datatype.as_str(),
+                    property.datatype,
                 )
                 .await?;
                 if let Some(unit) = &property.unit {
                     publish_retained(
                         &self.requests_tx,
                         format!("{}/{}/$unit", node_base, property.id),
-                        &unit,
+                        unit.as_str(),
                     )
                     .await?;
                 }
@@ -233,14 +234,14 @@ impl HomieDevice {
             publish_retained(
                 &self.requests_tx,
                 format!("{}/$properties", node_base),
-                &property_ids.join(","),
+                property_ids.join(","),
             )
             .await?;
         }
         publish_retained(
             &self.requests_tx,
             format!("{}/$nodes", self.device_base),
-            &node_ids.join(","),
+            node_ids.join(","),
         )
         .await?;
         publish_retained(
@@ -261,7 +262,7 @@ impl HomieDevice {
         publish_retained(
             &self.requests_tx,
             format!("{}/{}/{}", self.device_base, node_id, property_id),
-            &value.to_string(),
+            value.to_string(),
         )
         .await
     }
@@ -270,7 +271,7 @@ impl HomieDevice {
 async fn publish_retained(
     requests_tx: &Sender<Request>,
     name: String,
-    value: &str,
+    value: impl Into<Vec<u8>>,
 ) -> Result<(), SendError<Request>> {
     let mut publish = Publish::new(name, QoS::AtLeastOnce, value);
     publish.set_retain(true);
