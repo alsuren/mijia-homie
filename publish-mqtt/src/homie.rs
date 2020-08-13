@@ -190,53 +190,58 @@ impl HomieDevice {
         self.nodes.push(node);
     }
 
+    async fn publish_node(&self, node: &Node) -> Result<(), SendError<Request>> {
+        let node_base = format!("{}/{}", self.device_base, node.id);
+        publish_retained(
+            &self.requests_tx,
+            format!("{}/$name", node_base),
+            node.name.as_str(),
+        )
+        .await?;
+        publish_retained(
+            &self.requests_tx,
+            format!("{}/$type", node_base),
+            node.node_type.as_str(),
+        )
+        .await?;
+        let mut property_ids: Vec<&str> = vec![];
+        for property in &node.properties {
+            property_ids.push(&property.id);
+            publish_retained(
+                &self.requests_tx,
+                format!("{}/{}/$name", node_base, property.id),
+                property.name.as_str(),
+            )
+            .await?;
+            publish_retained(
+                &self.requests_tx,
+                format!("{}/{}/$datatype", node_base, property.id),
+                property.datatype,
+            )
+            .await?;
+            if let Some(unit) = &property.unit {
+                publish_retained(
+                    &self.requests_tx,
+                    format!("{}/{}/$unit", node_base, property.id),
+                    unit.as_str(),
+                )
+                .await?;
+            }
+        }
+        publish_retained(
+            &self.requests_tx,
+            format!("{}/$properties", node_base),
+            property_ids.join(","),
+        )
+        .await?;
+        Ok(())
+    }
+
     pub async fn publish_nodes(&self) -> Result<(), SendError<Request>> {
         let mut node_ids: Vec<&str> = vec![];
         for node in &self.nodes {
-            let node_base = format!("{}/{}", self.device_base, node.id);
             node_ids.push(&node.id);
-            publish_retained(
-                &self.requests_tx,
-                format!("{}/$name", node_base),
-                node.name.as_str(),
-            )
-            .await?;
-            publish_retained(
-                &self.requests_tx,
-                format!("{}/$type", node_base),
-                node.node_type.as_str(),
-            )
-            .await?;
-            let mut property_ids: Vec<&str> = vec![];
-            for property in &node.properties {
-                property_ids.push(&property.id);
-                publish_retained(
-                    &self.requests_tx,
-                    format!("{}/{}/$name", node_base, property.id),
-                    property.name.as_str(),
-                )
-                .await?;
-                publish_retained(
-                    &self.requests_tx,
-                    format!("{}/{}/$datatype", node_base, property.id),
-                    property.datatype,
-                )
-                .await?;
-                if let Some(unit) = &property.unit {
-                    publish_retained(
-                        &self.requests_tx,
-                        format!("{}/{}/$unit", node_base, property.id),
-                        unit.as_str(),
-                    )
-                    .await?;
-                }
-            }
-            publish_retained(
-                &self.requests_tx,
-                format!("{}/$properties", node_base),
-                property_ids.join(","),
-            )
-            .await?;
+            self.publish_node(node).await?;
         }
         publish_retained(
             &self.requests_tx,
