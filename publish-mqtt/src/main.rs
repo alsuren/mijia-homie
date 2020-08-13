@@ -6,7 +6,7 @@ use mijia::{
     connect_sensors, decode_value, find_sensors, hashmap_from_file, print_sensors,
     start_notify_sensors, SERVICE_CHARACTERISTIC_PATH,
 };
-use rumqttc::{self, MqttOptions};
+use rumqttc::MqttOptions;
 use rustls::ClientConfig;
 use std::error::Error;
 use std::sync::Arc;
