@@ -5,20 +5,43 @@ use tokio::task::{self, JoinHandle};
 
 const HOMIE_VERSION: &str = "4.0";
 
+#[derive(Clone, Copy, Debug)]
+pub enum Datatype {
+    Integer,
+    Float,
+    Boolean,
+    String,
+    Enum,
+    Color,
+}
+
+impl Datatype {
+    fn as_str(&self) -> &'static str {
+        match self {
+            Self::Integer => "integer",
+            Self::Float => "float",
+            Self::Boolean => "boolean",
+            Self::String => "string",
+            Self::Enum => "enum",
+            Self::Color => "color",
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Property {
     id: String,
     name: String,
-    datatype: String,
+    datatype: Datatype,
     unit: String,
 }
 
 impl Property {
-    pub fn new(id: &str, name: &str, datatype: &str, unit: &str) -> Property {
+    pub fn new(id: &str, name: &str, datatype: Datatype, unit: &str) -> Property {
         Property {
             id: id.to_string(),
             name: name.to_string(),
-            datatype: datatype.to_string(),
+            datatype: datatype,
             unit: unit.to_string(),
         }
     }
@@ -146,7 +169,7 @@ impl HomieDevice {
                 publish_retained(
                     &self.requests_tx,
                     format!("{}/{}/$datatype", node_base, property.id),
-                    &property.datatype,
+                    property.datatype.as_str(),
                 )
                 .await?;
                 publish_retained(

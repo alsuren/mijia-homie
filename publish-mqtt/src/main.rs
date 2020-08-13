@@ -15,7 +15,7 @@ use tokio::{task, time, try_join};
 
 mod homie;
 
-use homie::{HomieDevice, Node, Property};
+use homie::{Datatype, HomieDevice, Node, Property};
 
 const DEFAULT_MQTT_PREFIX: &str = "homie";
 const DEFAULT_DEVICE_ID: &str = "mijia-bridge";
@@ -124,9 +124,9 @@ async fn requests(mut homie: HomieDevice) -> Result<(), Box<dyn Error>> {
     connected_sensors.extend(connect_sensors(&unnamed_sensors));
 
     let properties = vec![
-        Property::new("temperature", "Temperature", "float", "ºC"),
-        Property::new("humidity", "Humidity", "integer", "%"),
-        Property::new("battery", "Battery level", "integer", "%"),
+        Property::new("temperature", "Temperature", Datatype::Float, "ºC"),
+        Property::new("humidity", "Humidity", Datatype::Integer, "%"),
+        Property::new("battery", "Battery level", Datatype::Integer, "%"),
     ];
     for sensor in &connected_sensors {
         let mac_address = sensor.get_address()?;
