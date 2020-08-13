@@ -5,6 +5,7 @@ use tokio::task::{self, JoinHandle};
 
 const HOMIE_VERSION: &str = "4.0";
 
+/// The data type for a Homie property.
 #[derive(Clone, Copy, Debug)]
 pub enum Datatype {
     Integer,
@@ -28,6 +29,7 @@ impl Datatype {
     }
 }
 
+/// A [property](https://homieiot.github.io/specification/#properties) of a Homie node.
 #[derive(Clone, Debug)]
 pub struct Property {
     id: String,
@@ -37,6 +39,16 @@ pub struct Property {
 }
 
 impl Property {
+    /// Create a new property with the given attributes.
+    ///
+    /// # Arguments
+    /// * `id`: The topic ID for the property. This must be unique per node, and follow the Homie
+    ///   [ID format](https://homieiot.github.io/specification/#topic-ids).
+    /// * `name`: The human-readable name of the property.
+    /// * `datatype`: The data type of the property.
+    /// * `unit`: The unit for the property, if any. This may be one of the
+    ///   [recommended units](https://homieiot.github.io/specification/#property-attributes), or
+    ///   any other custom unit.
     pub fn new(id: &str, name: &str, datatype: Datatype, unit: Option<&str>) -> Property {
         Property {
             id: id.to_string(),
@@ -47,6 +59,7 @@ impl Property {
     }
 }
 
+/// A [node](https://homieiot.github.io/specification/#nodes) of a Homie device.
 #[derive(Clone, Debug)]
 pub struct Node {
     id: String,
@@ -56,6 +69,14 @@ pub struct Node {
 }
 
 impl Node {
+    /// Create a new node with the given attributes.
+    ///
+    /// # Arguments
+    /// * `id`: The topic ID for the node. This must be unique per device, and follow the Homie
+    ///   [ID format](https://homieiot.github.io/specification/#topic-ids).
+    /// * `name`: The human-readable name of the node.
+    /// * `type`: The type of the node. This is an arbitrary string.
+    /// * `property`: The properties of the node. There should be at least one.
     pub fn new(id: String, name: String, node_type: String, properties: Vec<Property>) -> Node {
         Node {
             id,
@@ -66,6 +87,8 @@ impl Node {
     }
 }
 
+/// A Homie [device](https://homieiot.github.io/specification/#devices). This corresponds to a
+/// single MQTT connection.
 pub(crate) struct HomieDevice {
     requests_tx: Sender<Request>,
     device_base: String,
@@ -74,6 +97,21 @@ pub(crate) struct HomieDevice {
 }
 
 impl HomieDevice {
+    /// Create a new Homie device, connect to the MQTT server, and start a task to handle the MQTT
+    /// connection.
+    ///
+    /// # Arguments
+    /// * `device_base`: The base topic ID for the device, including the Homie base topic. This
+    ///   might be something like "homie/my-device-id" if you are using the default Homie
+    ///   [base topic](https://homieiot.github.io/specification/#base-topic). This must be
+    ///   unique per MQTT server.
+    /// * `device_name`: The human-readable name of the device.
+    /// * `mqtt_options`: Options for the MQTT connection, including which server to connect to.
+    ///
+    /// # Return value
+    /// A pair of the `HomieDevice` itself, and a `JoinHandle` for the task which handles the MQTT
+    /// connection. You should join on this handle to allow the connection to make progress, and
+    /// handle any errors it returns.
     pub async fn new(
         device_base: &str,
         device_name: &str,
