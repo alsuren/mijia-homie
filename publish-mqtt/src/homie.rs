@@ -193,14 +193,18 @@ impl HomieDevice {
         Ok(())
     }
 
-    pub fn add_node(&mut self, node: Node) {
-        assert_ne!(self.state, State::Ready);
-
+    pub async fn add_node(&mut self, node: Node) -> Result<(), SendError<Request>> {
         // First check that there isn't already a node with the same ID.
         if self.nodes.iter().any(|n| n.id == node.id) {
             panic!("Tried to add node with duplicate ID: {:?}", node);
         }
         self.nodes.push(node);
+        // `node` was moved into the `nodes` vector, but we can safely get a reference to it because
+        // nothing else can modify `nodes` in the meantime.
+        let node = &self.nodes[self.nodes.len() - 1];
+
+        self.publish_node(&node).await?;
+        self.publish_nodes().await
     }
 
     async fn publish_node(&self, node: &Node) -> Result<(), SendError<Request>> {
@@ -250,27 +254,32 @@ impl HomieDevice {
         Ok(())
     }
 
-    pub async fn publish_nodes(&mut self) -> Result<(), SendError<Request>> {
-        assert_eq!(self.state, State::Init);
-        self.state = State::Ready;
-
-        let mut node_ids: Vec<&str> = vec![];
-        for node in &self.nodes {
-            node_ids.push(&node.id);
-            self.publish_node(node).await?;
-        }
+    async fn publish_nodes(&mut self) -> Result<(), SendError<Request>> {
+        let node_ids = self
+            .nodes
+            .iter()
+            .map(|node| node.id.as_str())
+            .collect::<Vec<&str>>()
+            .join(",");
         publish_retained(
             &self.requests_tx,
             format!("{}/$nodes", self.device_base),
-            node_ids.join(","),
+            node_ids,
         )
-        .await?;
+        .await
+    }
+
+    pub async fn ready(&mut self) -> Result<(), SendError<Request>> {
+        assert_eq!(self.state, State::Init);
+        self.state = State::Ready;
+
         publish_retained(
             &self.requests_tx,
             format!("{}/$state", self.device_base),
             "ready",
         )
         .await?;
+
         Ok(())
     }
 
@@ -303,27 +312,35 @@ async fn publish_retained(
 mod tests {
     use super::*;
 
-    #[test]
-    #[should_panic]
-    fn test_duplicate_node() {
-        let (tx, _) = async_channel::unbounded();
+    #[tokio::test]
+    #[should_panic(expected = "Tried to add node with duplicate ID")]
+    async fn test_duplicate_node() {
+        let (tx, rx) = async_channel::unbounded();
         let mut device = HomieDevice::new(
             tx,
             "homie/test-device".to_string(),
             "Test device".to_string(),
         );
 
-        device.add_node(Node::new(
-            "id".to_string(),
-            "Name".to_string(),
-            "type".to_string(),
-            vec![],
-        ));
-        device.add_node(Node::new(
-            "id".to_string(),
-            "Name 2".to_string(),
-            "type2".to_string(),
-            vec![],
-        ));
+        device
+            .add_node(Node::new(
+                "id".to_string(),
+                "Name".to_string(),
+                "type".to_string(),
+                vec![],
+            ))
+            .await
+            .unwrap();
+        device
+            .add_node(Node::new(
+                "id".to_string(),
+                "Name 2".to_string(),
+                "type2".to_string(),
+                vec![],
+            ))
+            .await
+            .unwrap();
+        // Need to keep rx alive until here so that the channel isn't closed.
+        drop(rx);
     }
 }

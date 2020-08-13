@@ -132,14 +132,16 @@ async fn requests(mut homie: HomieDevice) -> Result<(), Box<dyn Error>> {
         let mac_address = sensor.get_address()?;
         let node_id = mac_address.replace(":", "");
         let node_name = sensor_names.get(&mac_address).unwrap_or(&mac_address);
-        homie.add_node(Node::new(
-            node_id,
-            node_name.clone(),
-            "Mijia sensor".to_string(),
-            properties.clone(),
-        ));
+        homie
+            .add_node(Node::new(
+                node_id,
+                node_name.clone(),
+                "Mijia sensor".to_string(),
+                properties.clone(),
+            ))
+            .await?;
     }
-    homie.publish_nodes().await?;
+    homie.ready().await?;
 
     start_notify_sensors(bt_session, &connected_sensors);
 
