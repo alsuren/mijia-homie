@@ -256,12 +256,12 @@ impl HomieDevice {
         &self,
         node_id: &str,
         property_id: &str,
-        value: &str,
+        value: impl ToString,
     ) -> Result<(), SendError<Request>> {
         publish_retained(
             &self.requests_tx,
             format!("{}/{}/{}", self.device_base, node_id, property_id),
-            value,
+            &value.to_string(),
         )
         .await
     }

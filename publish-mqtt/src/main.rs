@@ -181,13 +181,11 @@ async fn requests(mut homie: HomieDevice) -> Result<(), Box<dyn Error>> {
 
                 let node_id = mac_address.replace(":", "");
                 homie
-                    .publish_value(&node_id, "temperature", &format!("{:.2}", temperature))
+                    .publish_value(&node_id, "temperature", format!("{:.2}", temperature))
                     .await?;
+                homie.publish_value(&node_id, "humidity", humidity).await?;
                 homie
-                    .publish_value(&node_id, "humidity", &humidity.to_string())
-                    .await?;
-                homie
-                    .publish_value(&node_id, "battery", &battery_percent.to_string())
+                    .publish_value(&node_id, "battery", battery_percent)
                     .await?;
             } else {
                 println!("Invalid value from {}", device.get_id());
