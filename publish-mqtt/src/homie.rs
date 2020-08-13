@@ -6,7 +6,7 @@ use tokio::task::{self, JoinHandle};
 const HOMIE_VERSION: &str = "4.0";
 
 /// The data type for a Homie property.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Datatype {
     Integer,
     Float,
