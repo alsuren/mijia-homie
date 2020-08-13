@@ -51,10 +51,10 @@ impl Property {
     ///   any other custom unit.
     pub fn new(id: &str, name: &str, datatype: Datatype, unit: Option<&str>) -> Property {
         Property {
-            id: id.to_string(),
-            name: name.to_string(),
+            id: id.to_owned(),
+            name: name.to_owned(),
             datatype: datatype,
-            unit: unit.map(|s| s.to_string()),
+            unit: unit.map(|s| s.to_owned()),
         }
     }
 }
@@ -89,7 +89,7 @@ impl Node {
 
 /// A Homie [device](https://homieiot.github.io/specification/#devices). This corresponds to a
 /// single MQTT connection.
-pub(crate) struct HomieDevice {
+pub struct HomieDevice {
     requests_tx: Sender<Request>,
     device_base: String,
     device_name: String,
@@ -112,7 +112,7 @@ impl HomieDevice {
     /// A pair of the `HomieDevice` itself, and a `JoinHandle` for the task which handles the MQTT
     /// connection. You should join on this handle to allow the connection to make progress, and
     /// handle any errors it returns.
-    pub async fn new(
+    pub async fn spawn(
         device_base: &str,
         device_name: &str,
         mut mqtt_options: MqttOptions,
@@ -135,13 +135,12 @@ impl HomieDevice {
             nodes: vec![],
         };
 
-        let join_handle: JoinHandle<Result<(), Box<dyn Error + Send + Sync>>> =
-            task::spawn(async move {
-                loop {
-                    let (incoming, outgoing) = event_loop.poll().await?;
-                    log::trace!("Incoming = {:?}, Outgoing = {:?}", incoming, outgoing);
-                }
-            });
+        let join_handle = task::spawn(async move {
+            loop {
+                let (incoming, outgoing) = event_loop.poll().await?;
+                log::trace!("Incoming = {:?}, Outgoing = {:?}", incoming, outgoing);
+            }
+        });
 
         (homie, join_handle)
     }
