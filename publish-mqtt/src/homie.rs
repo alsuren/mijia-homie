@@ -6,7 +6,7 @@ use tokio::task::{self, JoinHandle};
 const HOMIE_VERSION: &str = "4.0";
 
 /// The data type for a Homie property.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Datatype {
     Integer,
     Float,
@@ -88,6 +88,13 @@ impl Node {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum State {
+    NotStarted,
+    Init,
+    Ready,
+}
+
 /// A Homie [device](https://homieiot.github.io/specification/#devices). This corresponds to a
 /// single MQTT connection.
 pub struct HomieDevice {
@@ -95,6 +102,7 @@ pub struct HomieDevice {
     device_base: String,
     device_name: String,
     nodes: Vec<Node>,
+    state: State,
 }
 
 impl HomieDevice {
@@ -151,10 +159,12 @@ impl HomieDevice {
             device_base,
             device_name,
             nodes: vec![],
+            state: State::NotStarted,
         }
     }
 
-    pub async fn start(&self) -> Result<(), SendError<Request>> {
+    pub async fn start(&mut self) -> Result<(), SendError<Request>> {
+        assert_eq!(self.state, State::NotStarted);
         publish_retained(
             &self.requests_tx,
             format!("{}/$homie", self.device_base),
@@ -179,10 +189,13 @@ impl HomieDevice {
             "init",
         )
         .await?;
+        self.state = State::Init;
         Ok(())
     }
 
     pub fn add_node(&mut self, node: Node) {
+        assert_ne!(self.state, State::Ready);
+
         // First check that there isn't already a node with the same ID.
         if self.nodes.iter().any(|n| n.id == node.id) {
             panic!("Tried to add node with duplicate ID: {:?}", node);
@@ -237,7 +250,10 @@ impl HomieDevice {
         Ok(())
     }
 
-    pub async fn publish_nodes(&self) -> Result<(), SendError<Request>> {
+    pub async fn publish_nodes(&mut self) -> Result<(), SendError<Request>> {
+        assert_eq!(self.state, State::Init);
+        self.state = State::Ready;
+
         let mut node_ids: Vec<&str> = vec![];
         for node in &self.nodes {
             node_ids.push(&node.id);
