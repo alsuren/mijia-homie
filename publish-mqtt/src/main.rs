@@ -3,11 +3,12 @@ use blurz::{
 };
 use futures::FutureExt;
 use mijia::{
-    connect_sensors, decode_value, find_sensors, hashmap_from_file, print_sensors,
+    connect_sensor, decode_value, find_sensors, hashmap_from_file, print_sensors,
     start_notify_sensors, SERVICE_CHARACTERISTIC_PATH,
 };
 use rumqttc::MqttOptions;
 use rustls::ClientConfig;
+use std::collections::HashMap;
 use std::error::Error;
 use std::sync::Arc;
 use std::time::Duration;
@@ -106,6 +107,32 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     Ok(())
 }
 
+async fn connect_sensors<'a>(
+    homie: &mut HomieDevice,
+    sensor_names: &HashMap<String, String>,
+    properties: &[Property],
+    sensors: &'a [BluetoothDevice<'a>],
+) -> Result<Vec<BluetoothDevice<'a>>, Box<dyn Error>> {
+    let mut connected_sensors = vec![];
+    for sensor in sensors {
+        if connect_sensor(&sensor) {
+            connected_sensors.push(sensor.clone());
+            let mac_address = sensor.get_address()?;
+            let node_id = mac_address.replace(":", "");
+            let node_name = sensor_names.get(&mac_address).unwrap_or(&mac_address);
+            homie
+                .add_node(Node::new(
+                    node_id,
+                    node_name.clone(),
+                    "Mijia sensor".to_string(),
+                    properties.to_vec(),
+                ))
+                .await?;
+        }
+    }
+    Ok(connected_sensors)
+}
+
 async fn requests(mut homie: HomieDevice) -> Result<(), Box<dyn Error>> {
     let sensor_names = hashmap_from_file(SENSOR_NAMES_FILENAME)?;
 
@@ -118,29 +145,21 @@ async fn requests(mut homie: HomieDevice) -> Result<(), Box<dyn Error>> {
     let (named_sensors, unnamed_sensors): (Vec<_>, Vec<_>) = sensors
         .into_iter()
         .partition(|sensor| sensor_names.contains_key(&sensor.get_address().unwrap()));
-    println!("Connecting to named sensors first");
-    let mut connected_sensors = connect_sensors(&named_sensors);
-    println!("Connecting to unnamed sensors");
-    connected_sensors.extend(connect_sensors(&unnamed_sensors));
 
-    let properties = vec![
+    let properties = [
         Property::new("temperature", "Temperature", Datatype::Float, Some("ºC")),
         Property::new("humidity", "Humidity", Datatype::Integer, Some("%")),
         Property::new("battery", "Battery level", Datatype::Integer, Some("%")),
     ];
-    for sensor in &connected_sensors {
-        let mac_address = sensor.get_address()?;
-        let node_id = mac_address.replace(":", "");
-        let node_name = sensor_names.get(&mac_address).unwrap_or(&mac_address);
-        homie
-            .add_node(Node::new(
-                node_id,
-                node_name.clone(),
-                "Mijia sensor".to_string(),
-                properties.clone(),
-            ))
-            .await?;
-    }
+
+    println!("Connecting to named sensors first");
+    let mut connected_sensors =
+        connect_sensors(&mut homie, &sensor_names, &properties, &named_sensors).await?;
+    println!("Connecting to unnamed sensors");
+    connected_sensors
+        .extend(connect_sensors(&mut homie, &sensor_names, &properties, &unnamed_sensors).await?);
+    println!("Connected to {} sensors.", connected_sensors.len());
+
     homie.ready().await?;
 
     start_notify_sensors(bt_session, &connected_sensors);

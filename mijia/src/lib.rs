@@ -76,13 +76,20 @@ pub fn print_sensors(sensors: &[BluetoothDevice], sensor_names: &HashMap<String,
     }
 }
 
+pub fn connect_sensor<'a>(sensor: &BluetoothDevice<'a>) -> bool {
+    if let Err(e) = sensor.connect(10000) {
+        println!("Failed to connect {:?}: {:?}", sensor.get_id(), e);
+        false
+    } else {
+        println!("Connected to {:?}", sensor.get_id());
+        true
+    }
+}
+
 pub fn connect_sensors<'a>(sensors: &'a [BluetoothDevice<'a>]) -> Vec<BluetoothDevice<'a>> {
     let mut connected_sensors = vec![];
     for device in sensors {
-        if let Err(e) = device.connect(10000) {
-            println!("Failed to connect {:?}: {:?}", device.get_id(), e);
-        } else {
-            println!("Connected to {:?}", device.get_id());
+        if connect_sensor(device) {
             connected_sensors.push(device.clone());
         }
     }
