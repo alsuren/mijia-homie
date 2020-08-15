@@ -210,7 +210,10 @@ async fn requests(mut homie: HomieDevice) -> Result<(), Box<dyn Error>> {
         {
             let (object_path, value) = match event {
                 Some(BluetoothEvent::Value { object_path, value }) => (object_path, value),
-                _ => continue,
+                _ => {
+                    log::trace!("{:?}", event);
+                    continue;
+                }
             };
 
             // TODO: Make this less hacky.
