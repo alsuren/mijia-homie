@@ -8,6 +8,7 @@ use mijia::{
 };
 use rumqttc::MqttOptions;
 use rustls::ClientConfig;
+use std::cmp::min;
 use std::collections::{HashMap, VecDeque};
 use std::error::Error;
 use std::sync::Arc;
@@ -23,6 +24,7 @@ const DEFAULT_DEVICE_ID: &str = "mijia-bridge";
 const DEFAULT_DEVICE_NAME: &str = "Mijia bridge";
 const DEFAULT_HOST: &str = "test.mosquitto.org";
 const DEFAULT_PORT: u16 = 1883;
+const DEFAULT_MAX_CONNECTED_SENSORS: usize = 20;
 const SCAN_DURATION: Duration = Duration::from_secs(15);
 const CONNECT_TIMEOUT_MS: i32 = 4_000;
 const INCOMING_TIMEOUT_MS: u32 = 1_000;
@@ -133,6 +135,10 @@ async fn connect_start_sensor<'a>(
 
 async fn requests(mut homie: HomieDevice) -> Result<(), Box<dyn Error>> {
     let sensor_names = hashmap_from_file(SENSOR_NAMES_FILENAME)?;
+    let max_connected_sensors = std::env::var("MAX_CONNECTED_SENSORS")
+        .ok()
+        .and_then(|val| val.parse::<usize>().ok())
+        .unwrap_or(DEFAULT_MAX_CONNECTED_SENSORS);
 
     homie.start().await?;
 
@@ -140,9 +146,14 @@ async fn requests(mut homie: HomieDevice) -> Result<(), Box<dyn Error>> {
     let device_list = scan(&bt_session).await?;
     let sensors = find_sensors(&bt_session, &device_list);
     print_sensors(&sensors, &sensor_names);
-    let (named_sensors, unnamed_sensors): (Vec<_>, Vec<_>) = sensors
+    let (named_sensors, mut unnamed_sensors): (Vec<_>, Vec<_>) = sensors
         .into_iter()
         .partition(|sensor| sensor_names.contains_key(&sensor.get_address().unwrap()));
+    println!(
+        "{} named sensors, {} unnamed sensors",
+        named_sensors.len(),
+        unnamed_sensors.len()
+    );
 
     let properties = [
         Property::new("temperature", "Temperature", Datatype::Float, Some("ºC")),
@@ -151,7 +162,17 @@ async fn requests(mut homie: HomieDevice) -> Result<(), Box<dyn Error>> {
     ];
 
     let mut sensors_to_connect: VecDeque<_> = named_sensors.into();
-    sensors_to_connect.extend(unnamed_sensors);
+    if sensors_to_connect.len() < max_connected_sensors {
+        let extra_sensor_count = min(
+            max_connected_sensors - sensors_to_connect.len(),
+            unnamed_sensors.len(),
+        );
+        println!(
+            "Adding {} unnamed sensors as max connected is {}",
+            extra_sensor_count, max_connected_sensors
+        );
+        sensors_to_connect.extend(unnamed_sensors.drain(0..extra_sensor_count));
+    }
 
     homie.ready().await?;
 
