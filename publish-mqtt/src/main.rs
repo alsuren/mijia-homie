@@ -3,12 +3,12 @@ use blurz::{
 };
 use futures::FutureExt;
 use mijia::{
-    connect_sensor, decode_value, find_sensors, hashmap_from_file, print_sensors,
-    start_notify_sensors, SERVICE_CHARACTERISTIC_PATH,
+    decode_value, find_sensors, hashmap_from_file, print_sensors, start_notify_sensor,
+    SERVICE_CHARACTERISTIC_PATH,
 };
 use rumqttc::MqttOptions;
 use rustls::ClientConfig;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::error::Error;
 use std::sync::Arc;
 use std::time::Duration;
@@ -24,7 +24,8 @@ const DEFAULT_DEVICE_NAME: &str = "Mijia bridge";
 const DEFAULT_HOST: &str = "test.mosquitto.org";
 const DEFAULT_PORT: u16 = 1883;
 const SCAN_DURATION: Duration = Duration::from_secs(15);
-const INCOMING_TIMEOUT_MS: u32 = 10_000;
+const CONNECT_TIMEOUT_MS: i32 = 4_000;
+const INCOMING_TIMEOUT_MS: u32 = 1_000;
 const SENSOR_NAMES_FILENAME: &str = "sensor_names.conf";
 
 async fn scan(bt_session: &BluetoothSession) -> Result<Vec<String>, Box<dyn Error>> {
@@ -107,30 +108,27 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     Ok(())
 }
 
-async fn connect_sensors<'a>(
+async fn connect_start_sensor<'a>(
+    bt_session: &'a BluetoothSession,
     homie: &mut HomieDevice,
     sensor_names: &HashMap<String, String>,
-    properties: &[Property],
-    sensors: &'a [BluetoothDevice<'a>],
-) -> Result<Vec<BluetoothDevice<'a>>, Box<dyn Error>> {
-    let mut connected_sensors = vec![];
-    for sensor in sensors {
-        if connect_sensor(&sensor) {
-            connected_sensors.push(sensor.clone());
-            let mac_address = sensor.get_address()?;
-            let node_id = mac_address.replace(":", "");
-            let node_name = sensor_names.get(&mac_address).unwrap_or(&mac_address);
-            homie
-                .add_node(Node::new(
-                    node_id,
-                    node_name.clone(),
-                    "Mijia sensor".to_string(),
-                    properties.to_vec(),
-                ))
-                .await?;
-        }
-    }
-    Ok(connected_sensors)
+    properties: Vec<Property>,
+    sensor: &BluetoothDevice<'a>,
+) -> Result<(), Box<dyn Error>> {
+    sensor.connect(CONNECT_TIMEOUT_MS)?;
+    start_notify_sensor(bt_session, &sensor)?;
+    let mac_address = sensor.get_address()?;
+    let node_id = mac_address.replace(":", "");
+    let node_name = sensor_names.get(&mac_address).unwrap_or(&mac_address);
+    homie
+        .add_node(Node::new(
+            node_id,
+            node_name.clone(),
+            "Mijia sensor".to_string(),
+            properties.to_vec(),
+        ))
+        .await?;
+    Ok(())
 }
 
 async fn requests(mut homie: HomieDevice) -> Result<(), Box<dyn Error>> {
@@ -152,23 +150,39 @@ async fn requests(mut homie: HomieDevice) -> Result<(), Box<dyn Error>> {
         Property::new("battery", "Battery level", Datatype::Integer, Some("%")),
     ];
 
-    println!("Connecting to named sensors first");
-    let mut connected_sensors =
-        connect_sensors(&mut homie, &sensor_names, &properties, &named_sensors).await?;
-    println!("Connecting to unnamed sensors");
-    connected_sensors
-        .extend(connect_sensors(&mut homie, &sensor_names, &properties, &unnamed_sensors).await?);
-    println!("Connected to {} sensors.", connected_sensors.len());
+    let mut sensors_to_connect: VecDeque<_> = named_sensors.into();
+    sensors_to_connect.extend(unnamed_sensors);
 
     homie.ready().await?;
-
-    start_notify_sensors(bt_session, &connected_sensors);
 
     // currently there is no way to set INCOMING_TIMEOUT_MS to -1 (which is how
     // you specify "infinite" according to
     // https://dbus.freedesktop.org/doc/api/html/group__DBusConnection.html#ga580d8766c23fe5f49418bc7d87b67dc6)
     // so we wrap the event loop in an infinite loop.
     loop {
+        println!("{} sensors in queue to connect.", sensors_to_connect.len());
+        // Try to connect to a sensor.
+        if let Some(sensor) = sensors_to_connect.pop_front() {
+            let mac_address = sensor.get_address()?;
+            let name = sensor_names.get(&mac_address).unwrap_or(&mac_address);
+            println!("Trying to connect to {}", name);
+            if let Err(e) = connect_start_sensor(
+                bt_session,
+                &mut homie,
+                &sensor_names,
+                properties.to_vec(),
+                &sensor,
+            )
+            .await
+            {
+                println!("Failed to connect to {}: {:?}", name, e);
+                sensors_to_connect.push_back(sensor);
+            } else {
+                println!("Connected to {} and started notifications", name);
+            }
+        }
+
+        // Process events until there are none available for the timeout.
         for event in bt_session
             .incoming(INCOMING_TIMEOUT_MS)
             .map(BluetoothEvent::from)

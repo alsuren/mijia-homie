@@ -99,16 +99,23 @@ pub fn connect_sensors<'a>(sensors: &'a [BluetoothDevice<'a>]) -> Vec<BluetoothD
     connected_sensors
 }
 
+pub fn start_notify_sensor<'a>(
+    bt_session: &'a BluetoothSession,
+    connected_sensor: &BluetoothDevice<'a>,
+) -> Result<(), Box<dyn Error>> {
+    let temp_humidity = BluetoothGATTCharacteristic::new(
+        bt_session,
+        connected_sensor.get_id() + SERVICE_CHARACTERISTIC_PATH,
+    );
+    temp_humidity.start_notify()
+}
+
 pub fn start_notify_sensors<'a>(
     bt_session: &'a BluetoothSession,
     connected_sensors: &'a [BluetoothDevice<'a>],
 ) {
     for device in connected_sensors {
-        let temp_humidity = BluetoothGATTCharacteristic::new(
-            bt_session,
-            device.get_id() + SERVICE_CHARACTERISTIC_PATH,
-        );
-        if let Err(e) = temp_humidity.start_notify() {
+        if let Err(e) = start_notify_sensor(bt_session, device) {
             println!("Failed to start notify on {}: {:?}", device.get_id(), e);
         }
     }
