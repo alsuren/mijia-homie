@@ -16,6 +16,9 @@ const CONNECT_TIMEOUT_MS: i32 = 10_000;
 
 const MIJIA_SERVICE_DATA_UUID: &str = "0000fe95-0000-1000-8000-00805f9b34fb";
 pub const SERVICE_CHARACTERISTIC_PATH: &str = "/service0021/char0035";
+const CONNECTION_INTERVAL_CHARACTERISTIC_PATH: &str = "/service0021/char0045";
+/// 500 in little-endian
+const CONNECTION_INTERVAL_500_MS: [u8; 3] = [0xF4, 0x01, 0x00];
 
 pub fn scan(bt_session: &BluetoothSession) -> Result<Vec<String>, Box<dyn Error>> {
     let adapter: BluetoothAdapter = BluetoothAdapter::init(bt_session)?;
@@ -108,7 +111,13 @@ pub fn start_notify_sensor<'a>(
         bt_session,
         connected_sensor.get_id() + SERVICE_CHARACTERISTIC_PATH,
     );
-    temp_humidity.start_notify()
+    temp_humidity.start_notify()?;
+    let connection_interval = BluetoothGATTCharacteristic::new(
+        bt_session,
+        connected_sensor.get_id() + CONNECTION_INTERVAL_CHARACTERISTIC_PATH,
+    );
+    connection_interval.write_value(CONNECTION_INTERVAL_500_MS.to_vec(), None)?;
+    Ok(())
 }
 
 pub fn start_notify_sensors<'a>(
