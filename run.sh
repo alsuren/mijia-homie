@@ -5,8 +5,21 @@ set -euxo pipefail
 #
 #     cargo install --git=https://github.com/alsuren/cross --branch=docker-build-context
 #
-time cross build --target armv7-unknown-linux-gnueabihf --release
-time rsync target/armv7-unknown-linux-gnueabihf/release/read-all-devices pi@raspberrypi.local:read-all-devices
-time rsync target/armv7-unknown-linux-gnueabihf/release/publish-mqtt pi@raspberrypi.local:publish-mqtt
+TARGET_SSH=${TARGET_SSH:-pi@raspberrypi.local}
+PROFILE=${PROFILE:-debug}
 
-ssh pi@raspberrypi.local ./publish-mqtt
+if [ $PROFILE = release ]
+then
+    time cross build --target armv7-unknown-linux-gnueabihf --release
+elif [ $PROFILE = debug ]
+then
+    time cross build --target armv7-unknown-linux-gnueabihf
+else
+    echo "Invalid profile '$PROFILE'"
+    exit 1
+fi
+
+time rsync target/armv7-unknown-linux-gnueabihf/$PROFILE/read-all-devices $TARGET_SSH:read-all-devices
+time rsync target/armv7-unknown-linux-gnueabihf/$PROFILE/publish-mqtt $TARGET_SSH:publish-mqtt
+
+ssh $TARGET_SSH ./publish-mqtt
