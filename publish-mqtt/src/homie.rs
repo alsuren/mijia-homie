@@ -207,6 +207,11 @@ impl HomieDevice {
         self.publish_nodes().await
     }
 
+    pub async fn remove_node(&mut self, node_id: &str) -> Result<(), SendError<Request>> {
+        self.nodes.retain(|n| n.id != node_id);
+        self.publish_nodes().await
+    }
+
     async fn publish_node(&self, node: &Node) -> Result<(), SendError<Request>> {
         let node_base = format!("{}/{}", self.device_base, node.id);
         publish_retained(

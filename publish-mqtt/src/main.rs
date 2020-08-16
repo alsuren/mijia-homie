@@ -187,6 +187,8 @@ async fn requests(mut homie: HomieDevice) -> Result<(), Box<dyn Error>> {
 
     homie.ready().await?;
 
+    let mut sensors_connected: Vec<BluetoothDevice> = vec![];
+
     loop {
         println!("{} sensors in queue to connect.", sensors_to_connect.len());
         // Try to connect to a sensor.
@@ -209,6 +211,7 @@ async fn requests(mut homie: HomieDevice) -> Result<(), Box<dyn Error>> {
                 }
                 Ok(()) => {
                     println!("Connected to {} and started notifications", name);
+                    sensors_connected.push(sensor);
                 }
             }
         }
@@ -220,6 +223,27 @@ async fn requests(mut homie: HomieDevice) -> Result<(), Box<dyn Error>> {
         {
             let (object_path, value) = match event {
                 Some(BluetoothEvent::Value { object_path, value }) => (object_path, value),
+                Some(BluetoothEvent::Connected {
+                    object_path,
+                    connected: false,
+                }) => {
+                    if let Some(sensor_index) = sensors_connected
+                        .iter()
+                        .position(|s| s.get_id() == object_path)
+                    {
+                        let sensor = sensors_connected.remove(sensor_index);
+                        let (node_id, node_name) = node_id_name_for_sensor(&sensor, &sensor_names)?;
+                        println!("{} disconnected", node_name);
+                        homie.remove_node(&node_id).await?;
+                        sensors_to_connect.push_back(sensor);
+                    } else {
+                        println!(
+                            "{} disconnected but wasn't known to be connected.",
+                            object_path
+                        );
+                    }
+                    continue;
+                }
                 _ => {
                     log::trace!("{:?}", event);
                     continue;
