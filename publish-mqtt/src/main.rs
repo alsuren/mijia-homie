@@ -221,8 +221,41 @@ async fn requests(mut homie: HomieDevice) -> Result<(), Box<dyn Error>> {
             .incoming(INCOMING_TIMEOUT_MS)
             .map(BluetoothEvent::from)
         {
-            let (object_path, value) = match event {
-                Some(BluetoothEvent::Value { object_path, value }) => (object_path, value),
+            match event {
+                Some(BluetoothEvent::Value { object_path, value }) => {
+                    // TODO: Make this less hacky.
+                    if !object_path.ends_with(SERVICE_CHARACTERISTIC_PATH) {
+                        continue;
+                    }
+                    let device_path =
+                        &object_path[..object_path.len() - SERVICE_CHARACTERISTIC_PATH.len()];
+                    let device = BluetoothDevice::new(bt_session, device_path.to_string());
+
+                    if let Some((temperature, humidity, battery_voltage, battery_percent)) =
+                        decode_value(&value)
+                    {
+                        let (node_id, name) = node_id_name_for_sensor(&device, &sensor_names)?;
+                        println!(
+                            "{} Temperature: {:.2}ºC Humidity: {:?}% Battery {} mV ({} %) ({})",
+                            device.get_id(),
+                            temperature,
+                            humidity,
+                            battery_voltage,
+                            battery_percent,
+                            name
+                        );
+
+                        homie
+                            .publish_value(&node_id, "temperature", format!("{:.2}", temperature))
+                            .await?;
+                        homie.publish_value(&node_id, "humidity", humidity).await?;
+                        homie
+                            .publish_value(&node_id, "battery", battery_percent)
+                            .await?;
+                    } else {
+                        println!("Invalid value from {}", device.get_id());
+                    }
+                }
                 Some(BluetoothEvent::Connected {
                     object_path,
                     connected: false,
@@ -249,38 +282,6 @@ async fn requests(mut homie: HomieDevice) -> Result<(), Box<dyn Error>> {
                     continue;
                 }
             };
-
-            // TODO: Make this less hacky.
-            if !object_path.ends_with(SERVICE_CHARACTERISTIC_PATH) {
-                continue;
-            }
-            let device_path = &object_path[..object_path.len() - SERVICE_CHARACTERISTIC_PATH.len()];
-            let device = BluetoothDevice::new(bt_session, device_path.to_string());
-
-            if let Some((temperature, humidity, battery_voltage, battery_percent)) =
-                decode_value(&value)
-            {
-                let (node_id, name) = node_id_name_for_sensor(&device, &sensor_names)?;
-                println!(
-                    "{} Temperature: {:.2}ºC Humidity: {:?}% Battery {} mV ({} %) ({})",
-                    device.get_id(),
-                    temperature,
-                    humidity,
-                    battery_voltage,
-                    battery_percent,
-                    name
-                );
-
-                homie
-                    .publish_value(&node_id, "temperature", format!("{:.2}", temperature))
-                    .await?;
-                homie.publish_value(&node_id, "humidity", humidity).await?;
-                homie
-                    .publish_value(&node_id, "battery", battery_percent)
-                    .await?;
-            } else {
-                println!("Invalid value from {}", device.get_id());
-            }
         }
     }
 }
