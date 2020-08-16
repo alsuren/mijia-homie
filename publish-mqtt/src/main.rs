@@ -176,10 +176,6 @@ async fn requests(mut homie: HomieDevice) -> Result<(), Box<dyn Error>> {
 
     homie.ready().await?;
 
-    // currently there is no way to set INCOMING_TIMEOUT_MS to -1 (which is how
-    // you specify "infinite" according to
-    // https://dbus.freedesktop.org/doc/api/html/group__DBusConnection.html#ga580d8766c23fe5f49418bc7d87b67dc6)
-    // so we wrap the event loop in an infinite loop.
     loop {
         println!("{} sensors in queue to connect.", sensors_to_connect.len());
         // Try to connect to a sensor.
@@ -187,7 +183,7 @@ async fn requests(mut homie: HomieDevice) -> Result<(), Box<dyn Error>> {
             let mac_address = sensor.get_address()?;
             let name = sensor_names.get(&mac_address).unwrap_or(&mac_address);
             println!("Trying to connect to {}", name);
-            if let Err(e) = connect_start_sensor(
+            match connect_start_sensor(
                 bt_session,
                 &mut homie,
                 &sensor_names,
@@ -196,10 +192,13 @@ async fn requests(mut homie: HomieDevice) -> Result<(), Box<dyn Error>> {
             )
             .await
             {
-                println!("Failed to connect to {}: {:?}", name, e);
-                sensors_to_connect.push_back(sensor);
-            } else {
-                println!("Connected to {} and started notifications", name);
+                Err(e) => {
+                    println!("Failed to connect to {}: {:?}", name, e);
+                    sensors_to_connect.push_back(sensor);
+                }
+                Ok(()) => {
+                    println!("Connected to {} and started notifications", name);
+                }
             }
         }
 

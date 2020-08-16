@@ -12,6 +12,7 @@ use std::thread;
 use std::time::Duration;
 
 const SCAN_DURATION: Duration = Duration::from_millis(5000);
+const CONNECT_TIMEOUT_MS: i32 = 10_000;
 
 const MIJIA_SERVICE_DATA_UUID: &str = "0000fe95-0000-1000-8000-00805f9b34fb";
 pub const SERVICE_CHARACTERISTIC_PATH: &str = "/service0021/char0035";
@@ -77,7 +78,7 @@ pub fn print_sensors(sensors: &[BluetoothDevice], sensor_names: &HashMap<String,
 }
 
 pub fn connect_sensor<'a>(sensor: &BluetoothDevice<'a>) -> bool {
-    if let Err(e) = sensor.connect(10000) {
+    if let Err(e) = sensor.connect(CONNECT_TIMEOUT_MS) {
         println!("Failed to connect {:?}: {:?}", sensor.get_id(), e);
         false
     } else {
