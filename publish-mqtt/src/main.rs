@@ -110,6 +110,19 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     Ok(())
 }
 
+fn node_id_name_for_sensor(
+    sensor: &BluetoothDevice,
+    sensor_names: &HashMap<String, String>,
+) -> Result<(String, String), Box<dyn Error>> {
+    let mac_address = sensor.get_address()?;
+    let node_id = mac_address.replace(":", "");
+    let node_name = sensor_names
+        .get(&mac_address)
+        .cloned()
+        .unwrap_or(mac_address);
+    Ok((node_id, node_name))
+}
+
 async fn connect_start_sensor<'a>(
     bt_session: &'a BluetoothSession,
     homie: &mut HomieDevice,
@@ -119,13 +132,11 @@ async fn connect_start_sensor<'a>(
 ) -> Result<(), Box<dyn Error>> {
     sensor.connect(CONNECT_TIMEOUT_MS)?;
     start_notify_sensor(bt_session, &sensor)?;
-    let mac_address = sensor.get_address()?;
-    let node_id = mac_address.replace(":", "");
-    let node_name = sensor_names.get(&mac_address).unwrap_or(&mac_address);
+    let (node_id, node_name) = node_id_name_for_sensor(sensor, sensor_names)?;
     homie
         .add_node(Node::new(
             node_id,
-            node_name.clone(),
+            node_name,
             "Mijia sensor".to_string(),
             properties.to_vec(),
         ))
@@ -225,8 +236,7 @@ async fn requests(mut homie: HomieDevice) -> Result<(), Box<dyn Error>> {
             if let Some((temperature, humidity, battery_voltage, battery_percent)) =
                 decode_value(&value)
             {
-                let mac_address = device.get_address()?;
-                let name = sensor_names.get(&mac_address).unwrap_or(&mac_address);
+                let (node_id, name) = node_id_name_for_sensor(&device, &sensor_names)?;
                 println!(
                     "{} Temperature: {:.2}ºC Humidity: {:?}% Battery {} mV ({} %) ({})",
                     device.get_id(),
@@ -237,7 +247,6 @@ async fn requests(mut homie: HomieDevice) -> Result<(), Box<dyn Error>> {
                     name
                 );
 
-                let node_id = mac_address.replace(":", "");
                 homie
                     .publish_value(&node_id, "temperature", format!("{:.2}", temperature))
                     .await?;
