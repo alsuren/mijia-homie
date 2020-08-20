@@ -12,7 +12,7 @@ use rustls::ClientConfig;
 use std::collections::{HashMap, VecDeque};
 use std::error::Error;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tokio::{task, time, try_join};
 
 const DEFAULT_MQTT_PREFIX: &str = "homie";
@@ -23,6 +23,7 @@ const DEFAULT_PORT: u16 = 1883;
 const SCAN_DURATION: Duration = Duration::from_secs(15);
 const CONNECT_TIMEOUT_MS: i32 = 4_000;
 const INCOMING_TIMEOUT_MS: u32 = 1_000;
+const UPDATE_TIMEOUT: Duration = Duration::from_secs(60);
 const SENSOR_NAMES_FILENAME: &str = "sensor_names.conf";
 
 async fn scan(bt_session: &BluetoothSession) -> Result<Vec<String>, Box<dyn Error>> {
@@ -111,6 +112,7 @@ struct Sensor<'a> {
     device: BluetoothDevice<'a>,
     mac_address: String,
     name: String,
+    last_update_timestamp: Instant,
 }
 
 impl<'a> Sensor<'a> {
@@ -127,6 +129,7 @@ impl<'a> Sensor<'a> {
             device,
             mac_address,
             name,
+            last_update_timestamp: Instant::now(),
         })
     }
 
@@ -147,7 +150,7 @@ async fn connect_start_sensor<'a>(
     bt_session: &'a BluetoothSession,
     homie: &mut HomieDevice,
     properties: Vec<Property>,
-    sensor: &Sensor<'a>,
+    sensor: &mut Sensor<'a>,
 ) -> Result<(), Box<dyn Error>> {
     sensor.device.connect(CONNECT_TIMEOUT_MS)?;
     start_notify_sensor(bt_session, &sensor.device)?;
@@ -159,6 +162,7 @@ async fn connect_start_sensor<'a>(
             properties.to_vec(),
         ))
         .await?;
+    sensor.last_update_timestamp = Instant::now();
     Ok(())
 }
 
@@ -194,9 +198,11 @@ async fn requests(mut homie: HomieDevice) -> Result<(), Box<dyn Error>> {
     loop {
         println!("{} sensors in queue to connect.", sensors_to_connect.len());
         // Try to connect to a sensor.
-        if let Some(sensor) = sensors_to_connect.pop_front() {
+        if let Some(mut sensor) = sensors_to_connect.pop_front() {
             println!("Trying to connect to {}", sensor.name());
-            match connect_start_sensor(bt_session, &mut homie, properties.to_vec(), &sensor).await {
+            match connect_start_sensor(bt_session, &mut homie, properties.to_vec(), &mut sensor)
+                .await
+            {
                 Err(e) => {
                     println!("Failed to connect to {}: {:?}", sensor.name(), e);
                     sensors_to_connect.push_back(sensor);
@@ -206,6 +212,23 @@ async fn requests(mut homie: HomieDevice) -> Result<(), Box<dyn Error>> {
                     sensors_connected.push(sensor);
                 }
             }
+        }
+
+        // If a sensor hasn't sent any updates in a while, disconnect it and add it back to the
+        // connect queue.
+        let now = Instant::now();
+        if let Some(sensor_index) = sensors_connected
+            .iter()
+            .position(|s| now - s.last_update_timestamp > UPDATE_TIMEOUT)
+        {
+            let sensor = sensors_connected.remove(sensor_index);
+            println!(
+                "No update from {} for {:?}, reconnecting",
+                sensor.name,
+                now - sensor.last_update_timestamp
+            );
+            homie.remove_node(&sensor.node_id()).await?;
+            sensors_to_connect.push_back(sensor);
         }
 
         // Process events until there are none available for the timeout.
@@ -220,30 +243,34 @@ async fn requests(mut homie: HomieDevice) -> Result<(), Box<dyn Error>> {
                         Some(path) => path,
                         None => continue,
                     };
-                    let sensor = Sensor::new(
-                        BluetoothDevice::new(bt_session, device_path.to_string()),
-                        &sensor_names,
-                    )?;
+                    if let Some(sensor) = sensors_connected
+                        .iter_mut()
+                        .find(|s| s.device.get_id() == device_path)
+                    {
+                        sensor.last_update_timestamp = Instant::now();
+                        if let Some(readings) = decode_value(&value) {
+                            println!("{} {} ({})", sensor.mac_address(), readings, sensor.name());
 
-                    if let Some(readings) = decode_value(&value) {
-                        println!("{} {} ({})", sensor.mac_address(), readings, sensor.name());
-
-                        let node_id = sensor.node_id();
-                        homie
-                            .publish_value(
-                                &node_id,
-                                "temperature",
-                                format!("{:.2}", readings.temperature),
-                            )
-                            .await?;
-                        homie
-                            .publish_value(&node_id, "humidity", readings.humidity)
-                            .await?;
-                        homie
-                            .publish_value(&node_id, "battery", readings.battery_percent)
-                            .await?;
+                            let node_id = sensor.node_id();
+                            homie
+                                .publish_value(
+                                    &node_id,
+                                    "temperature",
+                                    format!("{:.2}", readings.temperature),
+                                )
+                                .await?;
+                            homie
+                                .publish_value(&node_id, "humidity", readings.humidity)
+                                .await?;
+                            homie
+                                .publish_value(&node_id, "battery", readings.battery_percent)
+                                .await?;
+                        } else {
+                            println!("Invalid value from {}", sensor.name());
+                        }
                     } else {
-                        println!("Invalid value from {}", sensor.name());
+                        // TODO: Still send it, in case it is useful?
+                        println!("Got update from unexpected device {}", device_path);
                     }
                 }
                 Some(BluetoothEvent::Connected {
