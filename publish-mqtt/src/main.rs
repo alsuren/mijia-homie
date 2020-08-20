@@ -107,33 +107,54 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     Ok(())
 }
 
-fn node_id_name_for_sensor(
-    sensor: &BluetoothDevice,
-    sensor_names: &HashMap<String, String>,
-) -> Result<(String, String), Box<dyn Error>> {
-    let mac_address = sensor.get_address()?;
-    let node_id = mac_address.replace(":", "");
-    let node_name = sensor_names
-        .get(&mac_address)
-        .cloned()
-        .unwrap_or(mac_address);
-    Ok((node_id, node_name))
+struct Sensor<'a> {
+    device: BluetoothDevice<'a>,
+    mac_address: String,
+    name: String,
+}
+
+impl<'a> Sensor<'a> {
+    pub fn new(
+        device: BluetoothDevice<'a>,
+        sensor_names: &HashMap<String, String>,
+    ) -> Result<Self, Box<dyn Error>> {
+        let mac_address = device.get_address()?;
+        let name = sensor_names
+            .get(&mac_address)
+            .cloned()
+            .unwrap_or_else(|| mac_address.clone());
+        Ok(Self {
+            device,
+            mac_address,
+            name,
+        })
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub fn mac_address(&self) -> &str {
+        &self.mac_address
+    }
+
+    pub fn node_id(&self) -> String {
+        self.mac_address.replace(":", "")
+    }
 }
 
 async fn connect_start_sensor<'a>(
     bt_session: &'a BluetoothSession,
     homie: &mut HomieDevice,
-    sensor_names: &HashMap<String, String>,
     properties: Vec<Property>,
-    sensor: &BluetoothDevice<'a>,
+    sensor: &Sensor<'a>,
 ) -> Result<(), Box<dyn Error>> {
-    sensor.connect(CONNECT_TIMEOUT_MS)?;
-    start_notify_sensor(bt_session, &sensor)?;
-    let (node_id, node_name) = node_id_name_for_sensor(sensor, sensor_names)?;
+    sensor.device.connect(CONNECT_TIMEOUT_MS)?;
+    start_notify_sensor(bt_session, &sensor.device)?;
     homie
         .add_node(Node::new(
-            node_id,
-            node_name,
+            sensor.node_id(),
+            sensor.name().to_string(),
             "Mijia sensor".to_string(),
             properties.to_vec(),
         ))
@@ -150,7 +171,8 @@ async fn requests(mut homie: HomieDevice) -> Result<(), Box<dyn Error>> {
     print_sensors(&sensors, &sensor_names);
     let (named_sensors, unnamed_sensors): (Vec<_>, Vec<_>) = sensors
         .into_iter()
-        .partition(|sensor| sensor_names.contains_key(&sensor.get_address().unwrap()));
+        .map(|d| Sensor::new(d, &sensor_names).unwrap())
+        .partition(|sensor| sensor_names.contains_key(sensor.mac_address()));
     println!(
         "{} named sensors, {} unnamed sensors",
         named_sensors.len(),
@@ -167,30 +189,20 @@ async fn requests(mut homie: HomieDevice) -> Result<(), Box<dyn Error>> {
 
     homie.ready().await?;
 
-    let mut sensors_connected: Vec<BluetoothDevice> = vec![];
+    let mut sensors_connected: Vec<Sensor> = vec![];
 
     loop {
         println!("{} sensors in queue to connect.", sensors_to_connect.len());
         // Try to connect to a sensor.
         if let Some(sensor) = sensors_to_connect.pop_front() {
-            let mac_address = sensor.get_address()?;
-            let name = sensor_names.get(&mac_address).unwrap_or(&mac_address);
-            println!("Trying to connect to {}", name);
-            match connect_start_sensor(
-                bt_session,
-                &mut homie,
-                &sensor_names,
-                properties.to_vec(),
-                &sensor,
-            )
-            .await
-            {
+            println!("Trying to connect to {}", sensor.name());
+            match connect_start_sensor(bt_session, &mut homie, properties.to_vec(), &sensor).await {
                 Err(e) => {
-                    println!("Failed to connect to {}: {:?}", name, e);
+                    println!("Failed to connect to {}: {:?}", sensor.name(), e);
                     sensors_to_connect.push_back(sensor);
                 }
                 Ok(()) => {
-                    println!("Connected to {} and started notifications", name);
+                    println!("Connected to {} and started notifications", sensor.name());
                     sensors_connected.push(sensor);
                 }
             }
@@ -208,12 +220,15 @@ async fn requests(mut homie: HomieDevice) -> Result<(), Box<dyn Error>> {
                         Some(path) => path,
                         None => continue,
                     };
-                    let device = BluetoothDevice::new(bt_session, device_path.to_string());
+                    let sensor = Sensor::new(
+                        BluetoothDevice::new(bt_session, device_path.to_string()),
+                        &sensor_names,
+                    )?;
 
                     if let Some(readings) = decode_value(&value) {
-                        let (node_id, name) = node_id_name_for_sensor(&device, &sensor_names)?;
-                        println!("{} {} ({})", device.get_id(), readings, name);
+                        println!("{} {} ({})", sensor.mac_address(), readings, sensor.name());
 
+                        let node_id = sensor.node_id();
                         homie
                             .publish_value(
                                 &node_id,
@@ -228,7 +243,7 @@ async fn requests(mut homie: HomieDevice) -> Result<(), Box<dyn Error>> {
                             .publish_value(&node_id, "battery", readings.battery_percent)
                             .await?;
                     } else {
-                        println!("Invalid value from {}", device.get_id());
+                        println!("Invalid value from {}", sensor.name());
                     }
                 }
                 Some(BluetoothEvent::Connected {
@@ -237,12 +252,11 @@ async fn requests(mut homie: HomieDevice) -> Result<(), Box<dyn Error>> {
                 }) => {
                     if let Some(sensor_index) = sensors_connected
                         .iter()
-                        .position(|s| s.get_id() == object_path)
+                        .position(|s| s.device.get_id() == object_path)
                     {
                         let sensor = sensors_connected.remove(sensor_index);
-                        let (node_id, node_name) = node_id_name_for_sensor(&sensor, &sensor_names)?;
-                        println!("{} disconnected", node_name);
-                        homie.remove_node(&node_id).await?;
+                        println!("{} disconnected", sensor.name());
+                        homie.remove_node(&sensor.node_id()).await?;
                         sensors_to_connect.push_back(sensor);
                     } else {
                         println!(
