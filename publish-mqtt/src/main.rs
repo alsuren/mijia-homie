@@ -224,11 +224,10 @@ async fn requests(mut homie: HomieDevice) -> Result<(), Box<dyn Error>> {
             match event {
                 Some(BluetoothEvent::Value { object_path, value }) => {
                     // TODO: Make this less hacky.
-                    if !object_path.ends_with(SERVICE_CHARACTERISTIC_PATH) {
-                        continue;
-                    }
-                    let device_path =
-                        &object_path[..object_path.len() - SERVICE_CHARACTERISTIC_PATH.len()];
+                    let device_path = match object_path.strip_suffix(SERVICE_CHARACTERISTIC_PATH) {
+                        Some(path) => path,
+                        None => continue,
+                    };
                     let device = BluetoothDevice::new(bt_session, device_path.to_string());
 
                     if let Some((temperature, humidity, battery_voltage, battery_percent)) =
