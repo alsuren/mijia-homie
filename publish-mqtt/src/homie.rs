@@ -5,6 +5,8 @@ use tokio::task::{self, JoinHandle};
 
 const HOMIE_VERSION: &str = "4.0";
 const HOMIE_IMPLEMENTATION: &str = "homie-rs";
+const DEFAULT_FIRMWARE_NAME: &str = env!("CARGO_PKG_NAME");
+const DEFAULT_FIRMWARE_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// The data type for a Homie property.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -102,6 +104,8 @@ pub struct HomieDevice {
     requests_tx: Sender<Request>,
     device_base: String,
     device_name: String,
+    firmware_name: String,
+    firmware_version: String,
     nodes: Vec<Node>,
     state: State,
 }
@@ -159,6 +163,8 @@ impl HomieDevice {
             requests_tx,
             device_base,
             device_name,
+            firmware_name: DEFAULT_FIRMWARE_NAME.to_string(),
+            firmware_version: DEFAULT_FIRMWARE_VERSION.to_string(),
             nodes: vec![],
             state: State::NotStarted,
         }
@@ -172,10 +178,23 @@ impl HomieDevice {
             HOMIE_VERSION,
         )
         .await?;
+        // TODO: Send $localip and $mac too.
+        publish_retained(
+            &self.requests_tx,
+            format!("{}/$fw/name", self.device_base),
+            self.firmware_name.as_str(),
+        )
+        .await?;
+        publish_retained(
+            &self.requests_tx,
+            format!("{}/$fw/version", self.device_base),
+            self.firmware_version.as_str(),
+        )
+        .await?;
         publish_retained(
             &self.requests_tx,
             format!("{}/$extensions", self.device_base),
-            "",
+            "org.homie.legacy-firmware:0.1.1:[4.x]",
         )
         .await?;
         publish_retained(
@@ -198,6 +217,15 @@ impl HomieDevice {
         .await?;
         self.state = State::Init;
         Ok(())
+    }
+
+    /// Set the firmware name and version to be advertised for the Homie device.
+    ///
+    /// If this is not set, it will default to the cargo package name and version.
+    pub fn set_firmware(&mut self, firmware_name: &str, firmware_version: &str) {
+        assert_eq!(self.state, State::NotStarted);
+        self.firmware_name = firmware_name.to_string();
+        self.firmware_version = firmware_version.to_string();
     }
 
     pub async fn add_node(&mut self, node: Node) -> Result<(), SendError<Request>> {
@@ -383,6 +411,42 @@ mod tests {
 
         device.start().await.unwrap();
         device.ready().await.unwrap();
+
+        // Need to keep rx alive until here so that the channel isn't closed.
+        drop(rx);
+    }
+
+    #[tokio::test]
+    async fn set_firmware() {
+        let (tx, rx) = async_channel::unbounded();
+        let mut device = HomieDevice::new(
+            tx,
+            "homie/test-device".to_string(),
+            "Test device".to_string(),
+        );
+
+        device.set_firmware("firmware_name", "firmware_version");
+
+        device.start().await.unwrap();
+        device.ready().await.unwrap();
+
+        // Need to keep rx alive until here so that the channel isn't closed.
+        drop(rx);
+    }
+
+    #[tokio::test]
+    #[should_panic(expected = "NotStarted")]
+    async fn set_firmware_after_start() {
+        let (tx, rx) = async_channel::unbounded();
+        let mut device = HomieDevice::new(
+            tx,
+            "homie/test-device".to_string(),
+            "Test device".to_string(),
+        );
+
+        device.start().await.unwrap();
+
+        device.set_firmware("firmware_name", "firmware_version");
 
         // Need to keep rx alive until here so that the channel isn't closed.
         drop(rx);
