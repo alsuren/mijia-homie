@@ -4,6 +4,7 @@ use std::error::Error;
 use tokio::task::{self, JoinHandle};
 
 const HOMIE_VERSION: &str = "4.0";
+const HOMIE_IMPLEMENTATION: &str = "homie-rs";
 
 /// The data type for a Homie property.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -175,6 +176,12 @@ impl HomieDevice {
             &self.requests_tx,
             format!("{}/$extensions", self.device_base),
             "",
+        )
+        .await?;
+        publish_retained(
+            &self.requests_tx,
+            format!("{}/$implementation", self.device_base),
+            HOMIE_IMPLEMENTATION,
         )
         .await?;
         publish_retained(
