@@ -86,7 +86,7 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     let mqtt_prefix =
         std::env::var("MQTT_PREFIX").unwrap_or_else(|_| DEFAULT_MQTT_PREFIX.to_string());
     let device_base = format!("{}/{}", mqtt_prefix, device_id);
-    let (homie, mqtt_handle) = HomieDevice::spawn(&device_base, &device_name, mqttoptions).await;
+    let (homie, mqtt_handle) = HomieDevice::spawn(&device_base, &device_name, mqttoptions).await?;
 
     let local = task::LocalSet::new();
 
@@ -144,7 +144,6 @@ async fn connect_start_sensor<'a>(
 
 async fn requests(mut homie: HomieDevice) -> Result<(), Box<dyn Error>> {
     let sensor_names = hashmap_from_file(SENSOR_NAMES_FILENAME)?;
-    homie.start().await?;
 
     let bt_session = &BluetoothSession::create_session(None)?;
     let device_list = scan(&bt_session).await?;

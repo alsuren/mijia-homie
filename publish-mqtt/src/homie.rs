@@ -136,10 +136,13 @@ impl HomieDevice {
         device_base: &str,
         device_name: &str,
         mut mqtt_options: MqttOptions,
-    ) -> (
-        HomieDevice,
-        impl Future<Output = Result<(), Box<dyn Error + Send + Sync>>>,
-    ) {
+    ) -> Result<
+        (
+            HomieDevice,
+            impl Future<Output = Result<(), Box<dyn Error + Send + Sync>>>,
+        ),
+        SendError<Request>,
+    > {
         mqtt_options.set_last_will(LastWill {
             topic: format!("{}/$state", device_base),
             message: "lost".to_string(),
@@ -148,7 +151,7 @@ impl HomieDevice {
         });
         let mut event_loop = EventLoop::new(mqtt_options, REQUESTS_CAP).await;
 
-        let homie = HomieDevice::new(
+        let mut homie = HomieDevice::new(
             event_loop.handle(),
             device_base.to_string(),
             device_name.to_string(),
@@ -156,6 +159,7 @@ impl HomieDevice {
 
         let stats = HomieStats::new(event_loop.handle(), device_base.to_string());
 
+        // This needs to be spawned before we wait for anything to be sent, as the start() calls below do.
         let event_task: JoinHandle<Result<(), Box<dyn Error + Send + Sync>>> =
             task::spawn(async move {
                 loop {
@@ -163,11 +167,15 @@ impl HomieDevice {
                     log::trace!("Incoming = {:?}, Outgoing = {:?}", incoming, outgoing);
                 }
             });
+
+        stats.start().await?;
+        homie.start().await?;
+
         let stats_task: JoinHandle<Result<(), Box<dyn Error + Send + Sync>>> =
             task::spawn(stats.run());
         let join_handle = try_join_handles(event_task, stats_task).map(|r| r.map(|((), ())| ()));
 
-        (homie, join_handle)
+        Ok((homie, join_handle))
     }
 
     fn new(requests_tx: Sender<Request>, device_base: String, device_name: String) -> HomieDevice {
@@ -182,7 +190,7 @@ impl HomieDevice {
         }
     }
 
-    pub async fn start(&mut self) -> Result<(), SendError<Request>> {
+    async fn start(&mut self) -> Result<(), SendError<Request>> {
         assert_eq!(self.state, State::NotStarted);
         publish_retained(
             &self.requests_tx,
@@ -203,7 +211,6 @@ impl HomieDevice {
             self.firmware_version.as_str(),
         )
         .await?;
-        HomieStats::start(&self.requests_tx, &self.device_base).await?;
         publish_retained(
             &self.requests_tx,
             format!("{}/$extensions", self.device_base),
@@ -370,13 +377,10 @@ impl HomieStats {
     }
 
     /// Send initial topics.
-    async fn start(
-        requests_tx: &Sender<Request>,
-        device_base: &str,
-    ) -> Result<(), SendError<Request>> {
+    async fn start(&self) -> Result<(), SendError<Request>> {
         publish_retained(
-            requests_tx,
-            format!("{}/$stats/interval", device_base),
+            &self.requests_tx,
+            format!("{}/$stats/interval", self.device_base),
             STATS_INTERVAL.as_secs().to_string(),
         )
         .await
