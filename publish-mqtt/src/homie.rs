@@ -174,6 +174,8 @@ impl HomieDeviceBuilder {
     }
 }
 
+const EXTENSION_IDS: [&str; 2] = [HomieStats::EXTENSION_ID, HomieFirmware::EXTENSION_ID];
+
 /// A Homie [device](https://homieiot.github.io/specification/#devices). This corresponds to a
 /// single MQTT connection.
 pub struct HomieDevice {
@@ -222,10 +224,7 @@ impl HomieDevice {
             .publish_retained("$homie", HOMIE_VERSION)
             .await?;
         self.publisher
-            .publish_retained(
-                "$extensions",
-                "org.homie.legacy-firmware:0.1.1:[4.x],org.homie.legacy-stats:0.1.1:[4.x]",
-            )
+            .publish_retained("$extensions", EXTENSION_IDS.join(","))
             .await?;
         self.publisher
             .publish_retained("$implementation", HOMIE_IMPLEMENTATION)
@@ -355,6 +354,8 @@ struct HomieStats {
 }
 
 impl HomieStats {
+    const EXTENSION_ID: &'static str = "org.homie.legacy-stats:0.1.1:[4.x]";
+
     fn new(publisher: DevicePublisher) -> Self {
         let now = Instant::now();
         Self {
@@ -390,6 +391,8 @@ struct HomieFirmware {
 }
 
 impl HomieFirmware {
+    const EXTENSION_ID: &'static str = "org.homie.legacy-firmware:0.1.1:[4.x]";
+
     fn new(publisher: DevicePublisher, firmware_name: String, firmware_version: String) -> Self {
         Self {
             publisher,
