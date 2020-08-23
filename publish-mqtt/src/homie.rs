@@ -1,12 +1,14 @@
 use async_channel::{SendError, Sender};
 use rumqttc::{self, EventLoop, LastWill, MqttOptions, Publish, QoS, Request};
 use std::error::Error;
+use std::time::{Duration, Instant};
 use tokio::task::{self, JoinHandle};
 
 const HOMIE_VERSION: &str = "4.0";
 const HOMIE_IMPLEMENTATION: &str = "homie-rs";
 const DEFAULT_FIRMWARE_NAME: &str = env!("CARGO_PKG_NAME");
 const DEFAULT_FIRMWARE_VERSION: &str = env!("CARGO_PKG_VERSION");
+const STATS_INTERVAL: Duration = Duration::from_secs(60);
 
 /// The data type for a Homie property.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -148,10 +150,13 @@ impl HomieDevice {
             device_name.to_string(),
         );
 
+        let mut stats = HomieStats::new(event_loop.handle(), device_base.to_string());
+
         let join_handle = task::spawn(async move {
             loop {
                 let (incoming, outgoing) = event_loop.poll().await?;
                 log::trace!("Incoming = {:?}, Outgoing = {:?}", incoming, outgoing);
+                stats.refresh().await?;
             }
         });
 
@@ -191,10 +196,11 @@ impl HomieDevice {
             self.firmware_version.as_str(),
         )
         .await?;
+        HomieStats::start(&self.requests_tx, &self.device_base).await?;
         publish_retained(
             &self.requests_tx,
             format!("{}/$extensions", self.device_base),
-            "org.homie.legacy-firmware:0.1.1:[4.x]",
+            "org.homie.legacy-firmware:0.1.1:[4.x],org.homie.legacy-stats:0.1.1:[4.x]",
         )
         .await?;
         publish_retained(
@@ -335,6 +341,55 @@ impl HomieDevice {
             value.to_string(),
         )
         .await
+    }
+}
+
+/// Legacy stats extension.
+struct HomieStats {
+    requests_tx: Sender<Request>,
+    device_base: String,
+    start_time: Instant,
+    last_sent: Instant,
+}
+
+impl HomieStats {
+    fn new(requests_tx: Sender<Request>, device_base: String) -> Self {
+        let now = Instant::now();
+        Self {
+            requests_tx,
+            device_base,
+            start_time: now,
+            last_sent: now - STATS_INTERVAL,
+        }
+    }
+
+    /// Send initial topics.
+    async fn start(
+        requests_tx: &Sender<Request>,
+        device_base: &str,
+    ) -> Result<(), SendError<Request>> {
+        publish_retained(
+            requests_tx,
+            format!("{}/$stats/interval", device_base),
+            STATS_INTERVAL.as_secs().to_string(),
+        )
+        .await
+    }
+
+    /// Send latest stats, if enough time has passed since last time.
+    async fn refresh(&mut self) -> Result<(), SendError<Request>> {
+        let now = Instant::now();
+        if now > self.last_sent + STATS_INTERVAL {
+            self.last_sent = now;
+            let uptime = now - self.start_time;
+            publish_retained(
+                &self.requests_tx,
+                format!("{}/$stats/uptime", self.device_base),
+                uptime.as_secs().to_string(),
+            )
+            .await?;
+        }
+        Ok(())
     }
 }
 
