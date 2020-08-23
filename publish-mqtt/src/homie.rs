@@ -406,16 +406,22 @@ async fn publish_retained(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use async_channel::Receiver;
+
+    fn test_device() -> (HomieDevice, Receiver<Request>) {
+        let (requests_tx, requests_rx) = async_channel::unbounded();
+        let device = HomieDevice::new(
+            requests_tx,
+            "homie/test-device".to_string(),
+            "Test device".to_string(),
+        );
+        (device, requests_rx)
+    }
 
     #[tokio::test]
     #[should_panic(expected = "Tried to add node with duplicate ID")]
     async fn duplicate_node() {
-        let (tx, rx) = async_channel::unbounded();
-        let mut device = HomieDevice::new(
-            tx,
-            "homie/test-device".to_string(),
-            "Test device".to_string(),
-        );
+        let (mut device, rx) = test_device();
 
         device
             .add_node(Node::new(
@@ -442,12 +448,7 @@ mod tests {
     #[tokio::test]
     #[should_panic(expected = "NotStarted")]
     async fn ready_before_start() {
-        let (tx, rx) = async_channel::unbounded();
-        let mut device = HomieDevice::new(
-            tx,
-            "homie/test-device".to_string(),
-            "Test device".to_string(),
-        );
+        let (mut device, rx) = test_device();
 
         device.ready().await.unwrap();
 
@@ -457,12 +458,7 @@ mod tests {
 
     #[tokio::test]
     async fn start_empty() {
-        let (tx, rx) = async_channel::unbounded();
-        let mut device = HomieDevice::new(
-            tx,
-            "homie/test-device".to_string(),
-            "Test device".to_string(),
-        );
+        let (mut device, rx) = test_device();
 
         device.start().await.unwrap();
         device.ready().await.unwrap();
@@ -473,12 +469,7 @@ mod tests {
 
     #[tokio::test]
     async fn set_firmware() {
-        let (tx, rx) = async_channel::unbounded();
-        let mut device = HomieDevice::new(
-            tx,
-            "homie/test-device".to_string(),
-            "Test device".to_string(),
-        );
+        let (mut device, rx) = test_device();
 
         device.set_firmware("firmware_name", "firmware_version");
 
@@ -492,12 +483,7 @@ mod tests {
     #[tokio::test]
     #[should_panic(expected = "NotStarted")]
     async fn set_firmware_after_start() {
-        let (tx, rx) = async_channel::unbounded();
-        let mut device = HomieDevice::new(
-            tx,
-            "homie/test-device".to_string(),
-            "Test device".to_string(),
-        );
+        let (mut device, rx) = test_device();
 
         device.start().await.unwrap();
 
@@ -509,12 +495,7 @@ mod tests {
 
     #[tokio::test]
     async fn add_node() {
-        let (tx, rx) = async_channel::unbounded();
-        let mut device = HomieDevice::new(
-            tx,
-            "homie/test-device".to_string(),
-            "Test device".to_string(),
-        );
+        let (mut device, rx) = test_device();
 
         device
             .add_node(Node::new(
@@ -547,12 +528,7 @@ mod tests {
     /// Add a node, remove it, and add it back again.
     #[tokio::test]
     async fn read_removed_node() {
-        let (tx, rx) = async_channel::unbounded();
-        let mut device = HomieDevice::new(
-            tx,
-            "homie/test-device".to_string(),
-            "Test device".to_string(),
-        );
+        let (mut device, rx) = test_device();
 
         device
             .add_node(Node::new(
