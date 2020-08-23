@@ -326,7 +326,7 @@ mod tests {
 
     #[tokio::test]
     #[should_panic(expected = "Tried to add node with duplicate ID")]
-    async fn test_duplicate_node() {
+    async fn duplicate_node() {
         let (tx, rx) = async_channel::unbounded();
         let mut device = HomieDevice::new(
             tx,
@@ -352,6 +352,112 @@ mod tests {
             ))
             .await
             .unwrap();
+        // Need to keep rx alive until here so that the channel isn't closed.
+        drop(rx);
+    }
+
+    #[tokio::test]
+    #[should_panic(expected = "NotStarted")]
+    async fn ready_before_start() {
+        let (tx, rx) = async_channel::unbounded();
+        let mut device = HomieDevice::new(
+            tx,
+            "homie/test-device".to_string(),
+            "Test device".to_string(),
+        );
+
+        device.ready().await.unwrap();
+
+        // Need to keep rx alive until here so that the channel isn't closed.
+        drop(rx);
+    }
+
+    #[tokio::test]
+    async fn start_empty() {
+        let (tx, rx) = async_channel::unbounded();
+        let mut device = HomieDevice::new(
+            tx,
+            "homie/test-device".to_string(),
+            "Test device".to_string(),
+        );
+
+        device.start().await.unwrap();
+        device.ready().await.unwrap();
+
+        // Need to keep rx alive until here so that the channel isn't closed.
+        drop(rx);
+    }
+
+    #[tokio::test]
+    async fn add_node() {
+        let (tx, rx) = async_channel::unbounded();
+        let mut device = HomieDevice::new(
+            tx,
+            "homie/test-device".to_string(),
+            "Test device".to_string(),
+        );
+
+        device
+            .add_node(Node::new(
+                "id".to_string(),
+                "Name".to_string(),
+                "type".to_string(),
+                vec![],
+            ))
+            .await
+            .unwrap();
+
+        device.start().await.unwrap();
+        device.ready().await.unwrap();
+
+        // Add another node after starting.
+        device
+            .add_node(Node::new(
+                "id2".to_string(),
+                "Name 2".to_string(),
+                "type2".to_string(),
+                vec![],
+            ))
+            .await
+            .unwrap();
+
+        // Need to keep rx alive until here so that the channel isn't closed.
+        drop(rx);
+    }
+
+    /// Add a node, remove it, and add it back again.
+    #[tokio::test]
+    async fn read_removed_node() {
+        let (tx, rx) = async_channel::unbounded();
+        let mut device = HomieDevice::new(
+            tx,
+            "homie/test-device".to_string(),
+            "Test device".to_string(),
+        );
+
+        device
+            .add_node(Node::new(
+                "id".to_string(),
+                "Name".to_string(),
+                "type".to_string(),
+                vec![],
+            ))
+            .await
+            .unwrap();
+
+        device.remove_node("id").await.unwrap();
+
+        // Adding it back shouldn't give an error.
+        device
+            .add_node(Node::new(
+                "id".to_string(),
+                "Name".to_string(),
+                "type".to_string(),
+                vec![],
+            ))
+            .await
+            .unwrap();
+
         // Need to keep rx alive until here so that the channel isn't closed.
         drop(rx);
     }
