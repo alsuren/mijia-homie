@@ -1,6 +1,7 @@
 use async_channel::{SendError, Sender};
 use futures::future::try_join;
 use futures::FutureExt;
+use local_ipaddress;
 use rumqttc::{self, EventLoop, LastWill, MqttOptions, Publish, QoS, Request};
 use std::error::Error;
 use std::future::Future;
@@ -403,7 +404,10 @@ impl HomieFirmware {
 
     /// Send initial topics.
     async fn start(&self) -> Result<(), SendError<Request>> {
-        // TODO: Send $localip and $mac too.
+        // TODO: Send $mac too.
+        self.publisher
+            .publish_retained("$localip", local_ipaddress::get().unwrap())
+            .await?;
         self.publisher
             .publish_retained("$fw/name", self.firmware_name.as_str())
             .await?;
