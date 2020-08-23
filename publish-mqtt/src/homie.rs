@@ -147,15 +147,15 @@ impl HomieDeviceBuilder {
         });
         let mut event_loop = EventLoop::new(self.mqtt_options, REQUESTS_CAP).await;
 
+        let publisher = DevicePublisher::new(event_loop.handle(), self.device_base);
         let mut homie = HomieDevice::new(
-            event_loop.handle(),
-            self.device_base,
+            publisher.clone(),
             self.device_name,
             self.firmware_name,
             self.firmware_version,
         );
 
-        let stats = HomieStats::new(event_loop.handle(), homie.device_base.to_string());
+        let stats = HomieStats::new(publisher);
 
         // This needs to be spawned before we wait for anything to be sent, as the start() calls below do.
         let event_task: JoinHandle<Result<(), Box<dyn Error + Send + Sync>>> =
@@ -180,8 +180,7 @@ impl HomieDeviceBuilder {
 /// A Homie [device](https://homieiot.github.io/specification/#devices). This corresponds to a
 /// single MQTT connection.
 pub struct HomieDevice {
-    requests_tx: Sender<Request>,
-    device_base: String,
+    publisher: DevicePublisher,
     device_name: String,
     firmware_name: String,
     firmware_version: String,
@@ -214,15 +213,13 @@ impl HomieDevice {
     }
 
     fn new(
-        requests_tx: Sender<Request>,
-        device_base: String,
+        publisher: DevicePublisher,
         device_name: String,
         firmware_name: String,
         firmware_version: String,
     ) -> HomieDevice {
         HomieDevice {
-            requests_tx,
-            device_base,
+            publisher,
             device_name,
             firmware_name,
             firmware_version,
@@ -233,22 +230,29 @@ impl HomieDevice {
 
     async fn start(&mut self) -> Result<(), SendError<Request>> {
         assert_eq!(self.state, State::NotStarted);
-        self.publish_retained("$homie", HOMIE_VERSION).await?;
+        self.publisher
+            .publish_retained("$homie", HOMIE_VERSION)
+            .await?;
         // TODO: Send $localip and $mac too.
-        self.publish_retained("$fw/name", self.firmware_name.as_str())
+        self.publisher
+            .publish_retained("$fw/name", self.firmware_name.as_str())
             .await?;
-        self.publish_retained("$fw/version", self.firmware_version.as_str())
+        self.publisher
+            .publish_retained("$fw/version", self.firmware_version.as_str())
             .await?;
-        self.publish_retained(
-            "$extensions",
-            "org.homie.legacy-firmware:0.1.1:[4.x],org.homie.legacy-stats:0.1.1:[4.x]",
-        )
-        .await?;
-        self.publish_retained("$implementation", HOMIE_IMPLEMENTATION)
+        self.publisher
+            .publish_retained(
+                "$extensions",
+                "org.homie.legacy-firmware:0.1.1:[4.x],org.homie.legacy-stats:0.1.1:[4.x]",
+            )
             .await?;
-        self.publish_retained("$name", self.device_name.as_str())
+        self.publisher
+            .publish_retained("$implementation", HOMIE_IMPLEMENTATION)
             .await?;
-        self.publish_retained("$state", "init").await?;
+        self.publisher
+            .publish_retained("$name", self.device_name.as_str())
+            .await?;
+        self.publisher.publish_retained("$state", "init").await?;
         self.state = State::Init;
         Ok(())
     }
@@ -273,29 +277,35 @@ impl HomieDevice {
     }
 
     async fn publish_node(&self, node: &Node) -> Result<(), SendError<Request>> {
-        self.publish_retained(&format!("{}/$name", node.id), node.name.as_str())
+        self.publisher
+            .publish_retained(&format!("{}/$name", node.id), node.name.as_str())
             .await?;
-        self.publish_retained(&format!("{}/$type", node.id), node.node_type.as_str())
+        self.publisher
+            .publish_retained(&format!("{}/$type", node.id), node.node_type.as_str())
             .await?;
         let mut property_ids: Vec<&str> = vec![];
         for property in &node.properties {
             property_ids.push(&property.id);
-            self.publish_retained(
-                &format!("{}/{}/$name", node.id, property.id),
-                property.name.as_str(),
-            )
-            .await?;
-            self.publish_retained(
-                &format!("{}/{}/$datatype", node.id, property.id),
-                property.datatype,
-            )
-            .await?;
+            self.publisher
+                .publish_retained(
+                    &format!("{}/{}/$name", node.id, property.id),
+                    property.name.as_str(),
+                )
+                .await?;
+            self.publisher
+                .publish_retained(
+                    &format!("{}/{}/$datatype", node.id, property.id),
+                    property.datatype,
+                )
+                .await?;
             if let Some(unit) = &property.unit {
-                self.publish_retained(&format!("{}/{}/$unit", node.id, property.id), unit.as_str())
+                self.publisher
+                    .publish_retained(&format!("{}/{}/$unit", node.id, property.id), unit.as_str())
                     .await?;
             }
         }
-        self.publish_retained(&format!("{}/$properties", node.id), property_ids.join(","))
+        self.publisher
+            .publish_retained(&format!("{}/$properties", node.id), property_ids.join(","))
             .await?;
         Ok(())
     }
@@ -307,14 +317,14 @@ impl HomieDevice {
             .map(|node| node.id.as_str())
             .collect::<Vec<&str>>()
             .join(",");
-        self.publish_retained("$nodes", node_ids).await
+        self.publisher.publish_retained("$nodes", node_ids).await
     }
 
     pub async fn ready(&mut self) -> Result<(), SendError<Request>> {
         assert_eq!(self.state, State::Init);
         self.state = State::Ready;
 
-        self.publish_retained("$state", "ready").await?;
+        self.publisher.publish_retained("$state", "ready").await?;
 
         Ok(())
     }
@@ -325,8 +335,24 @@ impl HomieDevice {
         property_id: &str,
         value: impl ToString,
     ) -> Result<(), SendError<Request>> {
-        self.publish_retained(&format!("{}/{}", node_id, property_id), value.to_string())
+        self.publisher
+            .publish_retained(&format!("{}/{}", node_id, property_id), value.to_string())
             .await
+    }
+}
+
+#[derive(Clone, Debug)]
+struct DevicePublisher {
+    requests_tx: Sender<Request>,
+    device_base: String,
+}
+
+impl DevicePublisher {
+    fn new(requests_tx: Sender<Request>, device_base: String) -> Self {
+        Self {
+            requests_tx,
+            device_base,
+        }
     }
 
     async fn publish_retained(
@@ -334,65 +360,45 @@ impl HomieDevice {
         subtopic: &str,
         value: impl Into<Vec<u8>>,
     ) -> Result<(), SendError<Request>> {
-        publish_retained(
-            &self.requests_tx,
-            format!("{}/{}", self.device_base, subtopic),
-            value,
-        )
-        .await
+        let name = format!("{}/{}", self.device_base, subtopic);
+        let mut publish = Publish::new(name, QoS::AtLeastOnce, value);
+        publish.set_retain(true);
+        self.requests_tx.send(publish.into()).await
     }
 }
 
 /// Legacy stats extension.
 struct HomieStats {
-    requests_tx: Sender<Request>,
-    device_base: String,
+    publisher: DevicePublisher,
     start_time: Instant,
 }
 
 impl HomieStats {
-    fn new(requests_tx: Sender<Request>, device_base: String) -> Self {
+    fn new(publisher: DevicePublisher) -> Self {
         let now = Instant::now();
         Self {
-            requests_tx,
-            device_base,
+            publisher,
             start_time: now,
         }
     }
 
     /// Send initial topics.
     async fn start(&self) -> Result<(), SendError<Request>> {
-        publish_retained(
-            &self.requests_tx,
-            format!("{}/$stats/interval", self.device_base),
-            STATS_INTERVAL.as_secs().to_string(),
-        )
-        .await
+        self.publisher
+            .publish_retained("$stats/interval", STATS_INTERVAL.as_secs().to_string())
+            .await
     }
 
     /// Periodically send stats.
     async fn run(self) -> Result<(), Box<dyn Error + Send + Sync>> {
         loop {
             let uptime = Instant::now() - self.start_time;
-            publish_retained(
-                &self.requests_tx,
-                format!("{}/$stats/uptime", self.device_base),
-                uptime.as_secs().to_string(),
-            )
-            .await?;
+            self.publisher
+                .publish_retained("$stats/uptime", uptime.as_secs().to_string())
+                .await?;
             delay_for(STATS_INTERVAL).await;
         }
     }
-}
-
-async fn publish_retained(
-    requests_tx: &Sender<Request>,
-    name: String,
-    value: impl Into<Vec<u8>>,
-) -> Result<(), SendError<Request>> {
-    let mut publish = Publish::new(name, QoS::AtLeastOnce, value);
-    publish.set_retain(true);
-    requests_tx.send(publish.into()).await
 }
 
 fn try_join_handles<A, B, E>(
@@ -412,9 +418,9 @@ mod tests {
 
     fn make_test_device() -> (HomieDevice, Receiver<Request>) {
         let (requests_tx, requests_rx) = async_channel::unbounded();
+        let publisher = DevicePublisher::new(requests_tx, "homie/test-device".to_string());
         let device = HomieDevice::new(
-            requests_tx,
-            "homie/test-device".to_string(),
+            publisher,
             "Test device".to_string(),
             "firmware_name".to_string(),
             "firmware_version".to_string(),
