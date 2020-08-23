@@ -233,49 +233,22 @@ impl HomieDevice {
 
     async fn start(&mut self) -> Result<(), SendError<Request>> {
         assert_eq!(self.state, State::NotStarted);
-        publish_retained(
-            &self.requests_tx,
-            format!("{}/$homie", self.device_base),
-            HOMIE_VERSION,
-        )
-        .await?;
+        self.publish_retained("$homie", HOMIE_VERSION).await?;
         // TODO: Send $localip and $mac too.
-        publish_retained(
-            &self.requests_tx,
-            format!("{}/$fw/name", self.device_base),
-            self.firmware_name.as_str(),
-        )
-        .await?;
-        publish_retained(
-            &self.requests_tx,
-            format!("{}/$fw/version", self.device_base),
-            self.firmware_version.as_str(),
-        )
-        .await?;
-        publish_retained(
-            &self.requests_tx,
-            format!("{}/$extensions", self.device_base),
+        self.publish_retained("$fw/name", self.firmware_name.as_str())
+            .await?;
+        self.publish_retained("$fw/version", self.firmware_version.as_str())
+            .await?;
+        self.publish_retained(
+            "$extensions",
             "org.homie.legacy-firmware:0.1.1:[4.x],org.homie.legacy-stats:0.1.1:[4.x]",
         )
         .await?;
-        publish_retained(
-            &self.requests_tx,
-            format!("{}/$implementation", self.device_base),
-            HOMIE_IMPLEMENTATION,
-        )
-        .await?;
-        publish_retained(
-            &self.requests_tx,
-            format!("{}/$name", self.device_base),
-            self.device_name.as_str(),
-        )
-        .await?;
-        publish_retained(
-            &self.requests_tx,
-            format!("{}/$state", self.device_base),
-            "init",
-        )
-        .await?;
+        self.publish_retained("$implementation", HOMIE_IMPLEMENTATION)
+            .await?;
+        self.publish_retained("$name", self.device_name.as_str())
+            .await?;
+        self.publish_retained("$state", "init").await?;
         self.state = State::Init;
         Ok(())
     }
@@ -300,49 +273,30 @@ impl HomieDevice {
     }
 
     async fn publish_node(&self, node: &Node) -> Result<(), SendError<Request>> {
-        let node_base = format!("{}/{}", self.device_base, node.id);
-        publish_retained(
-            &self.requests_tx,
-            format!("{}/$name", node_base),
-            node.name.as_str(),
-        )
-        .await?;
-        publish_retained(
-            &self.requests_tx,
-            format!("{}/$type", node_base),
-            node.node_type.as_str(),
-        )
-        .await?;
+        self.publish_retained(&format!("{}/$name", node.id), node.name.as_str())
+            .await?;
+        self.publish_retained(&format!("{}/$type", node.id), node.node_type.as_str())
+            .await?;
         let mut property_ids: Vec<&str> = vec![];
         for property in &node.properties {
             property_ids.push(&property.id);
-            publish_retained(
-                &self.requests_tx,
-                format!("{}/{}/$name", node_base, property.id),
+            self.publish_retained(
+                &format!("{}/{}/$name", node.id, property.id),
                 property.name.as_str(),
             )
             .await?;
-            publish_retained(
-                &self.requests_tx,
-                format!("{}/{}/$datatype", node_base, property.id),
+            self.publish_retained(
+                &format!("{}/{}/$datatype", node.id, property.id),
                 property.datatype,
             )
             .await?;
             if let Some(unit) = &property.unit {
-                publish_retained(
-                    &self.requests_tx,
-                    format!("{}/{}/$unit", node_base, property.id),
-                    unit.as_str(),
-                )
-                .await?;
+                self.publish_retained(&format!("{}/{}/$unit", node.id, property.id), unit.as_str())
+                    .await?;
             }
         }
-        publish_retained(
-            &self.requests_tx,
-            format!("{}/$properties", node_base),
-            property_ids.join(","),
-        )
-        .await?;
+        self.publish_retained(&format!("{}/$properties", node.id), property_ids.join(","))
+            .await?;
         Ok(())
     }
 
@@ -353,24 +307,14 @@ impl HomieDevice {
             .map(|node| node.id.as_str())
             .collect::<Vec<&str>>()
             .join(",");
-        publish_retained(
-            &self.requests_tx,
-            format!("{}/$nodes", self.device_base),
-            node_ids,
-        )
-        .await
+        self.publish_retained("$nodes", node_ids).await
     }
 
     pub async fn ready(&mut self) -> Result<(), SendError<Request>> {
         assert_eq!(self.state, State::Init);
         self.state = State::Ready;
 
-        publish_retained(
-            &self.requests_tx,
-            format!("{}/$state", self.device_base),
-            "ready",
-        )
-        .await?;
+        self.publish_retained("$state", "ready").await?;
 
         Ok(())
     }
@@ -381,10 +325,19 @@ impl HomieDevice {
         property_id: &str,
         value: impl ToString,
     ) -> Result<(), SendError<Request>> {
+        self.publish_retained(&format!("{}/{}", node_id, property_id), value.to_string())
+            .await
+    }
+
+    async fn publish_retained(
+        &self,
+        subtopic: &str,
+        value: impl Into<Vec<u8>>,
+    ) -> Result<(), SendError<Request>> {
         publish_retained(
             &self.requests_tx,
-            format!("{}/{}/{}", self.device_base, node_id, property_id),
-            value.to_string(),
+            format!("{}/{}", self.device_base, subtopic),
+            value,
         )
         .await
     }
