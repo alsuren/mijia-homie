@@ -86,7 +86,9 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     let mqtt_prefix =
         std::env::var("MQTT_PREFIX").unwrap_or_else(|_| DEFAULT_MQTT_PREFIX.to_string());
     let device_base = format!("{}/{}", mqtt_prefix, device_id);
-    let (homie, mqtt_handle) = HomieDevice::spawn(&device_base, &device_name, mqttoptions).await?;
+    let (homie, mqtt_handle) = HomieDevice::builder(&device_base, &device_name, mqttoptions)
+        .spawn()
+        .await?;
 
     let local = task::LocalSet::new();
 

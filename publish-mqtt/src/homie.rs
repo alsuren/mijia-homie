@@ -105,37 +105,33 @@ enum State {
     Ready,
 }
 
-/// A Homie [device](https://homieiot.github.io/specification/#devices). This corresponds to a
-/// single MQTT connection.
-pub struct HomieDevice {
-    requests_tx: Sender<Request>,
+/// Builder for `HomieDevice` and associated objects.
+pub struct HomieDeviceBuilder {
     device_base: String,
     device_name: String,
     firmware_name: String,
     firmware_version: String,
-    nodes: Vec<Node>,
-    state: State,
+    mqtt_options: MqttOptions,
 }
 
-impl HomieDevice {
+impl HomieDeviceBuilder {
+    /// Set the firmware name and version to be advertised for the Homie device.
+    ///
+    /// If this is not set, it will default to the cargo package name and version.
+    #[allow(dead_code)]
+    pub fn set_firmware(&mut self, firmware_name: &str, firmware_version: &str) {
+        self.firmware_name = firmware_name.to_string();
+        self.firmware_version = firmware_version.to_string();
+    }
+
     /// Create a new Homie device, connect to the MQTT server, and start a task to handle the MQTT
     /// connection.
-    ///
-    /// # Arguments
-    /// * `device_base`: The base topic ID for the device, including the Homie base topic. This
-    ///   might be something like "homie/my-device-id" if you are using the default Homie
-    ///   [base topic](https://homieiot.github.io/specification/#base-topic). This must be
-    ///   unique per MQTT server.
-    /// * `device_name`: The human-readable name of the device.
-    /// * `mqtt_options`: Options for the MQTT connection, including which server to connect to.
     ///
     /// # Return value
     /// A pair of the `HomieDevice` itself, and a `Future` for the tasks which handle the MQTT
     /// connection. You should join on this future to handle any errors it returns.
     pub async fn spawn(
-        device_base: &str,
-        device_name: &str,
-        mut mqtt_options: MqttOptions,
+        mut self,
     ) -> Result<
         (
             HomieDevice,
@@ -143,21 +139,23 @@ impl HomieDevice {
         ),
         SendError<Request>,
     > {
-        mqtt_options.set_last_will(LastWill {
-            topic: format!("{}/$state", device_base),
+        self.mqtt_options.set_last_will(LastWill {
+            topic: format!("{}/$state", self.device_base),
             message: "lost".to_string(),
             qos: QoS::AtLeastOnce,
             retain: true,
         });
-        let mut event_loop = EventLoop::new(mqtt_options, REQUESTS_CAP).await;
+        let mut event_loop = EventLoop::new(self.mqtt_options, REQUESTS_CAP).await;
 
         let mut homie = HomieDevice::new(
             event_loop.handle(),
-            device_base.to_string(),
-            device_name.to_string(),
+            self.device_base,
+            self.device_name,
+            self.firmware_name,
+            self.firmware_version,
         );
 
-        let stats = HomieStats::new(event_loop.handle(), device_base.to_string());
+        let stats = HomieStats::new(event_loop.handle(), homie.device_base.to_string());
 
         // This needs to be spawned before we wait for anything to be sent, as the start() calls below do.
         let event_task: JoinHandle<Result<(), Box<dyn Error + Send + Sync>>> =
@@ -177,14 +175,57 @@ impl HomieDevice {
 
         Ok((homie, join_handle))
     }
+}
 
-    fn new(requests_tx: Sender<Request>, device_base: String, device_name: String) -> HomieDevice {
+/// A Homie [device](https://homieiot.github.io/specification/#devices). This corresponds to a
+/// single MQTT connection.
+pub struct HomieDevice {
+    requests_tx: Sender<Request>,
+    device_base: String,
+    device_name: String,
+    firmware_name: String,
+    firmware_version: String,
+    nodes: Vec<Node>,
+    state: State,
+}
+
+impl HomieDevice {
+    /// Create a builder to construct a new Homie device.
+    ///
+    /// # Arguments
+    /// * `device_base`: The base topic ID for the device, including the Homie base topic. This
+    ///   might be something like "homie/my-device-id" if you are using the default Homie
+    ///   [base topic](https://homieiot.github.io/specification/#base-topic). This must be
+    ///   unique per MQTT server.
+    /// * `device_name`: The human-readable name of the device.
+    /// * `mqtt_options`: Options for the MQTT connection, including which server to connect to.
+    pub fn builder(
+        device_base: &str,
+        device_name: &str,
+        mqtt_options: MqttOptions,
+    ) -> HomieDeviceBuilder {
+        HomieDeviceBuilder {
+            device_base: device_base.to_string(),
+            device_name: device_name.to_string(),
+            firmware_name: DEFAULT_FIRMWARE_NAME.to_string(),
+            firmware_version: DEFAULT_FIRMWARE_VERSION.to_string(),
+            mqtt_options,
+        }
+    }
+
+    fn new(
+        requests_tx: Sender<Request>,
+        device_base: String,
+        device_name: String,
+        firmware_name: String,
+        firmware_version: String,
+    ) -> HomieDevice {
         HomieDevice {
             requests_tx,
             device_base,
             device_name,
-            firmware_name: DEFAULT_FIRMWARE_NAME.to_string(),
-            firmware_version: DEFAULT_FIRMWARE_VERSION.to_string(),
+            firmware_name,
+            firmware_version,
             nodes: vec![],
             state: State::NotStarted,
         }
@@ -237,16 +278,6 @@ impl HomieDevice {
         .await?;
         self.state = State::Init;
         Ok(())
-    }
-
-    /// Set the firmware name and version to be advertised for the Homie device.
-    ///
-    /// If this is not set, it will default to the cargo package name and version.
-    #[allow(dead_code)]
-    pub fn set_firmware(&mut self, firmware_name: &str, firmware_version: &str) {
-        assert_eq!(self.state, State::NotStarted);
-        self.firmware_name = firmware_name.to_string();
-        self.firmware_version = firmware_version.to_string();
     }
 
     pub async fn add_node(&mut self, node: Node) -> Result<(), SendError<Request>> {
@@ -432,6 +463,8 @@ mod tests {
             requests_tx,
             "homie/test-device".to_string(),
             "Test device".to_string(),
+            "firmware_name".to_string(),
+            "firmware_version".to_string(),
         );
         (device, requests_rx)
     }
@@ -486,29 +519,14 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn set_firmware_succeeds_before_start() {
-        let (mut device, rx) = make_test_device();
+    async fn set_firmware_succeeds() {
+        let mut builder = HomieDevice::builder(
+            "homie/test-device",
+            "Test device",
+            MqttOptions::new("client_id", "hostname", 1234),
+        );
 
-        device.set_firmware("firmware_name", "firmware_version");
-
-        device.start().await.unwrap();
-        device.ready().await.unwrap();
-
-        // Need to keep rx alive until here so that the channel isn't closed.
-        drop(rx);
-    }
-
-    #[tokio::test]
-    #[should_panic(expected = "NotStarted")]
-    async fn set_firmware_fails_after_start() {
-        let (mut device, rx) = make_test_device();
-
-        device.start().await.unwrap();
-
-        device.set_firmware("firmware_name", "firmware_version");
-
-        // Need to keep rx alive until here so that the channel isn't closed.
-        drop(rx);
+        builder.set_firmware("firmware_name", "firmware_version");
     }
 
     #[tokio::test]
