@@ -148,14 +148,10 @@ impl HomieDeviceBuilder {
         let mut event_loop = EventLoop::new(self.mqtt_options, REQUESTS_CAP).await;
 
         let publisher = DevicePublisher::new(event_loop.handle(), self.device_base);
-        let mut homie = HomieDevice::new(
-            publisher.clone(),
-            self.device_name,
-            self.firmware_name,
-            self.firmware_version,
-        );
+        let mut homie = HomieDevice::new(publisher.clone(), self.device_name);
 
-        let stats = HomieStats::new(publisher);
+        let stats = HomieStats::new(publisher.clone());
+        let firmware = HomieFirmware::new(publisher, self.firmware_name, self.firmware_version);
 
         // This needs to be spawned before we wait for anything to be sent, as the start() calls below do.
         let event_task: JoinHandle<Result<(), Box<dyn Error + Send + Sync>>> =
@@ -167,6 +163,7 @@ impl HomieDeviceBuilder {
             });
 
         stats.start().await?;
+        firmware.start().await?;
         homie.start().await?;
 
         let stats_task: JoinHandle<Result<(), Box<dyn Error + Send + Sync>>> =
@@ -182,8 +179,6 @@ impl HomieDeviceBuilder {
 pub struct HomieDevice {
     publisher: DevicePublisher,
     device_name: String,
-    firmware_name: String,
-    firmware_version: String,
     nodes: Vec<Node>,
     state: State,
 }
@@ -212,17 +207,10 @@ impl HomieDevice {
         }
     }
 
-    fn new(
-        publisher: DevicePublisher,
-        device_name: String,
-        firmware_name: String,
-        firmware_version: String,
-    ) -> HomieDevice {
+    fn new(publisher: DevicePublisher, device_name: String) -> HomieDevice {
         HomieDevice {
             publisher,
             device_name,
-            firmware_name,
-            firmware_version,
             nodes: vec![],
             state: State::NotStarted,
         }
@@ -232,13 +220,6 @@ impl HomieDevice {
         assert_eq!(self.state, State::NotStarted);
         self.publisher
             .publish_retained("$homie", HOMIE_VERSION)
-            .await?;
-        // TODO: Send $localip and $mac too.
-        self.publisher
-            .publish_retained("$fw/name", self.firmware_name.as_str())
-            .await?;
-        self.publisher
-            .publish_retained("$fw/version", self.firmware_version.as_str())
             .await?;
         self.publisher
             .publish_retained(
@@ -401,6 +382,35 @@ impl HomieStats {
     }
 }
 
+/// Legacy firmware extension.
+struct HomieFirmware {
+    publisher: DevicePublisher,
+    firmware_name: String,
+    firmware_version: String,
+}
+
+impl HomieFirmware {
+    fn new(publisher: DevicePublisher, firmware_name: String, firmware_version: String) -> Self {
+        Self {
+            publisher,
+            firmware_name,
+            firmware_version,
+        }
+    }
+
+    /// Send initial topics.
+    async fn start(&self) -> Result<(), SendError<Request>> {
+        // TODO: Send $localip and $mac too.
+        self.publisher
+            .publish_retained("$fw/name", self.firmware_name.as_str())
+            .await?;
+        self.publisher
+            .publish_retained("$fw/version", self.firmware_version.as_str())
+            .await?;
+        Ok(())
+    }
+}
+
 fn try_join_handles<A, B, E>(
     a: JoinHandle<Result<A, E>>,
     b: JoinHandle<Result<B, E>>,
@@ -419,12 +429,7 @@ mod tests {
     fn make_test_device() -> (HomieDevice, Receiver<Request>) {
         let (requests_tx, requests_rx) = async_channel::unbounded();
         let publisher = DevicePublisher::new(requests_tx, "homie/test-device".to_string());
-        let device = HomieDevice::new(
-            publisher,
-            "Test device".to_string(),
-            "firmware_name".to_string(),
-            "firmware_version".to_string(),
-        );
+        let device = HomieDevice::new(publisher, "Test device".to_string());
         (device, requests_rx)
     }
 
