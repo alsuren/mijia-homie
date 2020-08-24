@@ -228,6 +228,7 @@ impl HomieDevice {
     /// Set the firmware name and version to be advertised for the Homie device.
     ///
     /// If this is not set, it will default to the cargo package name and version.
+    #[allow(dead_code)]
     pub fn set_firmware(&mut self, firmware_name: &str, firmware_version: &str) {
         assert_eq!(self.state, State::NotStarted);
         self.firmware_name = firmware_name.to_string();
