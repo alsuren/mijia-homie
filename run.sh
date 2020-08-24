@@ -20,8 +20,8 @@ else
     exit 1
 fi
 
-time rsync target/armv7-unknown-linux-gnueabihf/$PROFILE/read-all-devices $TARGET_SSH:read-all-devices
-time rsync target/armv7-unknown-linux-gnueabihf/$PROFILE/publish-mqtt $TARGET_SSH:publish-mqtt
+time rsync --progress target/armv7-unknown-linux-gnueabihf/$PROFILE/read-all-devices $TARGET_SSH:read-all-devices-next
+time rsync --progress target/armv7-unknown-linux-gnueabihf/$PROFILE/publish-mqtt $TARGET_SSH:publish-mqtt
 
 if [ $RUN -eq 1 ]
 then
