@@ -379,7 +379,7 @@ impl HomieStats {
     /// Send latest stats, if enough time has passed since last time.
     async fn refresh(&mut self) -> Result<(), SendError<Request>> {
         let now = Instant::now();
-        if now > self.last_sent + STATS_INTERVAL {
+        if now >= self.last_sent + STATS_INTERVAL {
             self.last_sent = now;
             let uptime = now - self.start_time;
             publish_retained(
@@ -408,7 +408,7 @@ mod tests {
     use super::*;
     use async_channel::Receiver;
 
-    fn test_device() -> (HomieDevice, Receiver<Request>) {
+    fn make_test_device() -> (HomieDevice, Receiver<Request>) {
         let (requests_tx, requests_rx) = async_channel::unbounded();
         let device = HomieDevice::new(
             requests_tx,
@@ -420,8 +420,8 @@ mod tests {
 
     #[tokio::test]
     #[should_panic(expected = "Tried to add node with duplicate ID")]
-    async fn duplicate_node() {
-        let (mut device, rx) = test_device();
+    async fn add_node_fails_given_duplicate_id() {
+        let (mut device, rx) = make_test_device();
 
         device
             .add_node(Node::new(
@@ -447,8 +447,8 @@ mod tests {
 
     #[tokio::test]
     #[should_panic(expected = "NotStarted")]
-    async fn ready_before_start() {
-        let (mut device, rx) = test_device();
+    async fn ready_fails_if_called_before_start() {
+        let (mut device, rx) = make_test_device();
 
         device.ready().await.unwrap();
 
@@ -457,8 +457,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn start_empty() {
-        let (mut device, rx) = test_device();
+    async fn start_succeeds_with_no_nodes() {
+        let (mut device, rx) = make_test_device();
 
         device.start().await.unwrap();
         device.ready().await.unwrap();
@@ -468,8 +468,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn set_firmware() {
-        let (mut device, rx) = test_device();
+    async fn set_firmware_succeeds_before_start() {
+        let (mut device, rx) = make_test_device();
 
         device.set_firmware("firmware_name", "firmware_version");
 
@@ -482,8 +482,8 @@ mod tests {
 
     #[tokio::test]
     #[should_panic(expected = "NotStarted")]
-    async fn set_firmware_after_start() {
-        let (mut device, rx) = test_device();
+    async fn set_firmware_fails_after_start() {
+        let (mut device, rx) = make_test_device();
 
         device.start().await.unwrap();
 
@@ -494,8 +494,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn add_node() {
-        let (mut device, rx) = test_device();
+    async fn add_node_succeeds_before_and_after_start() {
+        let (mut device, rx) = make_test_device();
 
         device
             .add_node(Node::new(
@@ -527,8 +527,8 @@ mod tests {
 
     /// Add a node, remove it, and add it back again.
     #[tokio::test]
-    async fn read_removed_node() {
-        let (mut device, rx) = test_device();
+    async fn add_node_succeeds_after_remove() {
+        let (mut device, rx) = make_test_device();
 
         device
             .add_node(Node::new(
