@@ -1,8 +1,12 @@
 use async_channel::{SendError, Sender};
+use futures::future::try_join;
+use futures::FutureExt;
 use rumqttc::{self, EventLoop, LastWill, MqttOptions, Publish, QoS, Request};
 use std::error::Error;
+use std::future::Future;
 use std::time::{Duration, Instant};
-use tokio::task::{self, JoinHandle};
+use tokio::task::{self, JoinError, JoinHandle};
+use tokio::time::delay_for;
 
 const HOMIE_VERSION: &str = "4.0";
 const HOMIE_IMPLEMENTATION: &str = "homie-rs";
@@ -125,16 +129,15 @@ impl HomieDevice {
     /// * `mqtt_options`: Options for the MQTT connection, including which server to connect to.
     ///
     /// # Return value
-    /// A pair of the `HomieDevice` itself, and a `JoinHandle` for the task which handles the MQTT
-    /// connection. You should join on this handle to allow the connection to make progress, and
-    /// handle any errors it returns.
+    /// A pair of the `HomieDevice` itself, and a `Future` for the tasks which handle the MQTT
+    /// connection. You should join on this future to handle any errors it returns.
     pub async fn spawn(
         device_base: &str,
         device_name: &str,
         mut mqtt_options: MqttOptions,
     ) -> (
         HomieDevice,
-        JoinHandle<Result<(), Box<dyn Error + Send + Sync>>>,
+        impl Future<Output = Result<((), ()), Box<dyn Error + Send + Sync>>>,
     ) {
         mqtt_options.set_last_will(LastWill {
             topic: format!("{}/$state", device_base),
@@ -150,15 +153,18 @@ impl HomieDevice {
             device_name.to_string(),
         );
 
-        let mut stats = HomieStats::new(event_loop.handle(), device_base.to_string());
+        let stats = HomieStats::new(event_loop.handle(), device_base.to_string());
 
-        let join_handle = task::spawn(async move {
-            loop {
-                let (incoming, outgoing) = event_loop.poll().await?;
-                log::trace!("Incoming = {:?}, Outgoing = {:?}", incoming, outgoing);
-                stats.refresh().await?;
-            }
-        });
+        let event_task: JoinHandle<Result<(), Box<dyn Error + Send + Sync>>> =
+            task::spawn(async move {
+                loop {
+                    let (incoming, outgoing) = event_loop.poll().await?;
+                    log::trace!("Incoming = {:?}, Outgoing = {:?}", incoming, outgoing);
+                }
+            });
+        let stats_task: JoinHandle<Result<(), Box<dyn Error + Send + Sync>>> =
+            task::spawn(stats.run());
+        let join_handle = try_join_handles(event_task, stats_task);
 
         (homie, join_handle)
     }
@@ -350,7 +356,6 @@ struct HomieStats {
     requests_tx: Sender<Request>,
     device_base: String,
     start_time: Instant,
-    last_sent: Instant,
 }
 
 impl HomieStats {
@@ -360,7 +365,6 @@ impl HomieStats {
             requests_tx,
             device_base,
             start_time: now,
-            last_sent: now - STATS_INTERVAL,
         }
     }
 
@@ -377,20 +381,18 @@ impl HomieStats {
         .await
     }
 
-    /// Send latest stats, if enough time has passed since last time.
-    async fn refresh(&mut self) -> Result<(), SendError<Request>> {
-        let now = Instant::now();
-        if now >= self.last_sent + STATS_INTERVAL {
-            self.last_sent = now;
-            let uptime = now - self.start_time;
+    /// Periodically send stats.
+    async fn run(self) -> Result<(), Box<dyn Error + Send + Sync>> {
+        loop {
+            let uptime = Instant::now() - self.start_time;
             publish_retained(
                 &self.requests_tx,
                 format!("{}/$stats/uptime", self.device_base),
                 uptime.as_secs().to_string(),
             )
             .await?;
+            delay_for(STATS_INTERVAL).await;
         }
-        Ok(())
     }
 }
 
@@ -402,6 +404,16 @@ async fn publish_retained(
     let mut publish = Publish::new(name, QoS::AtLeastOnce, value);
     publish.set_retain(true);
     requests_tx.send(publish.into()).await
+}
+
+fn try_join_handles<A, B, E>(
+    a: JoinHandle<Result<A, E>>,
+    b: JoinHandle<Result<B, E>>,
+) -> impl Future<Output = Result<(A, B), E>>
+where
+    E: From<JoinError>,
+{
+    try_join(a.map(|res| Ok(res??)), b.map(|res| Ok(res??)))
 }
 
 #[cfg(test)]
