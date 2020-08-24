@@ -131,7 +131,18 @@ pub fn start_notify_sensors<'a>(
     }
 }
 
-pub fn decode_value(value: &[u8]) -> Option<(f32, u8, u16, u16)> {
+pub struct Readings {
+    /// Temperature in ºC, with 2 decimal places of precision
+    pub temperature: f32,
+    /// Percent humidity
+    pub humidity: u8,
+    /// Voltage in millivolts
+    pub battery_voltage: u16,
+    /// Inferred from `battery_voltage` with a bit of hand-waving.
+    pub battery_percent: u16,
+}
+
+pub fn decode_value(value: &[u8]) -> Option<Readings> {
     if value.len() != 5 {
         return None;
     }
@@ -142,7 +153,12 @@ pub fn decode_value(value: &[u8]) -> Option<(f32, u8, u16, u16)> {
     let humidity = value[2];
     let battery_voltage = u16::from_le_bytes(value[3..5].try_into().unwrap());
     let battery_percent = (max(battery_voltage, 2100) - 2100) / 10;
-    Some((temperature, humidity, battery_voltage, battery_percent))
+    Some(Readings {
+        temperature,
+        humidity,
+        battery_voltage,
+        battery_percent,
+    })
 }
 
 /// Read the given file of key-value pairs into a hashmap.

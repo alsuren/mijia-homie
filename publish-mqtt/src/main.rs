@@ -213,26 +213,30 @@ async fn requests(mut homie: HomieDevice) -> Result<(), Box<dyn Error>> {
                     };
                     let device = BluetoothDevice::new(bt_session, device_path.to_string());
 
-                    if let Some((temperature, humidity, battery_voltage, battery_percent)) =
-                        decode_value(&value)
-                    {
+                    if let Some(readings) = decode_value(&value) {
                         let (node_id, name) = node_id_name_for_sensor(&device, &sensor_names)?;
                         println!(
                             "{} Temperature: {:.2}ºC Humidity: {:?}% Battery {} mV ({} %) ({})",
                             device.get_id(),
-                            temperature,
-                            humidity,
-                            battery_voltage,
-                            battery_percent,
+                            readings.temperature,
+                            readings.humidity,
+                            readings.battery_voltage,
+                            readings.battery_percent,
                             name
                         );
 
                         homie
-                            .publish_value(&node_id, "temperature", format!("{:.2}", temperature))
+                            .publish_value(
+                                &node_id,
+                                "temperature",
+                                format!("{:.2}", readings.temperature),
+                            )
                             .await?;
-                        homie.publish_value(&node_id, "humidity", humidity).await?;
                         homie
-                            .publish_value(&node_id, "battery", battery_percent)
+                            .publish_value(&node_id, "humidity", readings.humidity)
+                            .await?;
+                        homie
+                            .publish_value(&node_id, "battery", readings.battery_percent)
                             .await?;
                     } else {
                         println!("Invalid value from {}", device.get_id());
