@@ -137,7 +137,7 @@ impl HomieDevice {
         mut mqtt_options: MqttOptions,
     ) -> (
         HomieDevice,
-        impl Future<Output = Result<((), ()), Box<dyn Error + Send + Sync>>>,
+        impl Future<Output = Result<(), Box<dyn Error + Send + Sync>>>,
     ) {
         mqtt_options.set_last_will(LastWill {
             topic: format!("{}/$state", device_base),
@@ -164,7 +164,7 @@ impl HomieDevice {
             });
         let stats_task: JoinHandle<Result<(), Box<dyn Error + Send + Sync>>> =
             task::spawn(stats.run());
-        let join_handle = try_join_handles(event_task, stats_task);
+        let join_handle = try_join_handles(event_task, stats_task).map(|r| r.map(|((), ())| ()));
 
         (homie, join_handle)
     }
