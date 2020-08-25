@@ -102,7 +102,7 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
         bluetooth_handle.map(|res| Ok(res?)),
         // MQTT event loop finished first.
         // Unwrap the JoinHandle Result to get to the real Result.
-        mqtt_handle.map(|res| Ok(res?)),
+        mqtt_handle,
     };
     res?;
     Ok(())
