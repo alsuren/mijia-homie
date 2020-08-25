@@ -133,7 +133,7 @@ impl HomieDeviceBuilder {
     /// A pair of the `HomieDevice` itself, and a `Future` for the tasks which handle the MQTT
     /// connection. You should join on this future to handle any errors it returns.
     pub async fn spawn(
-        mut self,
+        self,
     ) -> Result<
         (
             HomieDevice,
@@ -141,13 +141,14 @@ impl HomieDeviceBuilder {
         ),
         SendError<Request>,
     > {
-        self.mqtt_options.set_last_will(LastWill {
+        let mut mqtt_options = self.mqtt_options;
+        mqtt_options.set_last_will(LastWill {
             topic: format!("{}/$state", self.device_base),
             message: "lost".to_string(),
             qos: QoS::AtLeastOnce,
             retain: true,
         });
-        let event_loop = EventLoop::new(self.mqtt_options, REQUESTS_CAP).await;
+        let event_loop = EventLoop::new(mqtt_options, REQUESTS_CAP).await;
 
         let publisher = DevicePublisher::new(event_loop.handle(), self.device_base);
         let mut homie = HomieDevice::new(publisher.clone(), self.device_name);
