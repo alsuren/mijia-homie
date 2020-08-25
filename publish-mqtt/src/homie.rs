@@ -13,6 +13,7 @@ const HOMIE_IMPLEMENTATION: &str = "homie-rs";
 const DEFAULT_FIRMWARE_NAME: &str = env!("CARGO_PKG_NAME");
 const DEFAULT_FIRMWARE_VERSION: &str = env!("CARGO_PKG_VERSION");
 const STATS_INTERVAL: Duration = Duration::from_secs(60);
+const REQUESTS_CAP: usize = 10;
 
 /// The data type for a Homie property.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -145,7 +146,7 @@ impl HomieDevice {
             qos: QoS::AtLeastOnce,
             retain: true,
         });
-        let mut event_loop = EventLoop::new(mqtt_options, 10).await;
+        let mut event_loop = EventLoop::new(mqtt_options, REQUESTS_CAP).await;
 
         let homie = HomieDevice::new(
             event_loop.handle(),
