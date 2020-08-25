@@ -147,7 +147,7 @@ impl HomieDeviceBuilder {
             qos: QoS::AtLeastOnce,
             retain: true,
         });
-        let mut event_loop = EventLoop::new(self.mqtt_options, REQUESTS_CAP).await;
+        let event_loop = EventLoop::new(self.mqtt_options, REQUESTS_CAP).await;
 
         let publisher = DevicePublisher::new(event_loop.handle(), self.device_base);
         let mut homie = HomieDevice::new(publisher.clone(), self.device_name);
@@ -156,20 +156,14 @@ impl HomieDeviceBuilder {
         let firmware = HomieFirmware::new(publisher, self.firmware_name, self.firmware_version);
 
         // This needs to be spawned before we wait for anything to be sent, as the start() calls below do.
-        let event_task: JoinHandle<Result<(), Box<dyn Error + Send + Sync>>> =
-            task::spawn(async move {
-                loop {
-                    let (incoming, outgoing) = event_loop.poll().await?;
-                    log::trace!("Incoming = {:?}, Outgoing = {:?}", incoming, outgoing);
-                }
-            });
+        let event_task = HomieDevice::spawn(event_loop);
 
         stats.start().await?;
         firmware.start().await?;
         homie.start().await?;
 
-        let stats_task: JoinHandle<Result<(), Box<dyn Error + Send + Sync>>> =
-            task::spawn(stats.run());
+        let stats_task = stats.spawn();
+
         let join_handle = try_join_handles(event_task, stats_task).map(|r| r.map(|((), ())| ()));
 
         Ok((homie, join_handle))
@@ -237,6 +231,16 @@ impl HomieDevice {
         self.publisher.publish_retained("$state", "init").await?;
         self.state = State::Init;
         Ok(())
+    }
+
+    /// Spawn a task to handle the EventLoop.
+    fn spawn(mut event_loop: EventLoop) -> JoinHandle<Result<(), Box<dyn Error + Send + Sync>>> {
+        task::spawn(async move {
+            loop {
+                let (incoming, outgoing) = event_loop.poll().await?;
+                log::trace!("Incoming = {:?}, Outgoing = {:?}", incoming, outgoing);
+            }
+        })
     }
 
     pub async fn add_node(&mut self, node: Node) -> Result<(), SendError<Request>> {
@@ -374,14 +378,16 @@ impl HomieStats {
     }
 
     /// Periodically send stats.
-    async fn run(self) -> Result<(), Box<dyn Error + Send + Sync>> {
-        loop {
-            let uptime = Instant::now() - self.start_time;
-            self.publisher
-                .publish_retained("$stats/uptime", uptime.as_secs().to_string())
-                .await?;
-            delay_for(STATS_INTERVAL).await;
-        }
+    fn spawn(self) -> JoinHandle<Result<(), Box<dyn Error + Send + Sync>>> {
+        task::spawn(async move {
+            loop {
+                let uptime = Instant::now() - self.start_time;
+                self.publisher
+                    .publish_retained("$stats/uptime", uptime.as_secs().to_string())
+                    .await?;
+                delay_for(STATS_INTERVAL).await;
+            }
+        })
     }
 }
 
