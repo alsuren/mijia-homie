@@ -168,7 +168,7 @@ impl HomieDeviceBuilder {
         let event_loop = EventLoop::new(mqtt_options, REQUESTS_CAP).await;
 
         let publisher = DevicePublisher::new(event_loop.handle(), self.device_base);
-        let homie = HomieDevice::new(publisher.clone(), self.device_name);
+        let homie = HomieDevice::new(publisher.clone(), self.device_name, &EXTENSION_IDS);
 
         let stats = HomieStats::new(publisher.clone());
         let firmware = HomieFirmware::new(publisher, self.firmware_name, self.firmware_version);
@@ -186,6 +186,7 @@ pub struct HomieDevice {
     device_name: String,
     nodes: Vec<Node>,
     state: State,
+    extension_ids: String,
 }
 
 impl HomieDevice {
@@ -212,12 +213,13 @@ impl HomieDevice {
         }
     }
 
-    fn new(publisher: DevicePublisher, device_name: String) -> HomieDevice {
+    fn new(publisher: DevicePublisher, device_name: String, extension_ids: &[&str]) -> HomieDevice {
         HomieDevice {
             publisher,
             device_name,
             nodes: vec![],
             state: State::NotStarted,
+            extension_ids: extension_ids.join(","),
         }
     }
 
@@ -227,7 +229,7 @@ impl HomieDevice {
             .publish_retained("$homie", HOMIE_VERSION)
             .await?;
         self.publisher
-            .publish_retained("$extensions", EXTENSION_IDS.join(","))
+            .publish_retained("$extensions", self.extension_ids.as_str())
             .await?;
         self.publisher
             .publish_retained("$implementation", HOMIE_IMPLEMENTATION)
@@ -452,7 +454,7 @@ mod tests {
     fn make_test_device() -> (HomieDevice, Receiver<Request>) {
         let (requests_tx, requests_rx) = async_channel::unbounded();
         let publisher = DevicePublisher::new(requests_tx, "homie/test-device".to_string());
-        let device = HomieDevice::new(publisher, "Test device".to_string());
+        let device = HomieDevice::new(publisher, "Test device".to_string(), &[]);
         (device, requests_rx)
     }
 
