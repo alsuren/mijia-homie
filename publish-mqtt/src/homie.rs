@@ -141,20 +141,7 @@ impl HomieDeviceBuilder {
         ),
         SendError<Request>,
     > {
-        let mut mqtt_options = self.mqtt_options;
-        mqtt_options.set_last_will(LastWill {
-            topic: format!("{}/$state", self.device_base),
-            message: "lost".to_string(),
-            qos: QoS::AtLeastOnce,
-            retain: true,
-        });
-        let event_loop = EventLoop::new(mqtt_options, REQUESTS_CAP).await;
-
-        let publisher = DevicePublisher::new(event_loop.handle(), self.device_base);
-        let mut homie = HomieDevice::new(publisher.clone(), self.device_name);
-
-        let stats = HomieStats::new(publisher.clone());
-        let firmware = HomieFirmware::new(publisher, self.firmware_name, self.firmware_version);
+        let (event_loop, mut homie, stats, firmware) = self.build().await;
 
         // This needs to be spawned before we wait for anything to be sent, as the start() calls below do.
         let event_task = HomieDevice::spawn(event_loop);
@@ -168,6 +155,25 @@ impl HomieDeviceBuilder {
         let join_handle = try_join_handles(event_task, stats_task).map(|r| r.map(|((), ())| ()));
 
         Ok((homie, join_handle))
+    }
+
+    async fn build(self) -> (EventLoop, HomieDevice, HomieStats, HomieFirmware) {
+        let mut mqtt_options = self.mqtt_options;
+        mqtt_options.set_last_will(LastWill {
+            topic: format!("{}/$state", self.device_base),
+            message: "lost".to_string(),
+            qos: QoS::AtLeastOnce,
+            retain: true,
+        });
+        let event_loop = EventLoop::new(mqtt_options, REQUESTS_CAP).await;
+
+        let publisher = DevicePublisher::new(event_loop.handle(), self.device_base);
+        let homie = HomieDevice::new(publisher.clone(), self.device_name);
+
+        let stats = HomieStats::new(publisher.clone());
+        let firmware = HomieFirmware::new(publisher, self.firmware_name, self.firmware_version);
+
+        (event_loop, homie, stats, firmware)
     }
 }
 
@@ -501,7 +507,23 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn set_firmware_succeeds() {
+    async fn minimal_build_succeeds() {
+        let builder = HomieDevice::builder(
+            "homie/test-device",
+            "Test device",
+            MqttOptions::new("client_id", "hostname", 1234),
+        );
+
+        let (_event_loop, homie, _stats, firmware) = builder.build().await;
+
+        assert_eq!(homie.device_name, "Test device");
+        assert_eq!(homie.publisher.device_base, "homie/test-device");
+        assert_eq!(firmware.firmware_name, DEFAULT_FIRMWARE_NAME);
+        assert_eq!(firmware.firmware_version, DEFAULT_FIRMWARE_VERSION);
+    }
+
+    #[tokio::test]
+    async fn set_firmware_build_succeeds() {
         let mut builder = HomieDevice::builder(
             "homie/test-device",
             "Test device",
@@ -509,6 +531,13 @@ mod tests {
         );
 
         builder.set_firmware("firmware_name", "firmware_version");
+
+        let (_event_loop, homie, _stats, firmware) = builder.build().await;
+
+        assert_eq!(homie.device_name, "Test device");
+        assert_eq!(homie.publisher.device_base, "homie/test-device");
+        assert_eq!(firmware.firmware_name, "firmware_name");
+        assert_eq!(firmware.firmware_version, "firmware_version");
     }
 
     #[tokio::test]
