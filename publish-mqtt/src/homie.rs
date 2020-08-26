@@ -492,6 +492,7 @@ mod tests {
             ))
             .await
             .unwrap();
+
         // Need to keep rx alive until here so that the channel isn't closed.
         drop(rx);
     }
