@@ -132,6 +132,7 @@ pub fn start_notify_sensors<'a>(
     }
 }
 
+#[derive(Clone, Debug, PartialEq)]
 pub struct Readings {
     /// Temperature in ºC, with 2 decimal places of precision
     pub temperature: f32,
@@ -190,4 +191,37 @@ pub fn hashmap_from_file(filename: &str) -> Result<HashMap<String, String>, io::
         }
     }
     Ok(map)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn decode_empty() {
+        assert_eq!(decode_value(&[]), None);
+    }
+
+    #[test]
+    fn decode_too_short() {
+        assert_eq!(decode_value(&[1, 2, 3, 4]), None);
+    }
+
+    #[test]
+    fn decode_too_long() {
+        assert_eq!(decode_value(&[1, 2, 3, 4, 5, 6]), None);
+    }
+
+    #[test]
+    fn decode_valid() {
+        assert_eq!(
+            decode_value(&[1, 2, 3, 4, 10]),
+            Some(Readings {
+                temperature: 5.13,
+                humidity: 3,
+                battery_voltage: 2564,
+                battery_percent: 46
+            })
+        );
+    }
 }
