@@ -2,6 +2,7 @@ use blurz::{
     BluetoothAdapter, BluetoothDevice, BluetoothDiscoverySession, BluetoothEvent, BluetoothSession,
 };
 use futures::FutureExt;
+use homie::{Datatype, HomieDevice, Node, Property};
 use mijia::{
     decode_value, find_sensors, hashmap_from_file, print_sensors, start_notify_sensor,
     SERVICE_CHARACTERISTIC_PATH,
@@ -13,10 +14,6 @@ use std::error::Error;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::{task, time, try_join};
-
-mod homie;
-
-use homie::{Datatype, HomieDevice, Node, Property};
 
 const DEFAULT_MQTT_PREFIX: &str = "homie";
 const DEFAULT_DEVICE_ID: &str = "mijia-bridge";
