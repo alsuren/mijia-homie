@@ -215,15 +215,7 @@ async fn requests(mut homie: HomieDevice) -> Result<(), Box<dyn Error>> {
 
                     if let Some(readings) = decode_value(&value) {
                         let (node_id, name) = node_id_name_for_sensor(&device, &sensor_names)?;
-                        println!(
-                            "{} Temperature: {:.2}ºC Humidity: {:?}% Battery {} mV ({} %) ({})",
-                            device.get_id(),
-                            readings.temperature,
-                            readings.humidity,
-                            readings.battery_voltage,
-                            readings.battery_percent,
-                            name
-                        );
+                        println!("{} {} ({})", device.get_id(), readings, name);
 
                         homie
                             .publish_value(

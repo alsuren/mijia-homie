@@ -6,6 +6,7 @@ use std::cmp::max;
 use std::collections::HashMap;
 use std::convert::TryInto;
 use std::error::Error;
+use std::fmt::{Display, Formatter};
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, ErrorKind};
 use std::thread;
@@ -140,6 +141,16 @@ pub struct Readings {
     pub battery_voltage: u16,
     /// Inferred from `battery_voltage` with a bit of hand-waving.
     pub battery_percent: u16,
+}
+
+impl Display for Readings {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "Temperature: {:.2}ºC Humidity: {:?}% Battery: {:?} mV ({:?}%)",
+            self.temperature, self.humidity, self.battery_voltage, self.battery_percent
+        )
+    }
 }
 
 pub fn decode_value(value: &[u8]) -> Option<Readings> {

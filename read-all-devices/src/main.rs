@@ -46,15 +46,7 @@ fn main() {
             if let Some(readings) = decode_value(&value) {
                 let mac_address = device.get_address().unwrap();
                 let name = sensor_names.get(&mac_address).unwrap_or(&mac_address);
-                println!(
-                    "{} ({}) Temperature: {:.2}ºC Humidity: {:?}% Battery: {:?} mV ({:?}%)",
-                    object_path,
-                    name,
-                    readings.temperature,
-                    readings.humidity,
-                    readings.battery_voltage,
-                    readings.battery_percent
-                );
+                println!("{} ({}) {}", object_path, name, readings);
             }
         }
     }
