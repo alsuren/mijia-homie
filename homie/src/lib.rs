@@ -66,7 +66,7 @@ impl Property {
         Property {
             id: id.to_owned(),
             name: name.to_owned(),
-            datatype: datatype,
+            datatype,
             unit: unit.map(|s| s.to_owned()),
         }
     }
