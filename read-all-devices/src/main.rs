@@ -43,15 +43,10 @@ fn main() {
             let device_path = &object_path[..object_path.len() - SERVICE_CHARACTERISTIC_PATH.len()];
             let device = BluetoothDevice::new(bt_session, device_path.to_string());
 
-            if let Some((temperature, humidity, battery_voltage, battery_percent)) =
-                decode_value(&value)
-            {
+            if let Some(readings) = decode_value(&value) {
                 let mac_address = device.get_address().unwrap();
                 let name = sensor_names.get(&mac_address).unwrap_or(&mac_address);
-                println!(
-                    "{} ({}) Temperature: {:.2}ºC Humidity: {:?}% Battery: {:?} mV ({:?}%)",
-                    object_path, name, temperature, humidity, battery_voltage, battery_percent
-                );
+                println!("{} ({}) {}", object_path, name, readings);
             }
         }
     }

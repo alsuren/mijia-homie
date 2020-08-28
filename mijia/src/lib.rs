@@ -6,6 +6,7 @@ use std::cmp::max;
 use std::collections::HashMap;
 use std::convert::TryInto;
 use std::error::Error;
+use std::fmt::{Display, Formatter};
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, ErrorKind};
 use std::thread;
@@ -131,7 +132,29 @@ pub fn start_notify_sensors<'a>(
     }
 }
 
-pub fn decode_value(value: &[u8]) -> Option<(f32, u8, u16, u16)> {
+#[derive(Clone, Debug, PartialEq)]
+pub struct Readings {
+    /// Temperature in ºC, with 2 decimal places of precision
+    pub temperature: f32,
+    /// Percent humidity
+    pub humidity: u8,
+    /// Voltage in millivolts
+    pub battery_voltage: u16,
+    /// Inferred from `battery_voltage` with a bit of hand-waving.
+    pub battery_percent: u16,
+}
+
+impl Display for Readings {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "Temperature: {:.2}ºC Humidity: {:?}% Battery: {:?} mV ({:?}%)",
+            self.temperature, self.humidity, self.battery_voltage, self.battery_percent
+        )
+    }
+}
+
+pub fn decode_value(value: &[u8]) -> Option<Readings> {
     if value.len() != 5 {
         return None;
     }
@@ -142,7 +165,12 @@ pub fn decode_value(value: &[u8]) -> Option<(f32, u8, u16, u16)> {
     let humidity = value[2];
     let battery_voltage = u16::from_le_bytes(value[3..5].try_into().unwrap());
     let battery_percent = (max(battery_voltage, 2100) - 2100) / 10;
-    Some((temperature, humidity, battery_voltage, battery_percent))
+    Some(Readings {
+        temperature,
+        humidity,
+        battery_voltage,
+        battery_percent,
+    })
 }
 
 /// Read the given file of key-value pairs into a hashmap.
@@ -163,4 +191,37 @@ pub fn hashmap_from_file(filename: &str) -> Result<HashMap<String, String>, io::
         }
     }
     Ok(map)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn decode_empty() {
+        assert_eq!(decode_value(&[]), None);
+    }
+
+    #[test]
+    fn decode_too_short() {
+        assert_eq!(decode_value(&[1, 2, 3, 4]), None);
+    }
+
+    #[test]
+    fn decode_too_long() {
+        assert_eq!(decode_value(&[1, 2, 3, 4, 5, 6]), None);
+    }
+
+    #[test]
+    fn decode_valid() {
+        assert_eq!(
+            decode_value(&[1, 2, 3, 4, 10]),
+            Some(Readings {
+                temperature: 5.13,
+                humidity: 3,
+                battery_voltage: 2564,
+                battery_percent: 46
+            })
+        );
+    }
 }
