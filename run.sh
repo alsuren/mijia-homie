@@ -5,7 +5,7 @@ set -euxo pipefail
 #
 #     cargo install --git=https://github.com/alsuren/cross --branch=docker-build-context
 #
-TARGET=${TARGET:-armv7-unknown-linux-gnueabi}
+TARGET=${TARGET:-armv7-unknown-linux-gnueabihf}
 TARGET_SSH=${TARGET_SSH:-pi@raspberrypi.local}
 PROFILE=${PROFILE:-debug}
 RUN=${RUN:-1}
@@ -15,7 +15,7 @@ then
     time cross build --target $TARGET --release
 elif [ $PROFILE = debug ]
 then
-    time cross build --target $TARGET --verbose
+    time cross build --target $TARGET
 else
     echo "Invalid profile '$PROFILE'"
     exit 1
