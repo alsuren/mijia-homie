@@ -108,6 +108,7 @@ enum State {
 }
 
 /// Builder for `HomieDevice` and associated objects.
+#[derive(Debug)]
 pub struct HomieDeviceBuilder {
     device_base: String,
     device_name: String,
@@ -181,6 +182,7 @@ const EXTENSION_IDS: [&str; 2] = [HomieStats::EXTENSION_ID, HomieFirmware::EXTEN
 
 /// A Homie [device](https://homieiot.github.io/specification/#devices). This corresponds to a
 /// single MQTT connection.
+#[derive(Debug)]
 pub struct HomieDevice {
     publisher: DevicePublisher,
     device_name: String,
@@ -363,6 +365,7 @@ impl DevicePublisher {
 }
 
 /// Legacy stats extension.
+#[derive(Debug)]
 struct HomieStats {
     publisher: DevicePublisher,
     start_time: Instant,
@@ -401,6 +404,7 @@ impl HomieStats {
 }
 
 /// Legacy firmware extension.
+#[derive(Debug)]
 struct HomieFirmware {
     publisher: DevicePublisher,
     firmware_name: String,

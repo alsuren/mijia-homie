@@ -108,6 +108,7 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     Ok(())
 }
 
+#[derive(Debug)]
 struct Sensor {
     device_path: String,
     mac_address: String,
