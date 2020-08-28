@@ -9,3 +9,9 @@
 # will be able to use `context` and `dockerfile` to achieve the same result.
 context = "./docker"
 dockerfile = "./docker/Dockerfile.buster-gst-armv7-unknown-linux-gnueabihf"
+
+[target.aarch64-unknown-linux-gnu]
+# image = "alsuren/xiaomi-temp-aarch64-builder"
+
+context = "./docker"
+dockerfile = "./docker/Dockerfile.buster-gst-aarch64-unknown-linux-gnu"
