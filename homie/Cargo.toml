@@ -6,9 +6,9 @@ edition = "2018"
 
 [dependencies]
 async-channel = "1.4.0"
-futures = "*"
+futures = "0.3"
 local_ipaddress = "0.1"
-log = "*"
+log = "0.4"
 mac_address = "1.0"
-rumqttc = { git = "https://github.com/bytebeamio/rumqtt" }
+rumqttc = "0.0.6"
 tokio = "0.2.22"

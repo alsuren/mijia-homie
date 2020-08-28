@@ -7,12 +7,12 @@ edition = "2018"
 [dependencies]
 blurz = "0.4.0"
 color-backtrace = "0.4.2"
-futures = "*"
+futures = "0.3"
 homie = { path = "../homie" }
-log = "*"
+log = "0.4"
 mijia = { path = "../mijia" }
 pretty_env_logger = "0.4.0"
-rumqttc = { git = "https://github.com/bytebeamio/rumqtt" }
+rumqttc = "0.0.6"
 rustls = "0.17"
 rustls-native-certs = "0.3"
 tokio = "0.2.22"
