@@ -1,0 +1,14 @@
+[package]
+name = "homie"
+version = "0.1.0"
+authors = ["Andrew Walbran <qwandor@google.com>", "David Laban <alsuren@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+async-channel = "1.4.0"
+futures = "*"
+local_ipaddress = "0.1"
+log = "*"
+mac_address = "1.0"
+rumqttc = { git = "https://github.com/bytebeamio/rumqtt" }
+tokio = "0.2.22"
