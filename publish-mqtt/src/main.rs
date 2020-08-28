@@ -108,16 +108,16 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     Ok(())
 }
 
-struct Sensor<'a> {
-    device: BluetoothDevice<'a>,
+struct Sensor {
+    device_path: String,
     mac_address: String,
     name: String,
     last_update_timestamp: Instant,
 }
 
-impl<'a> Sensor<'a> {
+impl Sensor {
     pub fn new(
-        device: BluetoothDevice<'a>,
+        device: &BluetoothDevice,
         sensor_names: &HashMap<String, String>,
     ) -> Result<Self, Box<dyn Error>> {
         let mac_address = device.get_address()?;
@@ -126,7 +126,7 @@ impl<'a> Sensor<'a> {
             .cloned()
             .unwrap_or_else(|| mac_address.clone());
         Ok(Self {
-            device,
+            device_path: device.get_id(),
             mac_address,
             name,
             last_update_timestamp: Instant::now(),
@@ -144,16 +144,21 @@ impl<'a> Sensor<'a> {
     pub fn node_id(&self) -> String {
         self.mac_address.replace(":", "")
     }
+
+    pub fn device<'a>(&self, session: &'a BluetoothSession) -> BluetoothDevice<'a> {
+        BluetoothDevice::new(session, self.device_path.to_string())
+    }
 }
 
 async fn connect_start_sensor<'a>(
     bt_session: &'a BluetoothSession,
     homie: &mut HomieDevice,
     properties: Vec<Property>,
-    sensor: &mut Sensor<'a>,
+    sensor: &mut Sensor,
 ) -> Result<(), Box<dyn Error>> {
-    sensor.device.connect(CONNECT_TIMEOUT_MS)?;
-    start_notify_sensor(bt_session, &sensor.device)?;
+    let device = sensor.device(bt_session);
+    device.connect(CONNECT_TIMEOUT_MS)?;
+    start_notify_sensor(bt_session, &device)?;
     homie
         .add_node(Node::new(
             sensor.node_id(),
@@ -175,7 +180,7 @@ async fn requests(mut homie: HomieDevice) -> Result<(), Box<dyn Error>> {
     print_sensors(&sensors, &sensor_names);
     let (named_sensors, unnamed_sensors): (Vec<_>, Vec<_>) = sensors
         .into_iter()
-        .map(|d| Sensor::new(d, &sensor_names).unwrap())
+        .map(|d| Sensor::new(&d, &sensor_names).unwrap())
         .partition(|sensor| sensor_names.contains_key(sensor.mac_address()));
     println!(
         "{} named sensors, {} unnamed sensors",
@@ -245,7 +250,7 @@ async fn requests(mut homie: HomieDevice) -> Result<(), Box<dyn Error>> {
                     };
                     if let Some(sensor) = sensors_connected
                         .iter_mut()
-                        .find(|s| s.device.get_id() == device_path)
+                        .find(|s| s.device_path == device_path)
                     {
                         sensor.last_update_timestamp = Instant::now();
                         if let Some(readings) = decode_value(&value) {
@@ -279,7 +284,7 @@ async fn requests(mut homie: HomieDevice) -> Result<(), Box<dyn Error>> {
                 }) => {
                     if let Some(sensor_index) = sensors_connected
                         .iter()
-                        .position(|s| s.device.get_id() == object_path)
+                        .position(|s| s.device_path == object_path)
                     {
                         let sensor = sensors_connected.remove(sensor_index);
                         println!("{} disconnected", sensor.name());
