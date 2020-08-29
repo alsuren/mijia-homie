@@ -160,12 +160,6 @@ async fn requests(mut homie: HomieDevice) -> Result<(), Box<dyn Error>> {
         unnamed_sensors.len()
     );
 
-    let properties = [
-        Property::new("temperature", "Temperature", Datatype::Float, Some("ºC")),
-        Property::new("humidity", "Humidity", Datatype::Integer, Some("%")),
-        Property::new("battery", "Battery level", Datatype::Integer, Some("%")),
-    ];
-
     let mut sensors_to_connect: VecDeque<_> = named_sensors.into();
 
     homie.ready().await?;
@@ -173,23 +167,13 @@ async fn requests(mut homie: HomieDevice) -> Result<(), Box<dyn Error>> {
     let mut sensors_connected: Vec<Sensor> = vec![];
 
     loop {
-        println!("{} sensors in queue to connect.", sensors_to_connect.len());
-        // Try to connect to a sensor.
-        if let Some(mut sensor) = sensors_to_connect.pop_front() {
-            println!("Trying to connect to {}", sensor.name);
-            match connect_start_sensor(bt_session, &mut homie, properties.to_vec(), &mut sensor)
-                .await
-            {
-                Err(e) => {
-                    println!("Failed to connect to {}: {:?}", sensor.name, e);
-                    sensors_to_connect.push_back(sensor);
-                }
-                Ok(()) => {
-                    println!("Connected to {} and started notifications", sensor.name);
-                    sensors_connected.push(sensor);
-                }
-            }
-        }
+        connect_first_sensor_in_queue(
+            &bt_session,
+            &mut homie,
+            &mut sensors_connected,
+            &mut sensors_to_connect,
+        )
+        .await?;
 
         // If a sensor hasn't sent any updates in a while, disconnect it and add it back to the
         // connect queue.
@@ -218,21 +202,49 @@ async fn requests(mut homie: HomieDevice) -> Result<(), Box<dyn Error>> {
     }
 }
 
+async fn connect_first_sensor_in_queue(
+    bt_session: &BluetoothSession,
+    homie: &mut HomieDevice,
+    sensors_connected: &mut Vec<Sensor>,
+    sensors_to_connect: &mut VecDeque<Sensor>,
+) -> Result<(), Box<dyn Error>> {
+    println!("{} sensors in queue to connect.", sensors_to_connect.len());
+    // Try to connect to a sensor.
+    if let Some(mut sensor) = sensors_to_connect.pop_front() {
+        println!("Trying to connect to {}", sensor.name);
+        match connect_start_sensor(bt_session, homie, &mut sensor).await {
+            Err(e) => {
+                println!("Failed to connect to {}: {:?}", sensor.name, e);
+                sensors_to_connect.push_back(sensor);
+            }
+            Ok(()) => {
+                println!("Connected to {} and started notifications", sensor.name);
+                sensors_connected.push(sensor);
+            }
+        }
+    }
+    Ok(())
+}
+
 async fn connect_start_sensor<'a>(
     bt_session: &'a BluetoothSession,
     homie: &mut HomieDevice,
-    properties: Vec<Property>,
     sensor: &mut Sensor,
 ) -> Result<(), Box<dyn Error>> {
     let device = sensor.device(bt_session);
     device.connect(CONNECT_TIMEOUT_MS)?;
     start_notify_sensor(bt_session, &device)?;
+    let properties = vec![
+        Property::new("temperature", "Temperature", Datatype::Float, Some("ºC")),
+        Property::new("humidity", "Humidity", Datatype::Integer, Some("%")),
+        Property::new("battery", "Battery level", Datatype::Integer, Some("%")),
+    ];
     homie
         .add_node(Node::new(
             sensor.node_id(),
             sensor.name.to_string(),
             "Mijia sensor".to_string(),
-            properties.to_vec(),
+            properties,
         ))
         .await?;
     sensor.last_update_timestamp = Instant::now();
