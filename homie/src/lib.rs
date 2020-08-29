@@ -5,6 +5,7 @@ use local_ipaddress;
 use mac_address::get_mac_address;
 use rumqttc::{self, EventLoop, LastWill, MqttOptions, Publish, QoS, Request};
 use std::error::Error;
+use std::fmt::Display;
 use std::future::Future;
 use std::time::{Duration, Instant};
 use tokio::task::{self, JoinError, JoinHandle};
@@ -102,9 +103,37 @@ impl Node {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum State {
-    NotStarted,
     Init,
     Ready,
+    Disconnected,
+    Sleeping,
+    Lost,
+    Alert,
+}
+
+impl State {
+    fn as_str(&self) -> &'static str {
+        match self {
+            Self::Init => "init",
+            Self::Ready => "ready",
+            Self::Disconnected => "disconnected",
+            Self::Sleeping => "sleeping",
+            Self::Lost => "lost",
+            Self::Alert => "alert",
+        }
+    }
+}
+
+impl Display for State {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl Into<Vec<u8>> for State {
+    fn into(self) -> Vec<u8> {
+        self.as_str().into()
+    }
 }
 
 /// Builder for `HomieDevice` and associated objects.
@@ -162,7 +191,7 @@ impl HomieDeviceBuilder {
         let mut mqtt_options = self.mqtt_options;
         mqtt_options.set_last_will(LastWill {
             topic: format!("{}/$state", self.device_base),
-            message: "lost".to_string(),
+            message: State::Lost.to_string(),
             qos: QoS::AtLeastOnce,
             retain: true,
         });
@@ -220,13 +249,13 @@ impl HomieDevice {
             publisher,
             device_name,
             nodes: vec![],
-            state: State::NotStarted,
+            state: State::Disconnected,
             extension_ids: extension_ids.join(","),
         }
     }
 
     async fn start(&mut self) -> Result<(), SendError<Request>> {
-        assert_eq!(self.state, State::NotStarted);
+        assert_eq!(self.state, State::Disconnected);
         self.publisher
             .publish_retained("$homie", HOMIE_VERSION)
             .await?;
@@ -239,8 +268,7 @@ impl HomieDevice {
         self.publisher
             .publish_retained("$name", self.device_name.as_str())
             .await?;
-        self.publisher.publish_retained("$state", "init").await?;
-        self.state = State::Init;
+        self.set_state(State::Init).await?;
         Ok(())
     }
 
@@ -322,13 +350,32 @@ impl HomieDevice {
         self.publisher.publish_retained("$nodes", node_ids).await
     }
 
+    async fn set_state(&mut self, state: State) -> Result<(), SendError<Request>> {
+        self.state = state;
+        self.publisher.publish_retained("$state", self.state).await
+    }
+
+    /// Update the [state](https://homieiot.github.io/specification/#device-lifecycle) of the Homie
+    /// device to 'ready'. This should be called once it is ready to begin normal operation, or to
+    /// return to normal operation after calling `sleep()` or `alert()`.
     pub async fn ready(&mut self) -> Result<(), SendError<Request>> {
-        assert_eq!(self.state, State::Init);
-        self.state = State::Ready;
+        assert!(&[State::Init, State::Sleeping, State::Alert].contains(&self.state));
+        self.set_state(State::Ready).await
+    }
 
-        self.publisher.publish_retained("$state", "ready").await?;
+    /// Update the [state](https://homieiot.github.io/specification/#device-lifecycle) of the Homie
+    /// device to 'sleeping'. This should be only be called after `ready()`, otherwise it will panic.
+    pub async fn sleep(&mut self) -> Result<(), SendError<Request>> {
+        assert_eq!(self.state, State::Ready);
+        self.set_state(State::Sleeping).await
+    }
 
-        Ok(())
+    /// Update the [state](https://homieiot.github.io/specification/#device-lifecycle) of the Homie
+    /// device to 'alert', to indicate that something wrong is happening and manual intervention may
+    /// be required. This should be only be called after `ready()`, otherwise it will panic.
+    pub async fn alert(&mut self) -> Result<(), SendError<Request>> {
+        assert_eq!(self.state, State::Ready);
+        self.set_state(State::Alert).await
     }
 
     pub async fn publish_value(
@@ -497,7 +544,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[should_panic(expected = "NotStarted")]
+    #[should_panic(expected = "Init")]
     async fn ready_fails_if_called_before_start() {
         let (mut device, rx) = make_test_device();
 
@@ -512,6 +559,32 @@ mod tests {
         let (mut device, rx) = make_test_device();
 
         device.start().await.unwrap();
+        device.ready().await.unwrap();
+
+        // Need to keep rx alive until here so that the channel isn't closed.
+        drop(rx);
+    }
+
+    #[tokio::test]
+    async fn sleep_then_ready_again_succeeds() {
+        let (mut device, rx) = make_test_device();
+
+        device.start().await.unwrap();
+        device.ready().await.unwrap();
+        device.sleep().await.unwrap();
+        device.ready().await.unwrap();
+
+        // Need to keep rx alive until here so that the channel isn't closed.
+        drop(rx);
+    }
+
+    #[tokio::test]
+    async fn alert_then_ready_again_succeeds() {
+        let (mut device, rx) = make_test_device();
+
+        device.start().await.unwrap();
+        device.ready().await.unwrap();
+        device.alert().await.unwrap();
         device.ready().await.unwrap();
 
         // Need to keep rx alive until here so that the channel isn't closed.
