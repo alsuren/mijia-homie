@@ -91,7 +91,7 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     let local = task::LocalSet::new();
 
     let bluetooth_handle = local.spawn_local(async move {
-        requests(homie).await.unwrap();
+        bluetooth_mainloop(homie).await.unwrap();
     });
 
     // Poll everything to completion, until the first one bombs out.
@@ -143,7 +143,7 @@ impl Sensor {
     }
 }
 
-async fn requests(mut homie: HomieDevice) -> Result<(), Box<dyn Error>> {
+async fn bluetooth_mainloop(mut homie: HomieDevice) -> Result<(), Box<dyn Error>> {
     let sensor_names = hashmap_from_file(SENSOR_NAMES_FILENAME)?;
 
     let bt_session = &BluetoothSession::create_session(None)?;
