@@ -447,6 +447,7 @@ fn try_join_handles<A, B, E>(
 where
     E: From<JoinError>,
 {
+    // Unwrap the JoinHandle results to get to the real results.
     try_join(a.map(|res| Ok(res??)), b.map(|res| Ok(res??)))
 }
 
