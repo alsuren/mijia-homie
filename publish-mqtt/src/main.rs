@@ -270,70 +270,78 @@ async fn service_bluetooth_event_queue(
     // Process events until there are none available for the timeout.
     for event in bt_session
         .incoming(INCOMING_TIMEOUT_MS)
-        .map(BluetoothEvent::from)
+        .filter_map(BluetoothEvent::from)
     {
-        match event {
-            Some(BluetoothEvent::Value { object_path, value }) => {
-                // TODO: Make this less hacky.
-                let device_path = match object_path.strip_suffix(SERVICE_CHARACTERISTIC_PATH) {
-                    Some(path) => path,
-                    None => continue,
-                };
-                if let Some(sensor) = sensors_connected
-                    .iter_mut()
-                    .find(|s| s.device_path == device_path)
-                {
-                    sensor.last_update_timestamp = Instant::now();
-                    if let Some(readings) = decode_value(&value) {
-                        println!("{} {} ({})", sensor.mac_address, readings, sensor.name);
-
-                        let node_id = sensor.node_id();
-                        homie
-                            .publish_value(
-                                &node_id,
-                                "temperature",
-                                format!("{:.2}", readings.temperature),
-                            )
-                            .await?;
-                        homie
-                            .publish_value(&node_id, "humidity", readings.humidity)
-                            .await?;
-                        homie
-                            .publish_value(&node_id, "battery", readings.battery_percent)
-                            .await?;
-                    } else {
-                        println!("Invalid value from {}", sensor.name);
-                    }
-                } else {
-                    // TODO: Still send it, in case it is useful?
-                    println!("Got update from unexpected device {}", device_path);
-                }
-            }
-            Some(BluetoothEvent::Connected {
-                object_path,
-                connected: false,
-            }) => {
-                if let Some(sensor_index) = sensors_connected
-                    .iter()
-                    .position(|s| s.device_path == object_path)
-                {
-                    let sensor = sensors_connected.remove(sensor_index);
-                    println!("{} disconnected", sensor.name);
-                    homie.remove_node(&sensor.node_id()).await?;
-                    sensors_to_connect.push_back(sensor);
-                } else {
-                    println!(
-                        "{} disconnected but wasn't known to be connected.",
-                        object_path
-                    );
-                }
-                continue;
-            }
-            _ => {
-                log::trace!("{:?}", event);
-                continue;
-            }
-        };
+        handle_bluetooth_event(homie, sensors_connected, sensors_to_connect, event).await?;
     }
+    Ok(())
+}
+
+async fn handle_bluetooth_event(
+    homie: &mut HomieDevice,
+    sensors_connected: &mut Vec<Sensor>,
+    sensors_to_connect: &mut VecDeque<Sensor>,
+    event: BluetoothEvent,
+) -> Result<(), Box<dyn Error>> {
+    match event {
+        BluetoothEvent::Value { object_path, value } => {
+            // TODO: Make this less hacky.
+            let device_path = match object_path.strip_suffix(SERVICE_CHARACTERISTIC_PATH) {
+                Some(path) => path,
+                None => return Ok(()),
+            };
+            if let Some(sensor) = sensors_connected
+                .iter_mut()
+                .find(|s| s.device_path == device_path)
+            {
+                sensor.last_update_timestamp = Instant::now();
+                if let Some(readings) = decode_value(&value) {
+                    println!("{} {} ({})", sensor.mac_address, readings, sensor.name);
+
+                    let node_id = sensor.node_id();
+                    homie
+                        .publish_value(
+                            &node_id,
+                            "temperature",
+                            format!("{:.2}", readings.temperature),
+                        )
+                        .await?;
+                    homie
+                        .publish_value(&node_id, "humidity", readings.humidity)
+                        .await?;
+                    homie
+                        .publish_value(&node_id, "battery", readings.battery_percent)
+                        .await?;
+                } else {
+                    println!("Invalid value from {}", sensor.name);
+                }
+            } else {
+                // TODO: Still send it, in case it is useful?
+                println!("Got update from unexpected device {}", device_path);
+            }
+        }
+        BluetoothEvent::Connected {
+            object_path,
+            connected: false,
+        } => {
+            if let Some(sensor_index) = sensors_connected
+                .iter()
+                .position(|s| s.device_path == object_path)
+            {
+                let sensor = sensors_connected.remove(sensor_index);
+                println!("{} disconnected", sensor.name);
+                homie.remove_node(&sensor.node_id()).await?;
+                sensors_to_connect.push_back(sensor);
+            } else {
+                println!(
+                    "{} disconnected but wasn't known to be connected.",
+                    object_path
+                );
+            }
+        }
+        _ => {
+            log::trace!("{:?}", event);
+        }
+    };
     Ok(())
 }
