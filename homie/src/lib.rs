@@ -254,6 +254,10 @@ impl HomieDevice {
         })
     }
 
+    /// Add a node to the Homie device. It will immediately be published.
+    ///
+    /// This will panic if you attempt to add a node with the same ID as a node which was previously
+    /// added.
     pub async fn add_node(&mut self, node: Node) -> Result<(), SendError<Request>> {
         // First check that there isn't already a node with the same ID.
         if self.nodes.iter().any(|n| n.id == node.id) {
@@ -268,6 +272,7 @@ impl HomieDevice {
         self.publish_nodes().await
     }
 
+    /// Remove the node with the given ID.
     pub async fn remove_node(&mut self, node_id: &str) -> Result<(), SendError<Request>> {
         self.nodes.retain(|n| n.id != node_id);
         self.publish_nodes().await
