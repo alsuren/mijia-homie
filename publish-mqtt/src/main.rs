@@ -117,6 +117,10 @@ struct Sensor {
 }
 
 impl Sensor {
+    const PROPERTY_ID_TEMPERATURE: &'static str = "temperature";
+    const PROPERTY_ID_HUMIDITY: &'static str = "humidity";
+    const PROPERTY_ID_BATTERY: &'static str = "battery";
+
     pub fn new(
         device: &BluetoothDevice,
         sensor_names: &HashMap<String, String>,
@@ -148,9 +152,24 @@ impl Sensor {
             self.name.to_string(),
             "Mijia sensor".to_string(),
             vec![
-                Property::new("temperature", "Temperature", Datatype::Float, Some("ºC")),
-                Property::new("humidity", "Humidity", Datatype::Integer, Some("%")),
-                Property::new("battery", "Battery level", Datatype::Integer, Some("%")),
+                Property::new(
+                    Self::PROPERTY_ID_TEMPERATURE,
+                    "Temperature",
+                    Datatype::Float,
+                    Some("ºC"),
+                ),
+                Property::new(
+                    Self::PROPERTY_ID_HUMIDITY,
+                    "Humidity",
+                    Datatype::Integer,
+                    Some("%"),
+                ),
+                Property::new(
+                    Self::PROPERTY_ID_BATTERY,
+                    "Battery level",
+                    Datatype::Integer,
+                    Some("%"),
+                ),
             ],
         )
     }
@@ -166,15 +185,19 @@ impl Sensor {
         homie
             .publish_value(
                 &node_id,
-                "temperature",
+                Self::PROPERTY_ID_TEMPERATURE,
                 format!("{:.2}", readings.temperature),
             )
             .await?;
         homie
-            .publish_value(&node_id, "humidity", readings.humidity)
+            .publish_value(&node_id, Self::PROPERTY_ID_HUMIDITY, readings.humidity)
             .await?;
         homie
-            .publish_value(&node_id, "battery", readings.battery_percent)
+            .publish_value(
+                &node_id,
+                Self::PROPERTY_ID_BATTERY,
+                readings.battery_percent,
+            )
             .await?;
         Ok(())
     }
