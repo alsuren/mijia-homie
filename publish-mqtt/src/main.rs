@@ -4,7 +4,7 @@ use blurz::{
 use futures::FutureExt;
 use homie::{Datatype, HomieDevice, Node, Property};
 use mijia::{
-    decode_value, find_sensors, hashmap_from_file, print_sensors, start_notify_sensor,
+    decode_value, find_sensors, hashmap_from_file, print_sensors, start_notify_sensor, Readings,
     SERVICE_CHARACTERISTIC_PATH,
 };
 use rumqttc::MqttOptions;
@@ -296,22 +296,7 @@ async fn handle_bluetooth_event(
             {
                 sensor.last_update_timestamp = Instant::now();
                 if let Some(readings) = decode_value(&value) {
-                    println!("{} {} ({})", sensor.mac_address, readings, sensor.name);
-
-                    let node_id = sensor.node_id();
-                    homie
-                        .publish_value(
-                            &node_id,
-                            "temperature",
-                            format!("{:.2}", readings.temperature),
-                        )
-                        .await?;
-                    homie
-                        .publish_value(&node_id, "humidity", readings.humidity)
-                        .await?;
-                    homie
-                        .publish_value(&node_id, "battery", readings.battery_percent)
-                        .await?;
+                    publish_sensor_readings(homie, sensor, &readings).await?;
                 } else {
                     println!("Invalid value from {}", sensor.name);
                 }
@@ -343,5 +328,29 @@ async fn handle_bluetooth_event(
             log::trace!("{:?}", event);
         }
     };
+    Ok(())
+}
+
+async fn publish_sensor_readings(
+    homie: &HomieDevice,
+    sensor: &Sensor,
+    readings: &Readings,
+) -> Result<(), Box<dyn Error>> {
+    println!("{} {} ({})", sensor.mac_address, readings, sensor.name);
+
+    let node_id = sensor.node_id();
+    homie
+        .publish_value(
+            &node_id,
+            "temperature",
+            format!("{:.2}", readings.temperature),
+        )
+        .await?;
+    homie
+        .publish_value(&node_id, "humidity", readings.humidity)
+        .await?;
+    homie
+        .publish_value(&node_id, "battery", readings.battery_percent)
+        .await?;
     Ok(())
 }
