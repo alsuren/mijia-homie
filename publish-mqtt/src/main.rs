@@ -141,6 +141,43 @@ impl Sensor {
     pub fn device<'a>(&self, session: &'a BluetoothSession) -> BluetoothDevice<'a> {
         BluetoothDevice::new(session, self.device_path.to_string())
     }
+
+    fn as_node(&self) -> Node {
+        Node::new(
+            self.node_id(),
+            self.name.to_string(),
+            "Mijia sensor".to_string(),
+            vec![
+                Property::new("temperature", "Temperature", Datatype::Float, Some("ºC")),
+                Property::new("humidity", "Humidity", Datatype::Integer, Some("%")),
+                Property::new("battery", "Battery level", Datatype::Integer, Some("%")),
+            ],
+        )
+    }
+
+    async fn publish_readings(
+        &self,
+        homie: &HomieDevice,
+        readings: &Readings,
+    ) -> Result<(), Box<dyn Error>> {
+        println!("{} {} ({})", self.mac_address, readings, self.name);
+
+        let node_id = self.node_id();
+        homie
+            .publish_value(
+                &node_id,
+                "temperature",
+                format!("{:.2}", readings.temperature),
+            )
+            .await?;
+        homie
+            .publish_value(&node_id, "humidity", readings.humidity)
+            .await?;
+        homie
+            .publish_value(&node_id, "battery", readings.battery_percent)
+            .await?;
+        Ok(())
+    }
 }
 
 async fn bluetooth_mainloop(mut homie: HomieDevice) -> Result<(), Box<dyn Error>> {
@@ -220,19 +257,8 @@ async fn connect_start_sensor<'a>(
     let device = sensor.device(bt_session);
     device.connect(CONNECT_TIMEOUT_MS)?;
     start_notify_sensor(bt_session, &device)?;
-    let properties = vec![
-        Property::new("temperature", "Temperature", Datatype::Float, Some("ºC")),
-        Property::new("humidity", "Humidity", Datatype::Integer, Some("%")),
-        Property::new("battery", "Battery level", Datatype::Integer, Some("%")),
-    ];
-    homie
-        .add_node(Node::new(
-            sensor.node_id(),
-            sensor.name.to_string(),
-            "Mijia sensor".to_string(),
-            properties,
-        ))
-        .await?;
+
+    homie.add_node(sensor.as_node()).await?;
     sensor.last_update_timestamp = Instant::now();
     Ok(())
 }
@@ -296,7 +322,7 @@ async fn handle_bluetooth_event(
             {
                 sensor.last_update_timestamp = Instant::now();
                 if let Some(readings) = decode_value(&value) {
-                    publish_sensor_readings(homie, sensor, &readings).await?;
+                    sensor.publish_readings(homie, &readings).await?;
                 } else {
                     println!("Invalid value from {}", sensor.name);
                 }
@@ -328,29 +354,5 @@ async fn handle_bluetooth_event(
             log::trace!("{:?}", event);
         }
     };
-    Ok(())
-}
-
-async fn publish_sensor_readings(
-    homie: &HomieDevice,
-    sensor: &Sensor,
-    readings: &Readings,
-) -> Result<(), Box<dyn Error>> {
-    println!("{} {} ({})", sensor.mac_address, readings, sensor.name);
-
-    let node_id = sensor.node_id();
-    homie
-        .publish_value(
-            &node_id,
-            "temperature",
-            format!("{:.2}", readings.temperature),
-        )
-        .await?;
-    homie
-        .publish_value(&node_id, "humidity", readings.humidity)
-        .await?;
-    homie
-        .publish_value(&node_id, "battery", readings.battery_percent)
-        .await?;
     Ok(())
 }
