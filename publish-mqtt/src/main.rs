@@ -143,27 +143,6 @@ impl Sensor {
     }
 }
 
-async fn connect_start_sensor<'a>(
-    bt_session: &'a BluetoothSession,
-    homie: &mut HomieDevice,
-    properties: Vec<Property>,
-    sensor: &mut Sensor,
-) -> Result<(), Box<dyn Error>> {
-    let device = sensor.device(bt_session);
-    device.connect(CONNECT_TIMEOUT_MS)?;
-    start_notify_sensor(bt_session, &device)?;
-    homie
-        .add_node(Node::new(
-            sensor.node_id(),
-            sensor.name.to_string(),
-            "Mijia sensor".to_string(),
-            properties.to_vec(),
-        ))
-        .await?;
-    sensor.last_update_timestamp = Instant::now();
-    Ok(())
-}
-
 async fn requests(mut homie: HomieDevice) -> Result<(), Box<dyn Error>> {
     let sensor_names = hashmap_from_file(SENSOR_NAMES_FILENAME)?;
 
@@ -237,6 +216,27 @@ async fn requests(mut homie: HomieDevice) -> Result<(), Box<dyn Error>> {
         )
         .await?;
     }
+}
+
+async fn connect_start_sensor<'a>(
+    bt_session: &'a BluetoothSession,
+    homie: &mut HomieDevice,
+    properties: Vec<Property>,
+    sensor: &mut Sensor,
+) -> Result<(), Box<dyn Error>> {
+    let device = sensor.device(bt_session);
+    device.connect(CONNECT_TIMEOUT_MS)?;
+    start_notify_sensor(bt_session, &device)?;
+    homie
+        .add_node(Node::new(
+            sensor.node_id(),
+            sensor.name.to_string(),
+            "Mijia sensor".to_string(),
+            properties.to_vec(),
+        ))
+        .await?;
+    sensor.last_update_timestamp = Instant::now();
+    Ok(())
 }
 
 async fn service_bluetooth_event_queue(
