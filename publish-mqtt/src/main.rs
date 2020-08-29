@@ -175,22 +175,8 @@ async fn requests(mut homie: HomieDevice) -> Result<(), Box<dyn Error>> {
         )
         .await?;
 
-        // If a sensor hasn't sent any updates in a while, disconnect it and add it back to the
-        // connect queue.
-        let now = Instant::now();
-        if let Some(sensor_index) = sensors_connected
-            .iter()
-            .position(|s| now - s.last_update_timestamp > UPDATE_TIMEOUT)
-        {
-            let sensor = sensors_connected.remove(sensor_index);
-            println!(
-                "No update from {} for {:?}, reconnecting",
-                sensor.name,
-                now - sensor.last_update_timestamp
-            );
-            homie.remove_node(&sensor.node_id()).await?;
-            sensors_to_connect.push_back(sensor);
-        }
+        disconnect_first_stale_sensor(&mut homie, &mut sensors_connected, &mut sensors_to_connect)
+            .await?;
 
         service_bluetooth_event_queue(
             &bt_session,
@@ -248,6 +234,30 @@ async fn connect_start_sensor<'a>(
         ))
         .await?;
     sensor.last_update_timestamp = Instant::now();
+    Ok(())
+}
+
+/// If a sensor hasn't sent any updates in a while, disconnect it and add it back to the
+/// connect queue.
+async fn disconnect_first_stale_sensor(
+    homie: &mut HomieDevice,
+    sensors_connected: &mut Vec<Sensor>,
+    sensors_to_connect: &mut VecDeque<Sensor>,
+) -> Result<(), Box<dyn Error>> {
+    let now = Instant::now();
+    if let Some(sensor_index) = sensors_connected
+        .iter()
+        .position(|s| now - s.last_update_timestamp > UPDATE_TIMEOUT)
+    {
+        let sensor = sensors_connected.remove(sensor_index);
+        println!(
+            "No update from {} for {:?}, reconnecting",
+            sensor.name,
+            now - sensor.last_update_timestamp
+        );
+        homie.remove_node(&sensor.node_id()).await?;
+        sensors_to_connect.push_back(sensor);
+    }
     Ok(())
 }
 
