@@ -378,6 +378,13 @@ impl HomieDevice {
         self.set_state(State::Alert).await
     }
 
+    /// Disconnect cleanly from the MQTT broker, after updating the state of the Homie device to
+    // 'disconnected'.
+    pub async fn disconnect(mut self) -> Result<(), SendError<Request>> {
+        self.set_state(State::Disconnected).await?;
+        self.publisher.disconnect().await
+    }
+
     pub async fn publish_value(
         &self,
         node_id: &str,
@@ -413,6 +420,10 @@ impl DevicePublisher {
         let mut publish = Publish::new(name, QoS::AtLeastOnce, value);
         publish.set_retain(true);
         self.requests_tx.send(publish.into()).await
+    }
+
+    async fn disconnect(&self) -> Result<(), SendError<Request>> {
+        self.requests_tx.send(Request::Disconnect).await
     }
 }
 
@@ -588,6 +599,31 @@ mod tests {
         device.ready().await?;
         device.alert().await?;
         device.ready().await?;
+
+        // Need to keep rx alive until here so that the channel isn't closed.
+        drop(rx);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn disconnect_succeeds_before_ready() -> Result<(), SendError<Request>> {
+        let (mut device, rx) = make_test_device();
+
+        device.start().await?;
+        device.disconnect().await?;
+
+        // Need to keep rx alive until here so that the channel isn't closed.
+        drop(rx);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn disconnect_succeeds_after_ready() -> Result<(), SendError<Request>> {
+        let (mut device, rx) = make_test_device();
+
+        device.start().await?;
+        device.ready().await?;
+        device.disconnect().await?;
 
         // Need to keep rx alive until here so that the channel isn't closed.
         drop(rx);

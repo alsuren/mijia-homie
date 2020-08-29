@@ -39,6 +39,9 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
         homie.ready().await?;
         println!("ready");
 
+        time::delay_for(Duration::from_secs(5)).await;
+        homie.disconnect().await?;
+        println!("disconnected");
         Ok(())
     });
 
