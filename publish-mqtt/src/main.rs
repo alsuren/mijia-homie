@@ -205,7 +205,7 @@ impl Sensor {
 async fn bluetooth_mainloop(mut homie: HomieDevice) -> Result<(), Box<dyn Error>> {
     let sensor_names = hashmap_from_file(SENSOR_NAMES_FILENAME)?;
 
-    let bt_session = &BluetoothSession::create_session(None)?;
+    let bt_session = BluetoothSession::create_session(None)?;
     let device_list = scan(&bt_session).await?;
     let sensors = find_sensors(&bt_session, &device_list);
     print_sensors(&sensors, &sensor_names);
