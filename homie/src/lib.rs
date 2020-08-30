@@ -555,44 +555,47 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn start_succeeds_with_no_nodes() {
+    async fn start_succeeds_with_no_nodes() -> Result<(), SendError<Request>> {
         let (mut device, rx) = make_test_device();
 
-        device.start().await.unwrap();
-        device.ready().await.unwrap();
+        device.start().await?;
+        device.ready().await?;
 
         // Need to keep rx alive until here so that the channel isn't closed.
         drop(rx);
+        Ok(())
     }
 
     #[tokio::test]
-    async fn sleep_then_ready_again_succeeds() {
+    async fn sleep_then_ready_again_succeeds() -> Result<(), SendError<Request>> {
         let (mut device, rx) = make_test_device();
 
-        device.start().await.unwrap();
-        device.ready().await.unwrap();
-        device.sleep().await.unwrap();
-        device.ready().await.unwrap();
+        device.start().await?;
+        device.ready().await?;
+        device.sleep().await?;
+        device.ready().await?;
 
         // Need to keep rx alive until here so that the channel isn't closed.
         drop(rx);
+        Ok(())
     }
 
     #[tokio::test]
-    async fn alert_then_ready_again_succeeds() {
+    async fn alert_then_ready_again_succeeds() -> Result<(), SendError<Request>> {
         let (mut device, rx) = make_test_device();
 
-        device.start().await.unwrap();
-        device.ready().await.unwrap();
-        device.alert().await.unwrap();
-        device.ready().await.unwrap();
+        device.start().await?;
+        device.ready().await?;
+        device.alert().await?;
+        device.ready().await?;
 
         // Need to keep rx alive until here so that the channel isn't closed.
         drop(rx);
+        Ok(())
     }
 
     #[tokio::test]
-    async fn minimal_build_succeeds() {
+    async fn minimal_build_succeeds() -> Result<(), SendError<Request>> {
         let builder = HomieDevice::builder(
             "homie/test-device",
             "Test device",
@@ -605,10 +608,12 @@ mod tests {
         assert_eq!(homie.publisher.device_base, "homie/test-device");
         assert_eq!(firmware.firmware_name, DEFAULT_FIRMWARE_NAME);
         assert_eq!(firmware.firmware_version, DEFAULT_FIRMWARE_VERSION);
+
+        Ok(())
     }
 
     #[tokio::test]
-    async fn set_firmware_build_succeeds() {
+    async fn set_firmware_build_succeeds() -> Result<(), SendError<Request>> {
         let mut builder = HomieDevice::builder(
             "homie/test-device",
             "Test device",
@@ -623,10 +628,12 @@ mod tests {
         assert_eq!(homie.publisher.device_base, "homie/test-device");
         assert_eq!(firmware.firmware_name, "firmware_name");
         assert_eq!(firmware.firmware_version, "firmware_version");
+
+        Ok(())
     }
 
     #[tokio::test]
-    async fn add_node_succeeds_before_and_after_start() {
+    async fn add_node_succeeds_before_and_after_start() -> Result<(), SendError<Request>> {
         let (mut device, rx) = make_test_device();
 
         device
@@ -636,11 +643,10 @@ mod tests {
                 "type".to_string(),
                 vec![],
             ))
-            .await
-            .unwrap();
+            .await?;
 
-        device.start().await.unwrap();
-        device.ready().await.unwrap();
+        device.start().await?;
+        device.ready().await?;
 
         // Add another node after starting.
         device
@@ -650,16 +656,16 @@ mod tests {
                 "type2".to_string(),
                 vec![],
             ))
-            .await
-            .unwrap();
+            .await?;
 
         // Need to keep rx alive until here so that the channel isn't closed.
         drop(rx);
+        Ok(())
     }
 
     /// Add a node, remove it, and add it back again.
     #[tokio::test]
-    async fn add_node_succeeds_after_remove() {
+    async fn add_node_succeeds_after_remove() -> Result<(), SendError<Request>> {
         let (mut device, rx) = make_test_device();
 
         device
@@ -669,10 +675,9 @@ mod tests {
                 "type".to_string(),
                 vec![],
             ))
-            .await
-            .unwrap();
+            .await?;
 
-        device.remove_node("id").await.unwrap();
+        device.remove_node("id").await?;
 
         // Adding it back shouldn't give an error.
         device
@@ -682,10 +687,10 @@ mod tests {
                 "type".to_string(),
                 vec![],
             ))
-            .await
-            .unwrap();
+            .await?;
 
         // Need to keep rx alive until here so that the channel isn't closed.
         drop(rx);
+        Ok(())
     }
 }
