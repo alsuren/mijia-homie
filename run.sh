@@ -9,6 +9,7 @@ TARGET=${TARGET:-armv7-unknown-linux-gnueabihf}
 TARGET_SSH=${TARGET_SSH:-pi@raspberrypi.local}
 PROFILE=${PROFILE:-debug}
 RUN=${RUN:-1}
+SUFFIX=${SUFFIX:-}
 
 if [ $PROFILE = release ]
 then
@@ -21,10 +22,9 @@ else
     exit 1
 fi
 
-time rsync --progress target/$TARGET/$PROFILE/read-all-devices $TARGET_SSH:read-all-devices-next
-time rsync --progress target/$TARGET/$PROFILE/publish-mqtt $TARGET_SSH:publish-mqtt
+time rsync --progress target/$TARGET/$PROFILE/publish-mqtt $TARGET_SSH:publish-mqtt$SUFFIX
 
 if [ $RUN -eq 1 ]
 then
-    ssh $TARGET_SSH ./publish-mqtt
+    ssh $TARGET_SSH ./publish-mqtt$SUFFIX
 fi
