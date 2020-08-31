@@ -32,10 +32,8 @@ pub enum BluetoothEvent {
 
 impl BluetoothEvent {
     pub fn from(conn_msg: Message) -> Option<BluetoothEvent> {
-        let result: Result<
-            (&str, HashMap<String, Variant<Box<RefArg>>>),
-            TypeMismatchError,
-        > = conn_msg.read2();
+        let result: Result<(&str, HashMap<String, Variant<Box<dyn RefArg>>>), TypeMismatchError> =
+            conn_msg.read2();
 
         match result {
             Ok((_, properties)) => {
