@@ -505,8 +505,6 @@ name = "mijia"
 version = "0.1.0"
 dependencies = [
  "blurz",
- "lazy_static",
- "regex",
 ]
 
 [[package]]
