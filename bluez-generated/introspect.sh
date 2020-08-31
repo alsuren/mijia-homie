@@ -36,6 +36,8 @@ ssh pi@raspberrypi.local \
                 --dest=org.bluez \
                 --object-path=${interface_to_path[${interface}]} \
                 --xml \
+            | xmllint --format - \
+            | grep -v '^ *<node name=".*"/>$' \
             > specs/$interface.xml
     done
 )
