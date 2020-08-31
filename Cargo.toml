@@ -1,6 +1,7 @@
 [workspace]
 
 members = [
+    "bluez-generated",
     "homie",
     "mijia",
     "publish-mqtt",

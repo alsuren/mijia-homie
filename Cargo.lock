@@ -99,12 +99,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "bluez-generated"
+version = "0.1.0"
+dependencies = [
+ "dbus 0.8.4",
+]
+
+[[package]]
 name = "blurz"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b1bc2df4d0f1d373b324672d9966aca3f5ba1f03d69edad6240144774539ea59"
 dependencies = [
- "dbus",
+ "dbus 0.6.5",
  "hex",
 ]
 
@@ -180,6 +187,17 @@ version = "0.6.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "48b5f0f36f1eebe901b0e6bee369a77ed3396334bf3f09abd46454a576f71819"
 dependencies = [
+ "libc",
+ "libdbus-sys",
+]
+
+[[package]]
+name = "dbus"
+version = "0.8.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5cd9e78c210146a1860f897db03412fd5091fd73100778e43ee255cca252cf32"
+dependencies = [
+ "futures",
  "libc",
  "libdbus-sys",
 ]
