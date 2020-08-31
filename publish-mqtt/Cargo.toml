@@ -7,6 +7,7 @@ edition = "2018"
 [dependencies]
 blurz = "0.4.0"
 color-backtrace = "0.4.2"
+dbus = "0.6.3"
 futures = "0.3"
 homie = { path = "../homie" }
 log = "0.4"

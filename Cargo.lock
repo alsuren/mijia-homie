@@ -694,6 +694,7 @@ version = "0.1.0"
 dependencies = [
  "blurz",
  "color-backtrace",
+ "dbus",
  "dotenv",
  "futures",
  "homie",
