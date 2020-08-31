@@ -56,6 +56,6 @@ if [ ${GENERATE:-1} = 1 ]; then
             --interfaces=$interface \
             --client=nonblock \
             --methodtype=none \
-            > generated/$modname.rs
+            > src/generated/$modname.rs
     done
 fi
