@@ -10,5 +10,5 @@ futures = "0.3"
 local_ipaddress = "0.1"
 log = "0.4"
 mac_address = "1.0"
-rumqttc = "0.0.6"
+rumqttc = { git = "https://github.com/bytebeamio/rumqtt" }
 tokio = "0.2.22"
