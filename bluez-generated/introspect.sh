@@ -34,6 +34,6 @@ ssh pi@raspberrypi.local \
                 --xml \
                 | xmllint --format - \
                 | grep -v '^ *<node name=".*"/>$' \
-                    >specs/$interface.xml
+                    > specs/$interface.xml
         done
     )
