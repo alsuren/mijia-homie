@@ -189,12 +189,12 @@ impl HomieDeviceBuilder {
 
     async fn build(self) -> (EventLoop, HomieDevice, HomieStats, HomieFirmware) {
         let mut mqtt_options = self.mqtt_options;
-        mqtt_options.set_last_will(LastWill {
-            topic: format!("{}/$state", self.device_base),
-            message: State::Lost.to_string(),
-            qos: QoS::AtLeastOnce,
-            retain: true,
-        });
+        mqtt_options.set_last_will(LastWill::new(
+            format!("{}/$state", self.device_base),
+            State::Lost,
+            QoS::AtLeastOnce,
+            true,
+        ));
         let event_loop = EventLoop::new(mqtt_options, REQUESTS_CAP).await;
 
         let publisher = DevicePublisher::new(event_loop.handle(), self.device_base);
