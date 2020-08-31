@@ -23,6 +23,7 @@ const DEFAULT_DEVICE_NAME: &str = "Mijia bridge";
 const DEFAULT_HOST: &str = "test.mosquitto.org";
 const DEFAULT_PORT: u16 = 1883;
 const SCAN_DURATION: Duration = Duration::from_secs(15);
+const CONNECT_INTERVAL: Duration = Duration::from_secs(11);
 const CONNECT_TIMEOUT_MS: i32 = 4_000;
 const UPDATE_TIMEOUT: Duration = Duration::from_secs(60);
 const SENSOR_NAMES_FILENAME: &str = "sensor_names.conf";
@@ -270,6 +271,7 @@ async fn bluetooth_mainloop(
                 )
                 .await?;
             }
+            time::delay_for(CONNECT_INTERVAL).await;
         }
         #[allow(unreachable_code)]
         Ok(())
