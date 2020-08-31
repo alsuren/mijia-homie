@@ -358,11 +358,13 @@ async fn service_bluetooth_event_queue(
     state: Arc<Mutex<SensorState>>,
     conn: Arc<SyncConnection>,
 ) -> Result<(), Box<dyn Error>> {
+    println!("Subscribing to events");
     let mut rule = dbus::message::MatchRule::new();
     rule.msg_type = Some(dbus::message::MessageType::Signal);
     rule.sender = Some(dbus::strings::BusName::new("org.bluez")?);
 
     let (msg_match, mut events) = conn.add_match(rule).await?.msg_stream();
+    println!("Processing events");
     // Process events until there are none available for the timeout.
     while let Some(raw_event) = events.next().await {
         if let Some(event) = BluetoothEvent::from(raw_event) {
@@ -378,6 +380,7 @@ async fn handle_bluetooth_event(
     state: Arc<Mutex<SensorState>>,
     event: BluetoothEvent,
 ) -> Result<(), Box<dyn Error>> {
+    println!("Locking(handle_bluetooth_event({:?})).", event);
     let state = &mut *state.lock().await;
     let homie = &mut state.homie;
     let sensors_connected = &mut state.sensors_connected;
@@ -427,5 +430,7 @@ async fn handle_bluetooth_event(
             log::trace!("{:?}", event);
         }
     };
+    println!("Unlocking(handle_bluetooth_event()).");
+
     Ok(())
 }
