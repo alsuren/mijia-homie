@@ -28,10 +28,18 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
                     "temperature",
                     "Temperature",
                     Datatype::Float,
+                    false,
                     Some("ºC"),
                     None,
                 ),
-                Property::new("humidity", "Humidity", Datatype::Integer, Some("%"), None),
+                Property::new(
+                    "humidity",
+                    "Humidity",
+                    Datatype::Integer,
+                    false,
+                    Some("%"),
+                    None,
+                ),
             ],
         ))
         .await?;

@@ -3,10 +3,14 @@ use futures::future::try_join;
 use futures::FutureExt;
 use local_ipaddress;
 use mac_address::get_mac_address;
-use rumqttc::{self, EventLoop, LastWill, MqttOptions, Publish, QoS, Request};
+use rumqttc::{
+    self, EventLoop, Incoming, LastWill, MqttOptions, Publish, QoS, Request, Subscribe, Unsubscribe,
+};
 use std::error::Error;
-use std::fmt::Display;
+use std::fmt::{self, Debug, Display, Formatter};
 use std::future::Future;
+use std::pin::Pin;
+use std::str;
 use std::time::{Duration, Instant};
 use tokio::task::{self, JoinError, JoinHandle};
 use tokio::time::delay_for;
@@ -49,6 +53,7 @@ pub struct Property {
     id: String,
     name: String,
     datatype: Datatype,
+    settable: bool,
     unit: Option<String>,
     format: Option<String>,
 }
@@ -61,6 +66,9 @@ impl Property {
     ///   [ID format](https://homieiot.github.io/specification/#topic-ids).
     /// * `name`: The human-readable name of the property.
     /// * `datatype`: The data type of the property.
+    /// * `settable`: Whether the property can be set by the Homie controller. This should be true
+    ///   for properties like the brightness or power state of a light, and false for things like
+    ///   the temperature reading of a sensor.
     /// * `unit`: The unit for the property, if any. This may be one of the
     ///   [recommended units](https://homieiot.github.io/specification/#property-attributes), or
     ///   any other custom unit.
@@ -70,6 +78,7 @@ impl Property {
         id: &str,
         name: &str,
         datatype: Datatype,
+        settable: bool,
         unit: Option<&str>,
         format: Option<&str>,
     ) -> Property {
@@ -77,6 +86,7 @@ impl Property {
             id: id.to_owned(),
             name: name.to_owned(),
             datatype,
+            settable,
             unit: unit.map(|s| s.to_owned()),
             format: format.map(|s| s.to_owned()),
         }
@@ -146,14 +156,34 @@ impl Into<Vec<u8>> for State {
     }
 }
 
+type UpdateCallback = Box<
+    dyn FnMut(String, String, String) -> Pin<Box<dyn Future<Output = bool> + Send>> + Send + Sync,
+>;
+
 /// Builder for `HomieDevice` and associated objects.
-#[derive(Debug)]
 pub struct HomieDeviceBuilder {
     device_base: String,
     device_name: String,
     firmware_name: String,
     firmware_version: String,
     mqtt_options: MqttOptions,
+    update_callback: Option<UpdateCallback>,
+}
+
+impl Debug for HomieDeviceBuilder {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("HomieDeviceBuilder")
+            .field("device_base", &self.device_base)
+            .field("device_name", &self.device_name)
+            .field("firmware_name", &self.firmware_name)
+            .field("firmware_version", &self.firmware_version)
+            .field("mqtt_options", &self.mqtt_options)
+            .field(
+                "update_callback",
+                &self.update_callback.as_ref().map(|_| "..."),
+            )
+            .finish()
+    }
 }
 
 impl HomieDeviceBuilder {
@@ -163,6 +193,18 @@ impl HomieDeviceBuilder {
     pub fn set_firmware(&mut self, firmware_name: &str, firmware_version: &str) {
         self.firmware_name = firmware_name.to_string();
         self.firmware_version = firmware_version.to_string();
+    }
+
+    pub fn set_update_callback<F, Fut>(&mut self, mut update_callback: F)
+    where
+        F: (FnMut(String, String, String) -> Fut) + Send + Sync + 'static,
+        Fut: Future<Output = bool> + Send + 'static,
+    {
+        self.update_callback = Some(Box::new(
+            move |node_id: String, property_id: String, value: String| {
+                update_callback(node_id, property_id, value).boxed()
+            },
+        ));
     }
 
     /// Create a new Homie device, connect to the MQTT server, and start a task to handle the MQTT
@@ -180,23 +222,30 @@ impl HomieDeviceBuilder {
         ),
         SendError<Request>,
     > {
-        let (event_loop, mut homie, stats, firmware) = self.build();
+        let (event_loop, mut homie, stats, firmware, update_callback) = self.build();
 
         // This needs to be spawned before we wait for anything to be sent, as the start() calls below do.
-        let event_task = HomieDevice::spawn(event_loop);
+        let event_task = homie.spawn(event_loop, update_callback);
 
         stats.start().await?;
         firmware.start().await?;
         homie.start().await?;
 
         let stats_task = stats.spawn();
-
-        let join_handle = try_join_handles(event_task, stats_task).map(|r| r.map(|((), ())| ()));
+        let join_handle = try_join(event_task, stats_task).map(|r| r.map(|((), ())| ()));
 
         Ok((homie, join_handle))
     }
 
-    fn build(self) -> (EventLoop, HomieDevice, HomieStats, HomieFirmware) {
+    fn build(
+        self,
+    ) -> (
+        EventLoop,
+        HomieDevice,
+        HomieStats,
+        HomieFirmware,
+        Option<UpdateCallback>,
+    ) {
         let mut mqtt_options = self.mqtt_options;
         mqtt_options.set_last_will(LastWill::new(
             format!("{}/$state", self.device_base),
@@ -212,7 +261,7 @@ impl HomieDeviceBuilder {
         let stats = HomieStats::new(publisher.clone());
         let firmware = HomieFirmware::new(publisher, self.firmware_name, self.firmware_version);
 
-        (event_loop, homie, stats, firmware)
+        (event_loop, homie, stats, firmware, self.update_callback)
     }
 }
 
@@ -250,6 +299,7 @@ impl HomieDevice {
             firmware_name: DEFAULT_FIRMWARE_NAME.to_string(),
             firmware_version: DEFAULT_FIRMWARE_VERSION.to_string(),
             mqtt_options,
+            update_callback: None,
         }
     }
 
@@ -282,13 +332,68 @@ impl HomieDevice {
     }
 
     /// Spawn a task to handle the EventLoop.
-    fn spawn(mut event_loop: EventLoop) -> JoinHandle<Result<(), Box<dyn Error + Send + Sync>>> {
-        task::spawn(async move {
+    fn spawn(
+        &self,
+        mut event_loop: EventLoop,
+        mut update_callback: Option<UpdateCallback>,
+    ) -> impl Future<Output = Result<(), Box<dyn Error + Send + Sync>>> {
+        let device_base = format!("{}/", self.publisher.device_base);
+        let (incoming_tx, incoming_rx) = async_channel::unbounded();
+
+        let mqtt_task = task::spawn(async move {
             loop {
                 let (incoming, outgoing) = event_loop.poll().await?;
                 log::trace!("Incoming = {:?}, Outgoing = {:?}", incoming, outgoing);
+
+                if let Some(incoming) = incoming {
+                    incoming_tx.send(incoming).await?;
+                }
             }
-        })
+        });
+
+        let publisher = self.publisher.clone();
+        let incoming_task: JoinHandle<Result<(), Box<dyn Error + Send + Sync>>> =
+            task::spawn(async move {
+                loop {
+                    match incoming_rx.recv().await? {
+                        Incoming::Publish(publish) => {
+                            if let Some(rest) = publish.topic.strip_prefix(&device_base) {
+                                if let ([node_id, property_id, "set"], Ok(payload)) = (
+                                    rest.split("/").collect::<Vec<&str>>().as_slice(),
+                                    str::from_utf8(&publish.payload),
+                                ) {
+                                    log::trace!(
+                                        "set node {:?} property {:?} to {:?}",
+                                        node_id,
+                                        property_id,
+                                        payload
+                                    );
+                                    if let Some(callback) = update_callback.as_mut() {
+                                        if callback(
+                                            node_id.to_string(),
+                                            property_id.to_string(),
+                                            payload.to_string(),
+                                        )
+                                        .await
+                                        {
+                                            publisher
+                                                .publish_retained(
+                                                    &format!("{}/{}", node_id, property_id),
+                                                    payload,
+                                                )
+                                                .await?;
+                                        }
+                                    }
+                                }
+                            } else {
+                                log::warn!("Unexpected publish: {:?}", publish);
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            });
+        try_join_handles(mqtt_task, incoming_task).map(|r| r.map(|((), ())| ()))
     }
 
     /// Add a node to the Homie device. It will immediately be published.
@@ -311,7 +416,10 @@ impl HomieDevice {
 
     /// Remove the node with the given ID.
     pub async fn remove_node(&mut self, node_id: &str) -> Result<(), SendError<Request>> {
-        self.nodes.retain(|n| n.id != node_id);
+        // Panic on attempt to remove a node which was never added.
+        let index = self.nodes.iter().position(|n| n.id == node_id).unwrap();
+        self.unpublish_node(&self.nodes[index]).await?;
+        self.nodes.remove(index);
         self.publish_nodes().await
     }
 
@@ -337,6 +445,12 @@ impl HomieDevice {
                     property.datatype,
                 )
                 .await?;
+            self.publisher
+                .publish_retained(
+                    &format!("{}/{}/$settable", node.id, property.id),
+                    if property.settable { "true" } else { "false" },
+                )
+                .await?;
             if let Some(unit) = &property.unit {
                 self.publisher
                     .publish_retained(&format!("{}/{}/$unit", node.id, property.id), unit.as_str())
@@ -350,10 +464,26 @@ impl HomieDevice {
                     )
                     .await?;
             }
+            if property.settable {
+                self.publisher
+                    .subscribe(&format!("{}/{}/set", node.id, property.id))
+                    .await?;
+            }
         }
         self.publisher
             .publish_retained(&format!("{}/$properties", node.id), property_ids.join(","))
             .await?;
+        Ok(())
+    }
+
+    async fn unpublish_node(&self, node: &Node) -> Result<(), SendError<Request>> {
+        for property in &node.properties {
+            if property.settable {
+                self.publisher
+                    .unsubscribe(&format!("{}/{}/set", node.id, property.id))
+                    .await?;
+            }
+        }
         Ok(())
     }
 
@@ -444,6 +574,18 @@ impl DevicePublisher {
     async fn disconnect(&self) -> Result<(), SendError<Request>> {
         self.requests_tx.send(Request::Disconnect).await
     }
+
+    async fn subscribe(&self, subtopic: &str) -> Result<(), SendError<Request>> {
+        let topic = format!("{}/{}", self.device_base, subtopic);
+        let subscribe = Subscribe::new(topic, QoS::AtLeastOnce);
+        self.requests_tx.send(subscribe.into()).await
+    }
+
+    async fn unsubscribe(&self, subtopic: &str) -> Result<(), SendError<Request>> {
+        let topic = format!("{}/{}", self.device_base, subtopic);
+        let unsubscribe = Unsubscribe::new(topic);
+        self.requests_tx.send(unsubscribe.into()).await
+    }
 }
 
 /// Legacy stats extension.
@@ -472,8 +614,8 @@ impl HomieStats {
     }
 
     /// Periodically send stats.
-    fn spawn(self) -> JoinHandle<Result<(), Box<dyn Error + Send + Sync>>> {
-        task::spawn(async move {
+    fn spawn(self) -> impl Future<Output = Result<(), Box<dyn Error + Send + Sync>>> {
+        let task: JoinHandle<Result<(), Box<dyn Error + Send + Sync>>> = task::spawn(async move {
             loop {
                 let uptime = Instant::now() - self.start_time;
                 self.publisher
@@ -481,7 +623,8 @@ impl HomieStats {
                     .await?;
                 delay_for(STATS_INTERVAL).await;
             }
-        })
+        });
+        task.map(|res| Ok(res??))
     }
 }
 
@@ -647,7 +790,7 @@ mod tests {
             MqttOptions::new("client_id", "hostname", 1234),
         );
 
-        let (_event_loop, homie, _stats, firmware) = builder.build();
+        let (_event_loop, homie, _stats, firmware, _callback) = builder.build();
 
         assert_eq!(homie.device_name, "Test device");
         assert_eq!(homie.publisher.device_base, "homie/test-device");
@@ -667,7 +810,7 @@ mod tests {
 
         builder.set_firmware("firmware_name", "firmware_version");
 
-        let (_event_loop, homie, _stats, firmware) = builder.build();
+        let (_event_loop, homie, _stats, firmware, _callback) = builder.build();
 
         assert_eq!(homie.device_name, "Test device");
         assert_eq!(homie.publisher.device_base, "homie/test-device");
