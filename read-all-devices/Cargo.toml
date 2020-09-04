@@ -6,7 +6,12 @@ edition = "2018"
 license = "MIT OR Apache-2.0"
 
 [dependencies]
-blurz = "0.4.0"
 lazy_static = "1.4.0"
-mijia = { path = "../mijia" }
 regex = "1"
+
+
+dbus = {version = "0.8.4", features = ["futures"]}
+futures = "0.3"
+bluez-generated = { path = "../bluez-generated" }
+tokio = "0.2.22"
+dbus-tokio = "*"

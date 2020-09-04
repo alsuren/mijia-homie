@@ -1,53 +1,48 @@
-use blurz::{BluetoothDevice, BluetoothEvent, BluetoothSession};
-use mijia::{
-    connect_sensors, decode_value, find_sensors, hashmap_from_file, print_sensors, scan,
-    start_notify_sensors, SERVICE_CHARACTERISTIC_PATH,
-};
-use std::thread;
-use std::time::Duration;
+use dbus::nonblock::SyncConnection;
+use futures::FutureExt;
+use futures::StreamExt;
+use std::error::Error;
+use std::sync::Arc;
 
-mod explore_device;
+#[tokio::main(core_threads = 3)]
+async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
+    // Connect to the D-Bus session bus (this is blocking, unfortunately).
+    let (dbus_resource, conn) = dbus_tokio::connection::new_system_sync()?;
+    let dbus_handle = tokio::spawn(async {
+        let err = dbus_resource.await;
+        Err::<(), Box<dyn Error + Send + Sync>>(err)
+    });
+    let bluetooth_handle = service_bluetooth_event_queue(conn);
 
-const SENSOR_NAMES_FILENAME: &str = "sensor_names.conf";
+    let res: Result<_, Box<dyn Error + Send + Sync>> = tokio::try_join! {
+        // The resource is a task that should be spawned onto a tokio compatible
+        // reactor ASAP. If the resource ever finishes, you lost connection to D-Bus.
+        dbus_handle.map(|res| Ok(res??)),
+        // Bluetooth finished first. Convert error and get on with your life.
+        bluetooth_handle.map(|res| Ok(res?)),
+    };
+    res?;
+    Ok(())
+}
 
-fn main() {
-    let sensor_names = hashmap_from_file(SENSOR_NAMES_FILENAME).unwrap();
-    let bt_session = &BluetoothSession::create_session(None).unwrap();
-    let device_list = scan(&bt_session).unwrap();
-    let sensors = find_sensors(&bt_session, &device_list);
-    println!();
-    print_sensors(&sensors, &sensor_names);
-    let connected_sensors = connect_sensors(&sensors);
-    print_sensors(&connected_sensors, &sensor_names);
+async fn service_bluetooth_event_queue(
+    conn: Arc<SyncConnection>,
+) -> Result<(), Box<dyn Error + Send + Sync>> {
+    println!("Subscribing to events");
+    let mut rule = dbus::message::MatchRule::new();
+    rule.msg_type = Some(dbus::message::MessageType::Signal);
+    rule.sender = Some(dbus::strings::BusName::new("org.bluez")?);
 
-    // We need to wait a bit after calling connect to safely
-    // get the gatt services
-    thread::sleep(Duration::from_millis(5000));
-    for device in &connected_sensors {
-        explore_device::explore_gatt_profile(bt_session, &device);
+    let (msg_match, mut events) = conn.add_match(rule).await?.msg_stream();
+    println!("Processing events");
+    // Process events until there are none available for the timeout.
+    while let Some(raw_event) = dbg!(events.next().await) {
+        // if let Some(event) = BluetoothEvent::from(raw_event) {
+        dbg!(raw_event);
+        println!("handle_bluetooth_event(state.clone(), event).await?");
+        // }
     }
-    start_notify_sensors(bt_session, &connected_sensors);
-
-    println!("READINGS");
-    loop {
-        for event in bt_session.incoming(1000).map(BluetoothEvent::from) {
-            let (object_path, value) = match event {
-                Some(BluetoothEvent::Value { object_path, value }) => (object_path, value),
-                _ => continue,
-            };
-
-            // TODO: Make this less hacky.
-            if !object_path.ends_with(SERVICE_CHARACTERISTIC_PATH) {
-                continue;
-            }
-            let device_path = &object_path[..object_path.len() - SERVICE_CHARACTERISTIC_PATH.len()];
-            let device = BluetoothDevice::new(bt_session, device_path.to_string());
-
-            if let Some(readings) = decode_value(&value) {
-                let mac_address = device.get_address().unwrap();
-                let name = sensor_names.get(&mac_address).unwrap_or(&mac_address);
-                println!("{} ({}) {}", object_path, name, readings);
-            }
-        }
-    }
+    // TODO: move this into a defer or scope guard or something.
+    conn.remove_match(msg_match.token()).await?;
+    Ok(())
 }

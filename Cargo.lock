@@ -763,10 +763,13 @@ dependencies = [
 name = "read-all-devices"
 version = "0.1.0"
 dependencies = [
- "blurz",
+ "bluez-generated",
+ "dbus 0.8.4",
+ "dbus-tokio",
+ "futures",
  "lazy_static",
- "mijia",
  "regex",
+ "tokio",
 ]
 
 [[package]]
