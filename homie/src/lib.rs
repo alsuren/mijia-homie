@@ -385,6 +385,8 @@ impl HomieDevice {
         self.publisher.disconnect().await
     }
 
+    /// Publish a new value for the given property of the given node of this device. The caller is
+    /// responsible for ensuring that the value is of the correct type.
     pub async fn publish_value(
         &self,
         node_id: &str,
