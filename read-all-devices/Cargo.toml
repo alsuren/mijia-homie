@@ -1,0 +1,12 @@
+[package]
+name = "read-all-devices"
+version = "0.1.0"
+authors = ["Luis Félix <lcs.felix@gmail.com>"]
+edition = "2018"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+blurz = "0.4.0"
+lazy_static = "1.4.0"
+mijia = { path = "../mijia" }
+regex = "1"
