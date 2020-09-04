@@ -1,10 +1,12 @@
 use bluez_generated::bluetooth_event::BluetoothEvent;
+use bluez_generated::generated::adapter1::OrgBluezAdapter1;
 use dbus::nonblock::SyncConnection;
 use futures::FutureExt;
 use futures::StreamExt;
 use mijia::{decode_value, SERVICE_CHARACTERISTIC_PATH};
 use std::error::Error;
 use std::sync::Arc;
+use std::time::Duration;
 
 #[tokio::main(core_threads = 3)]
 async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
@@ -16,6 +18,15 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
         let err = dbus_resource.await;
         Err::<(), Box<dyn Error + Send + Sync>>(err)
     });
+
+    let adapter = dbus::nonblock::Proxy::new(
+        "org.bluez",
+        "/org/bluez/hci0",
+        Duration::from_secs(10),
+        conn.clone(),
+    );
+
+    adapter.set_powered(true).await?;
 
     let bluetooth_handle = service_bluetooth_event_queue(conn);
 
