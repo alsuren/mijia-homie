@@ -435,8 +435,8 @@ impl DevicePublisher {
         subtopic: &str,
         value: impl Into<Vec<u8>>,
     ) -> Result<(), SendError<Request>> {
-        let name = format!("{}/{}", self.device_base, subtopic);
-        let mut publish = Publish::new(name, QoS::AtLeastOnce, value);
+        let topic = format!("{}/{}", self.device_base, subtopic);
+        let mut publish = Publish::new(topic, QoS::AtLeastOnce, value);
         publish.set_retain(true);
         self.requests_tx.send(publish.into()).await
     }
