@@ -147,9 +147,9 @@ impl Sensor {
 
     fn as_node(&self) -> Node {
         Node::new(
-            self.node_id(),
-            self.name.to_string(),
-            "Mijia sensor".to_string(),
+            &self.node_id(),
+            &self.name,
+            "Mijia sensor",
             vec![
                 Property::new(
                     Self::PROPERTY_ID_TEMPERATURE,

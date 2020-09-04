@@ -101,11 +101,11 @@ impl Node {
     /// * `name`: The human-readable name of the node.
     /// * `type`: The type of the node. This is an arbitrary string.
     /// * `property`: The properties of the node. There should be at least one.
-    pub fn new(id: String, name: String, node_type: String, properties: Vec<Property>) -> Node {
+    pub fn new(id: &str, name: &str, node_type: &str, properties: Vec<Property>) -> Node {
         Node {
-            id,
-            name,
-            node_type,
+            id: id.to_owned(),
+            name: name.to_owned(),
+            node_type: node_type.to_owned(),
             properties,
         }
     }
@@ -551,21 +551,11 @@ mod tests {
         let (mut device, rx) = make_test_device();
 
         device
-            .add_node(Node::new(
-                "id".to_string(),
-                "Name".to_string(),
-                "type".to_string(),
-                vec![],
-            ))
+            .add_node(Node::new("id", "Name", "type", vec![]))
             .await
             .unwrap();
         device
-            .add_node(Node::new(
-                "id".to_string(),
-                "Name 2".to_string(),
-                "type2".to_string(),
-                vec![],
-            ))
+            .add_node(Node::new("id", "Name 2", "type2", vec![]))
             .await
             .unwrap();
 
@@ -692,12 +682,7 @@ mod tests {
         let (mut device, rx) = make_test_device();
 
         device
-            .add_node(Node::new(
-                "id".to_string(),
-                "Name".to_string(),
-                "type".to_string(),
-                vec![],
-            ))
+            .add_node(Node::new("id", "Name", "type", vec![]))
             .await?;
 
         device.start().await?;
@@ -705,12 +690,7 @@ mod tests {
 
         // Add another node after starting.
         device
-            .add_node(Node::new(
-                "id2".to_string(),
-                "Name 2".to_string(),
-                "type2".to_string(),
-                vec![],
-            ))
+            .add_node(Node::new("id2", "Name 2", "type2", vec![]))
             .await?;
 
         // Need to keep rx alive until here so that the channel isn't closed.
@@ -724,24 +704,14 @@ mod tests {
         let (mut device, rx) = make_test_device();
 
         device
-            .add_node(Node::new(
-                "id".to_string(),
-                "Name".to_string(),
-                "type".to_string(),
-                vec![],
-            ))
+            .add_node(Node::new("id", "Name", "type", vec![]))
             .await?;
 
         device.remove_node("id").await?;
 
         // Adding it back shouldn't give an error.
         device
-            .add_node(Node::new(
-                "id".to_string(),
-                "Name".to_string(),
-                "type".to_string(),
-                vec![],
-            ))
+            .add_node(Node::new("id", "Name", "type", vec![]))
             .await?;
 
         // Need to keep rx alive until here so that the channel isn't closed.

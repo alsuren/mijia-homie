@@ -20,9 +20,9 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
 
     homie
         .add_node(Node::new(
-            "sensor".to_string(),
-            "Sensor".to_string(),
-            "Environment sensor".to_string(),
+            "sensor",
+            "Sensor",
+            "Environment sensor",
             vec![
                 Property::new(
                     "temperature",
