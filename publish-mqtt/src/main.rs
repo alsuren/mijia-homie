@@ -92,8 +92,8 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
 
     let local = task::LocalSet::new();
 
-    // Connect to the D-Bus session bus (this is blocking, unfortunately).
-    let (dbus_resource, conn) = dbus_tokio::connection::new_session_sync()?;
+    // Connect to the D-Bus system bus (this is blocking, unfortunately).
+    let (dbus_resource, conn) = dbus_tokio::connection::new_system_sync()?;
     let dbus_handle = tokio::spawn(async {
         let err = dbus_resource.await;
         Err::<(), Box<dyn Error + Send + Sync>>(err)
