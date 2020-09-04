@@ -156,18 +156,21 @@ impl Sensor {
                     "Temperature",
                     Datatype::Float,
                     Some("ºC"),
+                    None,
                 ),
                 Property::new(
                     Self::PROPERTY_ID_HUMIDITY,
                     "Humidity",
                     Datatype::Integer,
                     Some("%"),
+                    None,
                 ),
                 Property::new(
                     Self::PROPERTY_ID_BATTERY,
                     "Battery level",
                     Datatype::Integer,
                     Some("%"),
+                    None,
                 ),
             ],
         )

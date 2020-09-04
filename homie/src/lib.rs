@@ -50,6 +50,7 @@ pub struct Property {
     name: String,
     datatype: Datatype,
     unit: Option<String>,
+    format: Option<String>,
 }
 
 impl Property {
@@ -63,12 +64,21 @@ impl Property {
     /// * `unit`: The unit for the property, if any. This may be one of the
     ///   [recommended units](https://homieiot.github.io/specification/#property-attributes), or
     ///   any other custom unit.
-    pub fn new(id: &str, name: &str, datatype: Datatype, unit: Option<&str>) -> Property {
+    /// * `format`: The format for the property, if any. This must be specified if the datatype is
+    ///   `Enum` or `Color`, and may be specified if the datatype is `Integer` or `Float`.
+    pub fn new(
+        id: &str,
+        name: &str,
+        datatype: Datatype,
+        unit: Option<&str>,
+        format: Option<&str>,
+    ) -> Property {
         Property {
             id: id.to_owned(),
             name: name.to_owned(),
             datatype,
             unit: unit.map(|s| s.to_owned()),
+            format: format.map(|s| s.to_owned()),
         }
     }
 }
@@ -331,6 +341,14 @@ impl HomieDevice {
             if let Some(unit) = &property.unit {
                 self.publisher
                     .publish_retained(&format!("{}/{}/$unit", node.id, property.id), unit.as_str())
+                    .await?;
+            }
+            if let Some(format) = &property.format {
+                self.publisher
+                    .publish_retained(
+                        &format!("{}/{}/$format", node.id, property.id),
+                        format.as_str(),
+                    )
                     .await?;
             }
         }

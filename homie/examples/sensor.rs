@@ -24,8 +24,14 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
             "Sensor".to_string(),
             "Environment sensor".to_string(),
             vec![
-                Property::new("temperature", "Temperature", Datatype::Float, Some("ºC")),
-                Property::new("humidity", "Humidity", Datatype::Integer, Some("%")),
+                Property::new(
+                    "temperature",
+                    "Temperature",
+                    Datatype::Float,
+                    Some("ºC"),
+                    None,
+                ),
+                Property::new("humidity", "Humidity", Datatype::Integer, Some("%"), None),
             ],
         ))
         .await?;
