@@ -768,6 +768,7 @@ dependencies = [
  "dbus-tokio",
  "futures",
  "lazy_static",
+ "mijia",
  "regex",
  "tokio",
 ]

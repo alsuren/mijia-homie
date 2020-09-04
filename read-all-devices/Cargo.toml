@@ -15,3 +15,4 @@ futures = "0.3"
 bluez-generated = { path = "../bluez-generated" }
 tokio = "0.2.22"
 dbus-tokio = "*"
+mijia = { path = "../mijia" }
