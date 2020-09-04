@@ -15,7 +15,7 @@ use std::time::Duration;
 const SCAN_DURATION: Duration = Duration::from_millis(5000);
 const CONNECT_TIMEOUT_MS: i32 = 10_000;
 
-const MIJIA_SERVICE_DATA_UUID: &str = "0000fe95-0000-1000-8000-00805f9b34fb";
+pub const MIJIA_SERVICE_DATA_UUID: &str = "0000fe95-0000-1000-8000-00805f9b34fb";
 pub const SERVICE_CHARACTERISTIC_PATH: &str = "/service0021/char0035";
 const CONNECTION_INTERVAL_CHARACTERISTIC_PATH: &str = "/service0021/char0045";
 /// 500 in little-endian

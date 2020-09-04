@@ -1,9 +1,11 @@
 use bluez_generated::bluetooth_event::BluetoothEvent;
 use bluez_generated::generated::adapter1::OrgBluezAdapter1;
+use dbus::arg::RefArg;
+use dbus::nonblock::stdintf::org_freedesktop_dbus::ObjectManager;
 use dbus::nonblock::SyncConnection;
 use futures::FutureExt;
 use futures::StreamExt;
-use mijia::{decode_value, SERVICE_CHARACTERISTIC_PATH};
+use mijia::{decode_value, MIJIA_SERVICE_DATA_UUID, SERVICE_CHARACTERISTIC_PATH};
 use std::error::Error;
 use std::sync::Arc;
 use std::time::Duration;
@@ -27,6 +29,38 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     );
 
     adapter.set_powered(true).await?;
+    adapter.start_discovery().await?;
+
+    let bluez_root =
+        dbus::nonblock::Proxy::new("org.bluez", "/", Duration::from_secs(10), conn.clone());
+    let devices = bluez_root.get_managed_objects().await?;
+
+    println!("{:?}", devices);
+    devices
+        .iter()
+        .map(|(path, interfaces)| {
+            // FIXME: can we generate a strongly typed deserialiser for this,
+            // based on the introspection data?
+            let properties = interfaces.get("org.bluez.Device1")?;
+            // FIXME: UUIDs don't get populated until we connect. Use:
+            //     "ServiceData": Variant(InternalDict { data: [
+            //         ("0000fe95-0000-1000-8000-00805f9b34fb", Variant([48, 88, 91, 5, 1, 23, 33, 215, 56, 193, 164, 40, 1, 0])
+            //     )], outer_sig: Signature("a{sv}") })
+            // instead?
+            let uuids = dbg!(properties.get("UUIDs"))?;
+
+            uuids
+                .as_iter()?
+                .filter_map(|ids| {
+                    dbg!(ids)
+                        .as_iter()?
+                        .find(|id| dbg!(id).as_str() == Some(MIJIA_SERVICE_DATA_UUID))
+                })
+                .next()
+                .and_then(|_| Some(path))
+        })
+        .filter(Option::is_some)
+        .for_each(|id| println!("path: {:?}", id));
 
     let bluetooth_handle = service_bluetooth_event_queue(conn);
 
