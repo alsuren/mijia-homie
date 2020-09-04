@@ -47,14 +47,15 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
             //         ("0000fe95-0000-1000-8000-00805f9b34fb", Variant([48, 88, 91, 5, 1, 23, 33, 215, 56, 193, 164, 40, 1, 0])
             //     )], outer_sig: Signature("a{sv}") })
             // instead?
-            let uuids = dbg!(properties.get("UUIDs"))?;
+            let uuids = properties.get("UUIDs")?;
 
             uuids
+                // Mad hack to turn the Variant into an Array (like how option.as_iter() works?)
                 .as_iter()?
                 .filter_map(|ids| {
-                    dbg!(ids)
-                        .as_iter()?
-                        .find(|id| dbg!(id).as_str() == Some(MIJIA_SERVICE_DATA_UUID))
+                    // we now have an Array. I promise.
+                    ids.as_iter()?
+                        .find(|id| id.as_str() == Some(MIJIA_SERVICE_DATA_UUID))
                 })
                 .next()
                 .and_then(|_| Some(path))
