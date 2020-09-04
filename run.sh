@@ -10,21 +10,22 @@ TARGET_SSH=${TARGET_SSH:-pi@raspberrypi.local}
 PROFILE=${PROFILE:-debug}
 RUN=${RUN:-1}
 SUFFIX=${SUFFIX:-}
+BIN=${BIN:-publish-mqtt}
 
 if [ $PROFILE = release ]
 then
     time cross build --target $TARGET --release
 elif [ $PROFILE = debug ]
 then
-    time cross build --target $TARGET
+    time cross build --target $TARGET --bin $BIN
 else
     echo "Invalid profile '$PROFILE'"
     exit 1
 fi
 
-time rsync --progress target/$TARGET/$PROFILE/publish-mqtt $TARGET_SSH:publish-mqtt$SUFFIX
+time rsync --progress target/$TARGET/$PROFILE/$BIN $TARGET_SSH:$BIN$SUFFIX
 
 if [ $RUN -eq 1 ]
 then
-    ssh $TARGET_SSH ./publish-mqtt$SUFFIX
+    ssh $TARGET_SSH ./$BIN$SUFFIX
 fi
