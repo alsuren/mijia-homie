@@ -289,7 +289,7 @@ async fn check_for_sensors(
     adapter
         .start_discovery()
         .await
-        .with_context(|| std::line!().to_string())?;
+        .unwrap_or_else(|err| println!("starting discovery failed {:?}", err));
 
     let sensors = get_sensors(dbus_conn.clone())
         .await
