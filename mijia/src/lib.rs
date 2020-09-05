@@ -26,7 +26,7 @@ pub struct SensorProps {
 
 pub async fn get_sensors(
     dbus_conn: Arc<SyncConnection>,
-) -> Result<Vec<SensorProps>, Box<dyn Error + Send + Sync>> {
+) -> Result<Vec<SensorProps>, anyhow::Error> {
     let bluez_root =
         dbus::nonblock::Proxy::new("org.bluez", "/", Duration::from_secs(30), dbus_conn.clone());
     let tree = bluez_root.get_managed_objects().await?;
@@ -76,7 +76,7 @@ pub async fn get_sensors(
 pub async fn start_notify_sensor(
     dbus_conn: Arc<SyncConnection>,
     device_path: &str,
-) -> Result<(), Box<dyn Error + Send + Sync>> {
+) -> Result<(), anyhow::Error> {
     let temp_humidity_path: String = device_path.to_string() + SERVICE_CHARACTERISTIC_PATH;
     let temp_humidity = dbus::nonblock::Proxy::new(
         "org.bluez",

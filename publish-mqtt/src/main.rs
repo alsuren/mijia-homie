@@ -12,7 +12,6 @@ use mijia::{
 use rumqttc::MqttOptions;
 use rustls::ClientConfig;
 use std::collections::{HashMap, VecDeque};
-use std::error::Error;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::Mutex;
@@ -29,7 +28,7 @@ const UPDATE_TIMEOUT: Duration = Duration::from_secs(60);
 const SENSOR_NAMES_FILENAME: &str = "sensor_names.conf";
 
 #[tokio::main(core_threads = 3)]
-async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
+async fn main() -> Result<(), anyhow::Error> {
     dotenv::dotenv()?;
     pretty_env_logger::init();
     color_backtrace::install();
@@ -77,24 +76,21 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     let (dbus_resource, dbus_conn) = dbus_tokio::connection::new_system_sync()?;
     let dbus_handle = tokio::spawn(async {
         let err = dbus_resource.await;
-        Err::<(), Box<dyn Error + Send + Sync>>(err)
+        Err::<(), anyhow::Error>(anyhow::anyhow!(err))
     });
 
-    let bluetooth_handle = local.spawn_local(async move {
-        bluetooth_mainloop(homie, dbus_conn).await.unwrap();
-    });
+    let bluetooth_handle =
+        local.run_until(async move { bluetooth_mainloop(homie, dbus_conn).await });
 
     // Poll everything to completion, until the first one bombs out.
-    let res: Result<_, Box<dyn Error + Send + Sync>> = try_join! {
-        // LocalSet finished first. Colour me confused.
-        local.map(|()| Ok(println!("WTF?"))),
+    let res: Result<_, anyhow::Error> = try_join! {
         // The resource is a task that should be spawned onto a tokio compatible
         // reactor ASAP. If the resource ever finishes, you lost connection to D-Bus.
         dbus_handle.map(|res| Ok(res??)),
         // Bluetooth finished first. Convert error and get on with your life.
         bluetooth_handle.map(|res| Ok(res?)),
         // MQTT event loop finished first.
-        mqtt_handle,
+        mqtt_handle.map(|res| Ok(res?)),
     };
     res?;
     Ok(())
@@ -116,7 +112,7 @@ impl Sensor {
     pub fn new(
         props: SensorProps,
         sensor_names: &HashMap<String, String>,
-    ) -> Result<Self, Box<dyn Error + Send + Sync>> {
+    ) -> Result<Self, anyhow::Error> {
         let name = sensor_names
             .get(&props.mac_address)
             .cloned()
@@ -174,7 +170,7 @@ impl Sensor {
         &self,
         homie: &HomieDevice,
         readings: &Readings,
-    ) -> Result<(), Box<dyn Error + Send + Sync>> {
+    ) -> Result<(), anyhow::Error> {
         println!("{} {} ({})", self.mac_address, readings, self.name);
 
         let node_id = self.node_id();
@@ -209,7 +205,7 @@ struct SensorState {
 async fn bluetooth_mainloop(
     mut homie: HomieDevice,
     dbus_conn: Arc<SyncConnection>,
-) -> Result<(), Box<dyn Error + Send + Sync>> {
+) -> Result<(), anyhow::Error> {
     let sensor_names = hashmap_from_file(SENSOR_NAMES_FILENAME)?;
 
     homie.ready().await?;
@@ -266,7 +262,7 @@ async fn check_for_sensors(
     state: Arc<Mutex<SensorState>>,
     dbus_conn: Arc<SyncConnection>,
     sensor_names: &HashMap<String, String>,
-) -> Result<(), Box<dyn Error + Send + Sync>> {
+) -> Result<(), anyhow::Error> {
     let adapter = dbus::nonblock::Proxy::new(
         "org.bluez",
         "/org/bluez/hci0",
@@ -302,7 +298,7 @@ async fn connect_first_sensor_in_queue(
     homie: &mut HomieDevice,
     sensors_connected: &mut Vec<Sensor>,
     sensors_to_connect: &mut VecDeque<Sensor>,
-) -> Result<(), Box<dyn Error + Send + Sync>> {
+) -> Result<(), anyhow::Error> {
     println!("{} sensors in queue to connect.", sensors_to_connect.len());
     // Try to connect to a sensor.
     if let Some(mut sensor) = sensors_to_connect.pop_front() {
@@ -325,7 +321,7 @@ async fn connect_start_sensor<'a>(
     dbus_conn: Arc<SyncConnection>,
     homie: &mut HomieDevice,
     sensor: &mut Sensor,
-) -> Result<(), Box<dyn Error + Send + Sync>> {
+) -> Result<(), anyhow::Error> {
     let device = sensor.device(dbus_conn.clone());
     println!("Connecting");
     device.connect().await?;
@@ -350,7 +346,7 @@ async fn disconnect_first_stale_sensor(
     homie: &mut HomieDevice,
     sensors_connected: &mut Vec<Sensor>,
     sensors_to_connect: &mut VecDeque<Sensor>,
-) -> Result<(), Box<dyn Error + Send + Sync>> {
+) -> Result<(), anyhow::Error> {
     let now = Instant::now();
     if let Some(sensor_index) = sensors_connected
         .iter()
@@ -371,11 +367,11 @@ async fn disconnect_first_stale_sensor(
 async fn service_bluetooth_event_queue(
     state: Arc<Mutex<SensorState>>,
     dbus_conn: Arc<SyncConnection>,
-) -> Result<(), Box<dyn Error + Send + Sync>> {
+) -> Result<(), anyhow::Error> {
     println!("Subscribing to events");
     let mut rule = dbus::message::MatchRule::new();
     rule.msg_type = Some(dbus::message::MessageType::Signal);
-    rule.sender = Some(dbus::strings::BusName::new("org.bluez")?);
+    rule.sender = Some(dbus::strings::BusName::new("org.bluez").map_err(|s| anyhow::anyhow!(s))?);
 
     let (msg_match, mut events) = dbus_conn.add_match(rule).await?.msg_stream();
     println!("Processing events");
@@ -393,7 +389,7 @@ async fn service_bluetooth_event_queue(
 async fn handle_bluetooth_event(
     state: Arc<Mutex<SensorState>>,
     event: BluetoothEvent,
-) -> Result<(), Box<dyn Error + Send + Sync>> {
+) -> Result<(), anyhow::Error> {
     println!("Locking(handle_bluetooth_event({:?})).", event);
     let state = &mut *state.lock().await;
     let homie = &mut state.homie;

@@ -20,3 +20,4 @@ bluez-generated = { path = "../bluez-generated" }
 dbus-tokio = "*"
 dbus = {version = "0.8.4", features = ["futures"]}
 futures-channel = "*"
+anyhow = "*"
