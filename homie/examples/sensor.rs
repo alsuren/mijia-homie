@@ -7,7 +7,7 @@ use std::time::Duration;
 use tokio::task::{self, JoinHandle};
 use tokio::{time, try_join};
 
-#[tokio::main(core_threads = 2)]
+#[tokio::main]
 async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     pretty_env_logger::init();
 

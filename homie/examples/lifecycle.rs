@@ -6,7 +6,7 @@ use std::time::Duration;
 use tokio::task::{self, JoinHandle};
 use tokio::{time, try_join};
 
-#[tokio::main(core_threads = 2)]
+#[tokio::main]
 async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     let mut mqttoptions = MqttOptions::new("homie_example", "test.mosquitto.org", 1883);
     mqttoptions.set_keep_alive(5);
