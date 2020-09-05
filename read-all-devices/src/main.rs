@@ -3,12 +3,14 @@ use bluez_generated::generated::adapter1::OrgBluezAdapter1;
 use dbus::arg::RefArg;
 use dbus::nonblock::stdintf::org_freedesktop_dbus::ObjectManager;
 use dbus::nonblock::SyncConnection;
+use dbus::Path;
 use futures::FutureExt;
 use futures::StreamExt;
 use mijia::{decode_value, MIJIA_SERVICE_DATA_UUID, SERVICE_CHARACTERISTIC_PATH};
 use std::error::Error;
 use std::sync::Arc;
 use std::time::Duration;
+use std::time::Instant;
 
 #[tokio::main(core_threads = 3)]
 async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
@@ -31,37 +33,8 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     adapter.set_powered(true).await?;
     adapter.start_discovery().await?;
 
-    let bluez_root =
-        dbus::nonblock::Proxy::new("org.bluez", "/", Duration::from_secs(10), conn.clone());
-    let devices = bluez_root.get_managed_objects().await?;
-
-    println!("{:?}", devices);
-    devices
-        .iter()
-        .map(|(path, interfaces)| {
-            // FIXME: can we generate a strongly typed deserialiser for this,
-            // based on the introspection data?
-            let properties = interfaces.get("org.bluez.Device1")?;
-            // FIXME: UUIDs don't get populated until we connect. Use:
-            //     "ServiceData": Variant(InternalDict { data: [
-            //         ("0000fe95-0000-1000-8000-00805f9b34fb", Variant([48, 88, 91, 5, 1, 23, 33, 215, 56, 193, 164, 40, 1, 0])
-            //     )], outer_sig: Signature("a{sv}") })
-            // instead?
-            let uuids = properties.get("UUIDs")?;
-
-            uuids
-                // Mad hack to turn the Variant into an Array (like how option.as_iter() works?)
-                .as_iter()?
-                .filter_map(|ids| {
-                    // we now have an Array. I promise.
-                    ids.as_iter()?
-                        .find(|id| id.as_str() == Some(MIJIA_SERVICE_DATA_UUID))
-                })
-                .next()
-                .and_then(|_| Some(path))
-        })
-        .filter(Option::is_some)
-        .for_each(|id| println!("path: {:?}", id));
+    let sensors = get_sensors(conn.clone()).await?;
+    println!("{:?}", sensors);
 
     let bluetooth_handle = service_bluetooth_event_queue(conn);
 
@@ -72,6 +45,67 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     };
     res?;
     Ok(())
+}
+
+#[derive(Debug)]
+struct Sensor {
+    device_path: Path<'static>,
+    mac_address: String,
+    name: String,
+    last_update_timestamp: Instant,
+}
+
+async fn get_sensors(
+    conn: Arc<SyncConnection>,
+) -> Result<Vec<Sensor>, Box<dyn Error + Send + Sync>> {
+    let bluez_root =
+        dbus::nonblock::Proxy::new("org.bluez", "/", Duration::from_secs(10), conn.clone());
+    let tree = bluez_root.get_managed_objects().await?;
+
+    let paths = tree
+        .into_iter()
+        .filter_map(|(path, interfaces)| {
+            // FIXME: can we generate a strongly typed deserialiser for this,
+            // based on the introspection data?
+            let device_properties = interfaces.get("org.bluez.Device1")?;
+
+            let mac_address = device_properties
+                .get("Address")?
+                .as_iter()?
+                .filter_map(|addr| addr.as_str())
+                .next()?
+                .to_string();
+            // FIXME: UUIDs don't get populated until we connect. Use:
+            //     "ServiceData": Variant(InternalDict { data: [
+            //         ("0000fe95-0000-1000-8000-00805f9b34fb", Variant([48, 88, 91, 5, 1, 23, 33, 215, 56, 193, 164, 40, 1, 0])
+            //     )], outer_sig: Signature("a{sv}") })
+            // instead?
+            let uuids = device_properties.get("UUIDs")?;
+
+            if uuids
+                // Mad hack to turn the Variant into an Array (like how option.as_iter() works?)
+                .as_iter()?
+                .filter_map(|ids| {
+                    // we now have an Array. I promise.
+                    ids.as_iter()?
+                        .find(|id| id.as_str() == Some(MIJIA_SERVICE_DATA_UUID))
+                })
+                .next()
+                .is_some()
+            {
+                Some(Sensor {
+                    device_path: path.to_owned(),
+                    mac_address,
+                    // FIXME: use the sensor_names HashMap?
+                    name: "".to_string(),
+                    last_update_timestamp: Instant::now(),
+                })
+            } else {
+                None
+            }
+        })
+        .collect();
+    Ok(paths)
 }
 
 async fn service_bluetooth_event_queue(
