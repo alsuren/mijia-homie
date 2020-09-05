@@ -522,6 +522,7 @@ dependencies = [
  "bluez-generated",
  "blurz",
  "dbus 0.8.4",
+ "itertools",
 ]
 
 [[package]]

@@ -9,3 +9,4 @@ license = "MIT OR Apache-2.0"
 blurz = "0.4.0"
 bluez-generated = { path = "../bluez-generated" }
 dbus = {version = "0.8.4", features = ["futures"]}
+itertools = "*"

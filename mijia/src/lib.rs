@@ -1,9 +1,8 @@
 use bluez_generated::generated::gattcharacteristic1::OrgBluezGattCharacteristic1;
-use blurz::{
-    BluetoothAdapter, BluetoothDevice, BluetoothDiscoverySession, BluetoothGATTCharacteristic,
-    BluetoothSession,
-};
+use dbus::arg::RefArg;
+use dbus::nonblock::stdintf::org_freedesktop_dbus::ObjectManager;
 use dbus::nonblock::SyncConnection;
+use itertools::Itertools;
 use std::cmp::max;
 use std::collections::HashMap;
 use std::convert::TryInto;
@@ -12,17 +11,67 @@ use std::fmt::{Display, Formatter};
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, ErrorKind};
 use std::sync::Arc;
-use std::thread;
 use std::time::Duration;
-
-const SCAN_DURATION: Duration = Duration::from_millis(5000);
-const CONNECT_TIMEOUT_MS: i32 = 10_000;
 
 pub const MIJIA_SERVICE_DATA_UUID: &str = "0000fe95-0000-1000-8000-00805f9b34fb";
 pub const SERVICE_CHARACTERISTIC_PATH: &str = "/service0021/char0035";
 pub const CONNECTION_INTERVAL_CHARACTERISTIC_PATH: &str = "/service0021/char0045";
 /// 500 in little-endian
 pub const CONNECTION_INTERVAL_500_MS: [u8; 3] = [0xF4, 0x01, 0x00];
+
+pub struct SensorProps {
+    pub object_path: String,
+    pub mac_address: String,
+}
+
+pub async fn get_sensors(
+    dbus_conn: Arc<SyncConnection>,
+) -> Result<Vec<SensorProps>, Box<dyn Error + Send + Sync>> {
+    let bluez_root =
+        dbus::nonblock::Proxy::new("org.bluez", "/", Duration::from_secs(30), dbus_conn.clone());
+    let tree = bluez_root.get_managed_objects().await?;
+
+    let paths = tree
+        .into_iter()
+        .filter_map(|(path, interfaces)| {
+            // FIXME: can we generate a strongly typed deserialiser for this,
+            // based on the introspection data?
+            let device_properties = interfaces.get("org.bluez.Device1")?;
+
+            let mac_address = device_properties
+                .get("Address")?
+                .as_iter()?
+                .filter_map(|addr| addr.as_str())
+                .next()?
+                .to_string();
+            // UUIDs don't get populated until we connect. Use:
+            //     "ServiceData": Variant(InternalDict { data: [
+            //         ("0000fe95-0000-1000-8000-00805f9b34fb", Variant([48, 88, 91, 5, 1, 23, 33, 215, 56, 193, 164, 40, 1, 0])
+            //     )], outer_sig: Signature("a{sv}") })
+            // instead.
+            let service_data: HashMap<String, _> = device_properties
+                .get("ServiceData")?
+                // Variant(...)
+                .as_iter()?
+                .next()?
+                // InternalDict(...)
+                .as_iter()?
+                .tuples::<(_, _)>()
+                .map(|(k, v)| (k.as_str().unwrap().into(), v))
+                .collect();
+
+            if service_data.contains_key(MIJIA_SERVICE_DATA_UUID) {
+                Some(SensorProps {
+                    object_path: path.to_string(),
+                    mac_address,
+                })
+            } else {
+                None
+            }
+        })
+        .collect();
+    Ok(paths)
+}
 
 pub async fn start_notify_sensor(
     dbus_conn: Arc<SyncConnection>,

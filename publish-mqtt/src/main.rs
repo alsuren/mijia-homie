@@ -1,12 +1,12 @@
 use bluez_generated::bluetooth_event::BluetoothEvent;
 use bluez_generated::generated::device1::OrgBluezDevice1;
-use blurz::{BluetoothAdapter, BluetoothDevice, BluetoothDiscoverySession, BluetoothSession};
 use dbus::nonblock::SyncConnection;
 use futures::stream::StreamExt;
 use futures::FutureExt;
 use homie::{Datatype, HomieDevice, Node, Property};
 use mijia::{
-    decode_value, hashmap_from_file, start_notify_sensor, Readings, SERVICE_CHARACTERISTIC_PATH,
+    decode_value, get_sensors, hashmap_from_file, start_notify_sensor, Readings, SensorProps,
+    SERVICE_CHARACTERISTIC_PATH,
 };
 use rumqttc::MqttOptions;
 use rustls::ClientConfig;
@@ -22,9 +22,8 @@ const DEFAULT_DEVICE_ID: &str = "mijia-bridge";
 const DEFAULT_DEVICE_NAME: &str = "Mijia bridge";
 const DEFAULT_HOST: &str = "test.mosquitto.org";
 const DEFAULT_PORT: u16 = 1883;
-const SCAN_DURATION: Duration = Duration::from_secs(15);
+const SCAN_INTERVAL: Duration = Duration::from_secs(15);
 const CONNECT_INTERVAL: Duration = Duration::from_secs(11);
-const CONNECT_TIMEOUT_MS: i32 = 4_000;
 const UPDATE_TIMEOUT: Duration = Duration::from_secs(60);
 const SENSOR_NAMES_FILENAME: &str = "sensor_names.conf";
 
@@ -102,7 +101,7 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
 
 #[derive(Debug)]
 struct Sensor {
-    device_path: String,
+    object_path: String,
     mac_address: String,
     name: String,
     last_update_timestamp: Instant,
@@ -114,17 +113,16 @@ impl Sensor {
     const PROPERTY_ID_BATTERY: &'static str = "battery";
 
     pub fn new(
-        device: &BluetoothDevice,
+        props: SensorProps,
         sensor_names: &HashMap<String, String>,
-    ) -> Result<Self, Box<dyn Error>> {
-        let mac_address = device.get_address()?;
+    ) -> Result<Self, Box<dyn Error + Send + Sync>> {
         let name = sensor_names
-            .get(&mac_address)
+            .get(&props.mac_address)
             .cloned()
-            .unwrap_or_else(|| mac_address.clone());
+            .unwrap_or_else(|| props.mac_address.clone());
         Ok(Self {
-            device_path: device.get_id(),
-            mac_address,
+            object_path: props.object_path,
+            mac_address: props.mac_address,
             name,
             last_update_timestamp: Instant::now(),
         })
@@ -137,7 +135,7 @@ impl Sensor {
     pub fn device(&self, dbus_conn: Arc<SyncConnection>) -> impl OrgBluezDevice1 {
         dbus::nonblock::Proxy::new(
             "org.bluez",
-            self.device_path.to_owned(),
+            self.object_path.to_owned(),
             Duration::from_secs(30),
             dbus_conn.clone(),
         )
@@ -175,7 +173,7 @@ impl Sensor {
         &self,
         homie: &HomieDevice,
         readings: &Readings,
-    ) -> Result<(), Box<dyn Error>> {
+    ) -> Result<(), Box<dyn Error + Send + Sync>> {
         println!("{} {} ({})", self.mac_address, readings, self.name);
 
         let node_id = self.node_id();
@@ -210,7 +208,7 @@ struct SensorState {
 async fn bluetooth_mainloop(
     mut homie: HomieDevice,
     dbus_conn: Arc<SyncConnection>,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<(), Box<dyn Error + Send + Sync>> {
     let sensor_names = hashmap_from_file(SENSOR_NAMES_FILENAME)?;
 
     homie.ready().await?;
@@ -220,6 +218,8 @@ async fn bluetooth_mainloop(
         sensors_connected: vec![],
         homie,
     }));
+
+    let mut next_scan_due = Instant::now();
 
     let t1 = async {
         loop {
@@ -243,6 +243,28 @@ async fn bluetooth_mainloop(
                 )
                 .await?;
             }
+            let now = Instant::now();
+            if now > next_scan_due {
+                next_scan_due = now + SCAN_INTERVAL;
+                let sensors = get_sensors(dbus_conn.clone()).await?;
+                let state = &mut *state.lock().await;
+                for props in sensors {
+                    // Race Condition: When connecting, we remove from
+                    // sensors_to_connect before adding to sensors_connected
+                    if sensor_names.contains_key(&props.mac_address)
+                        && !state
+                            .sensors_to_connect
+                            .iter()
+                            .chain(state.sensors_connected.iter())
+                            .find(|s| s.mac_address == props.mac_address)
+                            .is_some()
+                    {
+                        state
+                            .sensors_to_connect
+                            .push_back(Sensor::new(props, &sensor_names)?)
+                    }
+                }
+            }
             time::delay_for(CONNECT_INTERVAL).await;
         }
         #[allow(unreachable_code)]
@@ -260,7 +282,7 @@ async fn connect_first_sensor_in_queue(
     homie: &mut HomieDevice,
     sensors_connected: &mut Vec<Sensor>,
     sensors_to_connect: &mut VecDeque<Sensor>,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<(), Box<dyn Error + Send + Sync>> {
     println!("{} sensors in queue to connect.", sensors_to_connect.len());
     // Try to connect to a sensor.
     if let Some(mut sensor) = sensors_to_connect.pop_front() {
@@ -283,11 +305,11 @@ async fn connect_start_sensor<'a>(
     dbus_conn: Arc<SyncConnection>,
     homie: &mut HomieDevice,
     sensor: &mut Sensor,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<(), Box<dyn Error + Send + Sync>> {
     let device = sensor.device(dbus_conn.clone());
     println!("Connecting");
     device.connect().await?;
-    match start_notify_sensor(dbus_conn.clone(), &sensor.device_path).await {
+    match start_notify_sensor(dbus_conn.clone(), &sensor.object_path).await {
         Ok(()) => {
             homie.add_node(sensor.as_node()).await?;
             sensor.last_update_timestamp = Instant::now();
@@ -308,7 +330,7 @@ async fn disconnect_first_stale_sensor(
     homie: &mut HomieDevice,
     sensors_connected: &mut Vec<Sensor>,
     sensors_to_connect: &mut VecDeque<Sensor>,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<(), Box<dyn Error + Send + Sync>> {
     let now = Instant::now();
     if let Some(sensor_index) = sensors_connected
         .iter()
@@ -329,7 +351,7 @@ async fn disconnect_first_stale_sensor(
 async fn service_bluetooth_event_queue(
     state: Arc<Mutex<SensorState>>,
     dbus_conn: Arc<SyncConnection>,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<(), Box<dyn Error + Send + Sync>> {
     println!("Subscribing to events");
     let mut rule = dbus::message::MatchRule::new();
     rule.msg_type = Some(dbus::message::MessageType::Signal);
@@ -351,7 +373,7 @@ async fn service_bluetooth_event_queue(
 async fn handle_bluetooth_event(
     state: Arc<Mutex<SensorState>>,
     event: BluetoothEvent,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<(), Box<dyn Error + Send + Sync>> {
     println!("Locking(handle_bluetooth_event({:?})).", event);
     let state = &mut *state.lock().await;
     let homie = &mut state.homie;
@@ -360,13 +382,13 @@ async fn handle_bluetooth_event(
     match event {
         BluetoothEvent::Value { object_path, value } => {
             // TODO: Make this less hacky.
-            let device_path = match object_path.strip_suffix(SERVICE_CHARACTERISTIC_PATH) {
+            let object_path = match object_path.strip_suffix(SERVICE_CHARACTERISTIC_PATH) {
                 Some(path) => path,
                 None => return Ok(()),
             };
             if let Some(sensor) = sensors_connected
                 .iter_mut()
-                .find(|s| s.device_path == device_path)
+                .find(|s| s.object_path == object_path)
             {
                 sensor.last_update_timestamp = Instant::now();
                 if let Some(readings) = decode_value(&value) {
@@ -376,7 +398,7 @@ async fn handle_bluetooth_event(
                 }
             } else {
                 // TODO: Still send it, in case it is useful?
-                println!("Got update from unexpected device {}", device_path);
+                println!("Got update from unexpected device {}", object_path);
             }
         }
         BluetoothEvent::Connected {
@@ -385,7 +407,7 @@ async fn handle_bluetooth_event(
         } => {
             if let Some(sensor_index) = sensors_connected
                 .iter()
-                .position(|s| s.device_path == object_path)
+                .position(|s| s.object_path == object_path)
             {
                 let sensor = sensors_connected.remove(sensor_index);
                 println!("{} disconnected", sensor.name);
