@@ -8,14 +8,15 @@ use dbus::nonblock::SyncConnection;
 use dbus::Path;
 use futures::FutureExt;
 use futures::StreamExt;
+use itertools::Itertools;
 use mijia::{
     decode_value, CONNECTION_INTERVAL_500_MS, CONNECTION_INTERVAL_CHARACTERISTIC_PATH,
     MIJIA_SERVICE_DATA_UUID, SERVICE_CHARACTERISTIC_PATH,
 };
+use std::collections::HashMap;
 use std::error::Error;
 use std::sync::Arc;
 use std::time::Duration;
-
 use std::time::Instant;
 
 #[tokio::main(core_threads = 3)]
@@ -135,24 +136,23 @@ async fn get_sensors(
                 .filter_map(|addr| addr.as_str())
                 .next()?
                 .to_string();
-            // FIXME: UUIDs don't get populated until we connect. Use:
+            // UUIDs don't get populated until we connect. Use:
             //     "ServiceData": Variant(InternalDict { data: [
             //         ("0000fe95-0000-1000-8000-00805f9b34fb", Variant([48, 88, 91, 5, 1, 23, 33, 215, 56, 193, 164, 40, 1, 0])
             //     )], outer_sig: Signature("a{sv}") })
-            // instead?
-            let uuids = device_properties.get("UUIDs")?;
-
-            if uuids
-                // Mad hack to turn the Variant into an Array (like how option.as_iter() works?)
+            // instead.
+            let service_data: HashMap<String, _> = device_properties
+                .get("ServiceData")?
+                // Variant(...)
                 .as_iter()?
-                .filter_map(|ids| {
-                    // we now have an Array. I promise.
-                    ids.as_iter()?
-                        .find(|id| id.as_str() == Some(MIJIA_SERVICE_DATA_UUID))
-                })
-                .next()
-                .is_some()
-            {
+                .next()?
+                // InternalDict(...)
+                .as_iter()?
+                .tuples::<(_, _)>()
+                .map(|(k, v)| (k.as_str().unwrap().into(), v))
+                .collect();
+
+            if service_data.contains_key(MIJIA_SERVICE_DATA_UUID) {
                 Some(Sensor {
                     device_path: path.to_owned(),
                     mac_address,
