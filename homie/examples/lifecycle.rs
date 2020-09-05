@@ -8,8 +8,9 @@ use tokio::{time, try_join};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
-    let mut mqttoptions = MqttOptions::new("homie_example", "test.mosquitto.org", 1883);
-    mqttoptions.set_keep_alive(5);
+    pretty_env_logger::init();
+
+    let mqttoptions = MqttOptions::new("homie_example", "test.mosquitto.org", 1883);
 
     let (mut homie, homie_handle) =
         HomieDevice::builder("homie/example", "Homie example", mqttoptions)
