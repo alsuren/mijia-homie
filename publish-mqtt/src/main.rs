@@ -1,3 +1,4 @@
+use anyhow::Context;
 use bluez_generated::bluetooth_event::BluetoothEvent;
 use bluez_generated::generated::adapter1::OrgBluezAdapter1;
 use bluez_generated::generated::device1::OrgBluezDevice1;
@@ -180,17 +181,20 @@ impl Sensor {
                 Self::PROPERTY_ID_TEMPERATURE,
                 format!("{:.2}", readings.temperature),
             )
-            .await?;
+            .await
+            .with_context(|| std::line!().to_string())?;
         homie
             .publish_value(&node_id, Self::PROPERTY_ID_HUMIDITY, readings.humidity)
-            .await?;
+            .await
+            .with_context(|| std::line!().to_string())?;
         homie
             .publish_value(
                 &node_id,
                 Self::PROPERTY_ID_BATTERY,
                 readings.battery_percent,
             )
-            .await?;
+            .await
+            .with_context(|| std::line!().to_string())?;
         Ok(())
     }
 }
@@ -208,7 +212,10 @@ async fn bluetooth_mainloop(
 ) -> Result<(), anyhow::Error> {
     let sensor_names = hashmap_from_file(SENSOR_NAMES_FILENAME)?;
 
-    homie.ready().await?;
+    homie
+        .ready()
+        .await
+        .with_context(|| std::line!().to_string())?;
 
     let state = Arc::new(Mutex::new(SensorState {
         sensors_to_connect: VecDeque::new(),
@@ -223,7 +230,9 @@ async fn bluetooth_mainloop(
             let now = Instant::now();
             if now > next_scan_due {
                 next_scan_due = now + SCAN_INTERVAL;
-                check_for_sensors(state.clone(), dbus_conn.clone(), &sensor_names).await?;
+                check_for_sensors(state.clone(), dbus_conn.clone(), &sensor_names)
+                    .await
+                    .with_context(|| std::line!().to_string())?;
             }
 
             {
@@ -234,7 +243,8 @@ async fn bluetooth_mainloop(
                     &mut state.sensors_connected,
                     &mut state.sensors_to_connect,
                 )
-                .await?;
+                .await
+                .with_context(|| std::line!().to_string())?;
             }
 
             {
@@ -244,7 +254,8 @@ async fn bluetooth_mainloop(
                     &mut state.sensors_connected,
                     &mut state.sensors_to_connect,
                 )
-                .await?;
+                .await
+                .with_context(|| std::line!().to_string())?;
             }
             time::delay_for(CONNECT_INTERVAL).await;
         }
@@ -252,7 +263,9 @@ async fn bluetooth_mainloop(
         Ok(())
     };
     let t2 = async {
-        service_bluetooth_event_queue(state.clone(), dbus_conn.clone()).await?;
+        service_bluetooth_event_queue(state.clone(), dbus_conn.clone())
+            .await
+            .with_context(|| std::line!().to_string())?;
         Ok(())
     };
     try_join!(t1, t2).map(|((), ())| ())
@@ -269,10 +282,18 @@ async fn check_for_sensors(
         Duration::from_secs(30),
         dbus_conn.clone(),
     );
-    adapter.set_powered(true).await?;
-    adapter.start_discovery().await?;
+    adapter
+        .set_powered(true)
+        .await
+        .with_context(|| std::line!().to_string())?;
+    adapter
+        .start_discovery()
+        .await
+        .with_context(|| std::line!().to_string())?;
 
-    let sensors = get_sensors(dbus_conn.clone()).await?;
+    let sensors = get_sensors(dbus_conn.clone())
+        .await
+        .with_context(|| std::line!().to_string())?;
     let state = &mut *state.lock().await;
     for props in sensors {
         // Race Condition: When connecting, we remove from
@@ -324,17 +345,26 @@ async fn connect_start_sensor<'a>(
 ) -> Result<(), anyhow::Error> {
     let device = sensor.device(dbus_conn.clone());
     println!("Connecting");
-    device.connect().await?;
+    device
+        .connect()
+        .await
+        .with_context(|| std::line!().to_string())?;
     match start_notify_sensor(dbus_conn.clone(), &sensor.object_path).await {
         Ok(()) => {
-            homie.add_node(sensor.as_node()).await?;
+            homie
+                .add_node(sensor.as_node())
+                .await
+                .with_context(|| std::line!().to_string())?;
             sensor.last_update_timestamp = Instant::now();
             Ok(())
         }
         Err(e) => {
             // If starting notifications failed, disconnect so that we start again from a clean
             // state next time.
-            device.disconnect().await?;
+            device
+                .disconnect()
+                .await
+                .with_context(|| std::line!().to_string())?;
             Err(e)
         }
     }
@@ -358,7 +388,10 @@ async fn disconnect_first_stale_sensor(
             sensor.name,
             now - sensor.last_update_timestamp
         );
-        homie.remove_node(&sensor.node_id()).await?;
+        homie
+            .remove_node(&sensor.node_id())
+            .await
+            .with_context(|| std::line!().to_string())?;
         sensors_to_connect.push_back(sensor);
     }
     Ok(())
@@ -373,12 +406,18 @@ async fn service_bluetooth_event_queue(
     rule.msg_type = Some(dbus::message::MessageType::Signal);
     rule.sender = Some(dbus::strings::BusName::new("org.bluez").map_err(|s| anyhow::anyhow!(s))?);
 
-    let (msg_match, mut events) = dbus_conn.add_match(rule).await?.msg_stream();
+    let (msg_match, mut events) = dbus_conn
+        .add_match(rule)
+        .await
+        .with_context(|| std::line!().to_string())?
+        .msg_stream();
     println!("Processing events");
     // Process events until there are none available for the timeout.
     while let Some(raw_event) = events.next().await {
         if let Some(event) = BluetoothEvent::from(raw_event) {
-            handle_bluetooth_event(state.clone(), event).await?
+            handle_bluetooth_event(state.clone(), event)
+                .await
+                .with_context(|| std::line!().to_string())?
         }
     }
     // TODO: move this into a defer or scope guard or something.

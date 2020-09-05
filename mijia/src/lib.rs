@@ -6,7 +6,6 @@ use itertools::Itertools;
 use std::cmp::max;
 use std::collections::HashMap;
 use std::convert::TryInto;
-use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, ErrorKind};

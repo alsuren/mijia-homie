@@ -4,7 +4,6 @@ use futures::FutureExt;
 use local_ipaddress;
 use mac_address::get_mac_address;
 use rumqttc::{self, EventLoop, LastWill, MqttOptions, Publish, QoS, Request};
-use std::error::Error;
 use std::fmt::Display;
 use std::future::Future;
 use std::time::{Duration, Instant};
