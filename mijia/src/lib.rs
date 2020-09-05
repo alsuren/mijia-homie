@@ -1,7 +1,9 @@
+use bluez_generated::generated::gattcharacteristic1::OrgBluezGattCharacteristic1;
 use blurz::{
     BluetoothAdapter, BluetoothDevice, BluetoothDiscoverySession, BluetoothGATTCharacteristic,
     BluetoothSession,
 };
+use dbus::nonblock::SyncConnection;
 use std::cmp::max;
 use std::collections::HashMap;
 use std::convert::TryInto;
@@ -9,6 +11,7 @@ use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, ErrorKind};
+use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
@@ -21,115 +24,31 @@ pub const CONNECTION_INTERVAL_CHARACTERISTIC_PATH: &str = "/service0021/char0045
 /// 500 in little-endian
 pub const CONNECTION_INTERVAL_500_MS: [u8; 3] = [0xF4, 0x01, 0x00];
 
-pub fn scan(bt_session: &BluetoothSession) -> Result<Vec<String>, Box<dyn Error>> {
-    let adapter: BluetoothAdapter = BluetoothAdapter::init(bt_session)?;
-    adapter.set_powered(true)?;
-
-    let discover_session =
-        BluetoothDiscoverySession::create_session(&bt_session, adapter.get_id())?;
-    discover_session.start_discovery()?;
-    println!("Scanning");
-    // Wait for the adapter to scan for a while.
-    thread::sleep(SCAN_DURATION);
-    let device_list = adapter.get_device_list()?;
-
-    discover_session.stop_discovery()?;
-
-    println!("{:?} devices found", device_list.len());
-
-    Ok(device_list)
-}
-
-pub fn find_sensors<'a>(
-    bt_session: &'a BluetoothSession,
-    device_list: &[String],
-) -> Vec<BluetoothDevice<'a>> {
-    let mut sensors = vec![];
-    for device_path in device_list {
-        let device = BluetoothDevice::new(bt_session, device_path.to_string());
-        println!(
-            "Device: {:?} Name: {:?}",
-            device_path,
-            device.get_name().ok()
-        );
-        if let Ok(service_data) = device.get_service_data() {
-            println!("Service data: {:?}", service_data);
-            if service_data.contains_key(MIJIA_SERVICE_DATA_UUID) {
-                sensors.push(device);
-            }
-        }
-    }
-
-    sensors
-}
-
-pub fn print_sensors(sensors: &[BluetoothDevice], sensor_names: &HashMap<String, String>) {
-    println!("{} sensors:", sensors.len());
-    for device in sensors {
-        let mac_address = device.get_address().unwrap();
-        // TODO: Find a less ugly way to do this.
-        let empty = "".to_string();
-        let name = sensor_names.get(&mac_address).unwrap_or(&empty);
-        println!(
-            "{}: {:?}, {} services, {} service data, '{}'",
-            mac_address,
-            device.get_name(),
-            device.get_gatt_services().map_or(0, |s| s.len()),
-            device.get_service_data().map_or(0, |s| s.len()),
-            name
-        );
-    }
-}
-
-pub fn connect_sensor<'a>(sensor: &BluetoothDevice<'a>) -> bool {
-    if let Err(e) = sensor.connect(CONNECT_TIMEOUT_MS) {
-        println!("Failed to connect {:?}: {:?}", sensor.get_id(), e);
-        false
-    } else {
-        println!("Connected to {:?}", sensor.get_id());
-        true
-    }
-}
-
-pub fn connect_sensors<'a>(sensors: &'a [BluetoothDevice<'a>]) -> Vec<BluetoothDevice<'a>> {
-    let mut connected_sensors = vec![];
-    for device in sensors {
-        if connect_sensor(device) {
-            connected_sensors.push(device.clone());
-        }
-    }
-
-    println!("Connected to {} sensors.", connected_sensors.len());
-
-    connected_sensors
-}
-
-pub fn start_notify_sensor<'a>(
-    bt_session: &'a BluetoothSession,
-    connected_sensor: &BluetoothDevice<'a>,
-) -> Result<(), Box<dyn Error>> {
-    let temp_humidity = BluetoothGATTCharacteristic::new(
-        bt_session,
-        connected_sensor.get_id() + SERVICE_CHARACTERISTIC_PATH,
+pub async fn start_notify_sensor(
+    dbus_conn: Arc<SyncConnection>,
+    device_path: &str,
+) -> Result<(), Box<dyn Error + Send + Sync>> {
+    let temp_humidity_path: String = device_path.to_string() + SERVICE_CHARACTERISTIC_PATH;
+    let temp_humidity = dbus::nonblock::Proxy::new(
+        "org.bluez",
+        temp_humidity_path,
+        Duration::from_secs(30),
+        dbus_conn.clone(),
     );
-    temp_humidity.start_notify()?;
-    let connection_interval = BluetoothGATTCharacteristic::new(
-        bt_session,
-        connected_sensor.get_id() + CONNECTION_INTERVAL_CHARACTERISTIC_PATH,
+    temp_humidity.start_notify().await?;
+
+    let connection_interval_path: String =
+        device_path.to_string() + CONNECTION_INTERVAL_CHARACTERISTIC_PATH;
+    let connection_interval = dbus::nonblock::Proxy::new(
+        "org.bluez",
+        connection_interval_path,
+        Duration::from_secs(30),
+        dbus_conn.clone(),
     );
-    connection_interval.write_value(CONNECTION_INTERVAL_500_MS.to_vec(), None)?;
+    connection_interval
+        .write_value(CONNECTION_INTERVAL_500_MS.to_vec(), Default::default())
+        .await?;
     Ok(())
-}
-
-pub fn start_notify_sensors<'a>(
-    bt_session: &'a BluetoothSession,
-    connected_sensors: &'a [BluetoothDevice<'a>],
-) {
-    for device in connected_sensors {
-        if let Err(e) = start_notify_sensor(bt_session, device) {
-            println!("Failed to start notify on {}: {:?}", device.get_id(), e);
-        }
-    }
 }
 
 #[derive(Clone, Debug, PartialEq)]

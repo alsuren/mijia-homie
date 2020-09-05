@@ -1,12 +1,12 @@
 use bluez_generated::bluetooth_event::BluetoothEvent;
+use bluez_generated::generated::device1::OrgBluezDevice1;
 use blurz::{BluetoothAdapter, BluetoothDevice, BluetoothDiscoverySession, BluetoothSession};
 use dbus::nonblock::SyncConnection;
 use futures::stream::StreamExt;
 use futures::FutureExt;
 use homie::{Datatype, HomieDevice, Node, Property};
 use mijia::{
-    decode_value, find_sensors, hashmap_from_file, print_sensors, start_notify_sensor, Readings,
-    SERVICE_CHARACTERISTIC_PATH,
+    decode_value, hashmap_from_file, start_notify_sensor, Readings, SERVICE_CHARACTERISTIC_PATH,
 };
 use rumqttc::MqttOptions;
 use rustls::ClientConfig;
@@ -27,25 +27,6 @@ const CONNECT_INTERVAL: Duration = Duration::from_secs(11);
 const CONNECT_TIMEOUT_MS: i32 = 4_000;
 const UPDATE_TIMEOUT: Duration = Duration::from_secs(60);
 const SENSOR_NAMES_FILENAME: &str = "sensor_names.conf";
-
-async fn scan(bt_session: &BluetoothSession) -> Result<Vec<String>, Box<dyn Error>> {
-    let adapter: BluetoothAdapter = BluetoothAdapter::init(bt_session)?;
-    adapter.set_powered(true)?;
-
-    let discover_session =
-        BluetoothDiscoverySession::create_session(&bt_session, adapter.get_id())?;
-    discover_session.start_discovery()?;
-    println!("Scanning");
-    // Wait for the adapter to scan for a while.
-    time::delay_for(SCAN_DURATION).await;
-    let device_list = adapter.get_device_list()?;
-
-    discover_session.stop_discovery()?;
-
-    println!("{:?} devices found", device_list.len());
-
-    Ok(device_list)
-}
 
 #[tokio::main(core_threads = 3)]
 async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
@@ -93,14 +74,14 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     let local = task::LocalSet::new();
 
     // Connect to the D-Bus system bus (this is blocking, unfortunately).
-    let (dbus_resource, conn) = dbus_tokio::connection::new_system_sync()?;
+    let (dbus_resource, dbus_conn) = dbus_tokio::connection::new_system_sync()?;
     let dbus_handle = tokio::spawn(async {
         let err = dbus_resource.await;
         Err::<(), Box<dyn Error + Send + Sync>>(err)
     });
 
     let bluetooth_handle = local.spawn_local(async move {
-        bluetooth_mainloop(homie, conn).await.unwrap();
+        bluetooth_mainloop(homie, dbus_conn).await.unwrap();
     });
 
     // Poll everything to completion, until the first one bombs out.
@@ -153,8 +134,13 @@ impl Sensor {
         self.mac_address.replace(":", "")
     }
 
-    pub fn device<'a>(&self, session: &'a BluetoothSession) -> BluetoothDevice<'a> {
-        BluetoothDevice::new(session, self.device_path.to_string())
+    pub fn device(&self, dbus_conn: Arc<SyncConnection>) -> impl OrgBluezDevice1 {
+        dbus::nonblock::Proxy::new(
+            "org.bluez",
+            self.device_path.to_owned(),
+            Duration::from_secs(30),
+            dbus_conn.clone(),
+        )
     }
 
     fn as_node(&self) -> Node {
@@ -223,28 +209,14 @@ struct SensorState {
 
 async fn bluetooth_mainloop(
     mut homie: HomieDevice,
-    conn: Arc<SyncConnection>,
+    dbus_conn: Arc<SyncConnection>,
 ) -> Result<(), Box<dyn Error>> {
     let sensor_names = hashmap_from_file(SENSOR_NAMES_FILENAME)?;
-
-    let bt_session = BluetoothSession::create_session(None)?;
-    let device_list = scan(&bt_session).await?;
-    let sensors = find_sensors(&bt_session, &device_list);
-    print_sensors(&sensors, &sensor_names);
-    let (named_sensors, unnamed_sensors): (Vec<_>, Vec<_>) = sensors
-        .into_iter()
-        .map(|d| Sensor::new(&d, &sensor_names).unwrap())
-        .partition(|sensor| sensor_names.contains_key(&sensor.mac_address));
-    println!(
-        "{} named sensors, {} unnamed sensors",
-        named_sensors.len(),
-        unnamed_sensors.len()
-    );
 
     homie.ready().await?;
 
     let state = Arc::new(Mutex::new(SensorState {
-        sensors_to_connect: named_sensors.into(),
+        sensors_to_connect: VecDeque::new(),
         sensors_connected: vec![],
         homie,
     }));
@@ -254,7 +226,7 @@ async fn bluetooth_mainloop(
             {
                 let state = &mut *state.lock().await;
                 connect_first_sensor_in_queue(
-                    &bt_session,
+                    dbus_conn.clone(),
                     &mut state.homie,
                     &mut state.sensors_connected,
                     &mut state.sensors_to_connect,
@@ -277,14 +249,14 @@ async fn bluetooth_mainloop(
         Ok(())
     };
     let t2 = async {
-        service_bluetooth_event_queue(state.clone(), conn.clone()).await?;
+        service_bluetooth_event_queue(state.clone(), dbus_conn.clone()).await?;
         Ok(())
     };
     try_join!(t1, t2).map(|((), ())| ())
 }
 
 async fn connect_first_sensor_in_queue(
-    bt_session: &BluetoothSession,
+    dbus_conn: Arc<SyncConnection>,
     homie: &mut HomieDevice,
     sensors_connected: &mut Vec<Sensor>,
     sensors_to_connect: &mut VecDeque<Sensor>,
@@ -293,7 +265,7 @@ async fn connect_first_sensor_in_queue(
     // Try to connect to a sensor.
     if let Some(mut sensor) = sensors_to_connect.pop_front() {
         println!("Trying to connect to {}", sensor.name);
-        match connect_start_sensor(bt_session, homie, &mut sensor).await {
+        match connect_start_sensor(dbus_conn.clone(), homie, &mut sensor).await {
             Err(e) => {
                 println!("Failed to connect to {}: {:?}", sensor.name, e);
                 sensors_to_connect.push_back(sensor);
@@ -308,14 +280,14 @@ async fn connect_first_sensor_in_queue(
 }
 
 async fn connect_start_sensor<'a>(
-    bt_session: &'a BluetoothSession,
+    dbus_conn: Arc<SyncConnection>,
     homie: &mut HomieDevice,
     sensor: &mut Sensor,
 ) -> Result<(), Box<dyn Error>> {
-    let device = sensor.device(bt_session);
+    let device = sensor.device(dbus_conn.clone());
     println!("Connecting");
-    device.connect(CONNECT_TIMEOUT_MS)?;
-    match start_notify_sensor(bt_session, &device) {
+    device.connect().await?;
+    match start_notify_sensor(dbus_conn.clone(), &sensor.device_path).await {
         Ok(()) => {
             homie.add_node(sensor.as_node()).await?;
             sensor.last_update_timestamp = Instant::now();
@@ -324,7 +296,7 @@ async fn connect_start_sensor<'a>(
         Err(e) => {
             // If starting notifications failed, disconnect so that we start again from a clean
             // state next time.
-            device.disconnect()?;
+            device.disconnect().await?;
             Err(e)
         }
     }
@@ -356,14 +328,14 @@ async fn disconnect_first_stale_sensor(
 
 async fn service_bluetooth_event_queue(
     state: Arc<Mutex<SensorState>>,
-    conn: Arc<SyncConnection>,
+    dbus_conn: Arc<SyncConnection>,
 ) -> Result<(), Box<dyn Error>> {
     println!("Subscribing to events");
     let mut rule = dbus::message::MatchRule::new();
     rule.msg_type = Some(dbus::message::MessageType::Signal);
     rule.sender = Some(dbus::strings::BusName::new("org.bluez")?);
 
-    let (msg_match, mut events) = conn.add_match(rule).await?.msg_stream();
+    let (msg_match, mut events) = dbus_conn.add_match(rule).await?.msg_stream();
     println!("Processing events");
     // Process events until there are none available for the timeout.
     while let Some(raw_event) = events.next().await {
@@ -372,7 +344,7 @@ async fn service_bluetooth_event_queue(
         }
     }
     // TODO: move this into a defer or scope guard or something.
-    conn.remove_match(msg_match.token()).await?;
+    dbus_conn.remove_match(msg_match.token()).await?;
     Ok(())
 }
 

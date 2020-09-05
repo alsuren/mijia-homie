@@ -519,7 +519,9 @@ checksum = "3728d817d99e5ac407411fa471ff9800a778d88a24685968b36824eaf4bee400"
 name = "mijia"
 version = "0.1.0"
 dependencies = [
+ "bluez-generated",
  "blurz",
+ "dbus 0.8.4",
 ]
 
 [[package]]
