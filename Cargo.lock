@@ -102,17 +102,7 @@ dependencies = [
 name = "bluez-generated"
 version = "0.1.0"
 dependencies = [
- "dbus 0.8.4",
-]
-
-[[package]]
-name = "blurz"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1bc2df4d0f1d373b324672d9966aca3f5ba1f03d69edad6240144774539ea59"
-dependencies = [
- "dbus 0.6.5",
- "hex",
+ "dbus",
 ]
 
 [[package]]
@@ -183,16 +173,6 @@ checksum = "b3a71ab494c0b5b860bdc8407ae08978052417070c2ced38573a9157ad75b8ac"
 
 [[package]]
 name = "dbus"
-version = "0.6.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "48b5f0f36f1eebe901b0e6bee369a77ed3396334bf3f09abd46454a576f71819"
-dependencies = [
- "libc",
- "libdbus-sys",
-]
-
-[[package]]
-name = "dbus"
 version = "0.8.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5cd9e78c210146a1860f897db03412fd5091fd73100778e43ee255cca252cf32"
@@ -208,7 +188,7 @@ version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baaf99ea9b8296ba0db293cad28c51d788e690c47ebe9974b864354b258a636a"
 dependencies = [
- "dbus 0.8.4",
+ "dbus",
  "libc",
  "mio",
  "tokio",
@@ -399,12 +379,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "hex"
-version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "805026a5d0141ffc30abb3be3173848ad46a1b1664fe632428479619a3644d77"
-
-[[package]]
 name = "homie"
 version = "0.1.0"
 dependencies = [
@@ -520,8 +494,7 @@ name = "mijia"
 version = "0.1.0"
 dependencies = [
  "bluez-generated",
- "blurz",
- "dbus 0.8.4",
+ "dbus",
  "itertools",
 ]
 
@@ -745,9 +718,8 @@ name = "publish-mqtt"
 version = "0.1.0"
 dependencies = [
  "bluez-generated",
- "blurz",
  "color-backtrace",
- "dbus 0.8.4",
+ "dbus",
  "dbus-tokio",
  "dotenv",
  "futures",
@@ -782,7 +754,7 @@ name = "read-all-devices"
 version = "0.1.0"
 dependencies = [
  "bluez-generated",
- "dbus 0.8.4",
+ "dbus",
  "dbus-tokio",
  "futures",
  "itertools",

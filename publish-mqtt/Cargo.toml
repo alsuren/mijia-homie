@@ -5,7 +5,6 @@ authors = ["David Laban <alsuren@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-blurz = "0.4.0"
 color-backtrace = "0.4.2"
 futures = "0.3"
 homie = { path = "../homie" }
