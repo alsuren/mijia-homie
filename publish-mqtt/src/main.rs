@@ -429,7 +429,6 @@ async fn handle_bluetooth_event(
     state: Arc<Mutex<SensorState>>,
     event: BluetoothEvent,
 ) -> Result<(), anyhow::Error> {
-    println!("Locking(handle_bluetooth_event({:?})).", event);
     let state = &mut *state.lock().await;
     let homie = &mut state.homie;
     let sensors_connected = &mut state.sensors_connected;
@@ -479,7 +478,6 @@ async fn handle_bluetooth_event(
             log::trace!("{:?}", event);
         }
     };
-    println!("Unlocking(handle_bluetooth_event()).");
 
     Ok(())
 }
