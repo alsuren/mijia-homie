@@ -1,4 +1,5 @@
 use bluez_generated::bluetooth_event::BluetoothEvent;
+use bluez_generated::generated::adapter1::OrgBluezAdapter1;
 use bluez_generated::generated::device1::OrgBluezDevice1;
 use dbus::nonblock::SyncConnection;
 use futures::stream::StreamExt;
@@ -223,6 +224,12 @@ async fn bluetooth_mainloop(
 
     let t1 = async {
         loop {
+            let now = Instant::now();
+            if now > next_scan_due {
+                next_scan_due = now + SCAN_INTERVAL;
+                check_for_sensors(state.clone(), dbus_conn.clone(), &sensor_names).await?;
+            }
+
             {
                 let state = &mut *state.lock().await;
                 connect_first_sensor_in_queue(
@@ -243,28 +250,6 @@ async fn bluetooth_mainloop(
                 )
                 .await?;
             }
-            let now = Instant::now();
-            if now > next_scan_due {
-                next_scan_due = now + SCAN_INTERVAL;
-                let sensors = get_sensors(dbus_conn.clone()).await?;
-                let state = &mut *state.lock().await;
-                for props in sensors {
-                    // Race Condition: When connecting, we remove from
-                    // sensors_to_connect before adding to sensors_connected
-                    if sensor_names.contains_key(&props.mac_address)
-                        && !state
-                            .sensors_to_connect
-                            .iter()
-                            .chain(state.sensors_connected.iter())
-                            .find(|s| s.mac_address == props.mac_address)
-                            .is_some()
-                    {
-                        state
-                            .sensors_to_connect
-                            .push_back(Sensor::new(props, &sensor_names)?)
-                    }
-                }
-            }
             time::delay_for(CONNECT_INTERVAL).await;
         }
         #[allow(unreachable_code)]
@@ -275,6 +260,41 @@ async fn bluetooth_mainloop(
         Ok(())
     };
     try_join!(t1, t2).map(|((), ())| ())
+}
+
+async fn check_for_sensors(
+    state: Arc<Mutex<SensorState>>,
+    dbus_conn: Arc<SyncConnection>,
+    sensor_names: &HashMap<String, String>,
+) -> Result<(), Box<dyn Error + Send + Sync>> {
+    let adapter = dbus::nonblock::Proxy::new(
+        "org.bluez",
+        "/org/bluez/hci0",
+        Duration::from_secs(30),
+        dbus_conn.clone(),
+    );
+    adapter.set_powered(true).await?;
+    adapter.start_discovery().await?;
+
+    let sensors = get_sensors(dbus_conn.clone()).await?;
+    let state = &mut *state.lock().await;
+    for props in sensors {
+        // Race Condition: When connecting, we remove from
+        // sensors_to_connect before adding to sensors_connected
+        if sensor_names.contains_key(&props.mac_address)
+            && !state
+                .sensors_to_connect
+                .iter()
+                .chain(state.sensors_connected.iter())
+                .find(|s| s.mac_address == props.mac_address)
+                .is_some()
+        {
+            state
+                .sensors_to_connect
+                .push_back(Sensor::new(props, &sensor_names)?)
+        }
+    }
+    Ok(())
 }
 
 async fn connect_first_sensor_in_queue(
