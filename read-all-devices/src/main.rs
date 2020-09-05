@@ -5,7 +5,6 @@ use bluez_generated::generated::gattcharacteristic1::OrgBluezGattCharacteristic1
 use dbus::arg::RefArg;
 use dbus::nonblock::stdintf::org_freedesktop_dbus::ObjectManager;
 use dbus::nonblock::SyncConnection;
-use dbus::Path;
 use futures::FutureExt;
 use futures::StreamExt;
 use itertools::Itertools;
@@ -110,7 +109,7 @@ async fn start_notify_sensor<'a>(
 
 #[derive(Debug)]
 struct Sensor {
-    device_path: Path<'static>,
+    device_path: String,
     mac_address: String,
     name: String,
     last_update_timestamp: Instant,
@@ -154,7 +153,7 @@ async fn get_sensors(
 
             if service_data.contains_key(MIJIA_SERVICE_DATA_UUID) {
                 Some(Sensor {
-                    device_path: path.to_owned(),
+                    device_path: path.to_string(),
                     mac_address,
                     // FIXME: use the sensor_names HashMap?
                     name: "".to_string(),
