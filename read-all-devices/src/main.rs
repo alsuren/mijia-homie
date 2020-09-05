@@ -8,9 +8,9 @@ use dbus::nonblock::SyncConnection;
 use dbus::Path;
 use futures::FutureExt;
 use futures::StreamExt;
-use mijia::CONNECTION_INTERVAL_CHARACTERISTIC_PATH;
 use mijia::{
-    decode_value, CONNECTION_INTERVAL_500_MS, MIJIA_SERVICE_DATA_UUID, SERVICE_CHARACTERISTIC_PATH,
+    decode_value, CONNECTION_INTERVAL_500_MS, CONNECTION_INTERVAL_CHARACTERISTIC_PATH,
+    MIJIA_SERVICE_DATA_UUID, SERVICE_CHARACTERISTIC_PATH,
 };
 use std::error::Error;
 use std::sync::Arc;
@@ -32,7 +32,7 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     let adapter = dbus::nonblock::Proxy::new(
         "org.bluez",
         "/org/bluez/hci0",
-        Duration::from_secs(10),
+        Duration::from_secs(30),
         conn.clone(),
     );
 
@@ -61,7 +61,7 @@ async fn connect_start_sensor<'a>(
     let device = dbus::nonblock::Proxy::new(
         "org.bluez",
         sensor.device_path.to_owned(),
-        Duration::from_secs(10),
+        Duration::from_secs(30),
         conn.clone(),
     );
     println!("Connecting");
@@ -88,7 +88,7 @@ async fn start_notify_sensor<'a>(
     let temp_humidity = dbus::nonblock::Proxy::new(
         "org.bluez",
         temp_humidity_path,
-        Duration::from_secs(10),
+        Duration::from_secs(30),
         conn.clone(),
     );
     temp_humidity.start_notify().await?;
@@ -98,7 +98,7 @@ async fn start_notify_sensor<'a>(
     let connection_interval = dbus::nonblock::Proxy::new(
         "org.bluez",
         connection_interval_path,
-        Duration::from_secs(10),
+        Duration::from_secs(30),
         conn.clone(),
     );
     connection_interval
@@ -119,7 +119,7 @@ async fn get_sensors(
     conn: Arc<SyncConnection>,
 ) -> Result<Vec<Sensor>, Box<dyn Error + Send + Sync>> {
     let bluez_root =
-        dbus::nonblock::Proxy::new("org.bluez", "/", Duration::from_secs(10), conn.clone());
+        dbus::nonblock::Proxy::new("org.bluez", "/", Duration::from_secs(30), conn.clone());
     let tree = bluez_root.get_managed_objects().await?;
 
     let paths = tree
