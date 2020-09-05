@@ -1,15 +1,21 @@
 use bluez_generated::bluetooth_event::BluetoothEvent;
 use bluez_generated::generated::adapter1::OrgBluezAdapter1;
+use bluez_generated::generated::device1::OrgBluezDevice1;
+use bluez_generated::generated::gattcharacteristic1::OrgBluezGattCharacteristic1;
 use dbus::arg::RefArg;
 use dbus::nonblock::stdintf::org_freedesktop_dbus::ObjectManager;
 use dbus::nonblock::SyncConnection;
 use dbus::Path;
 use futures::FutureExt;
 use futures::StreamExt;
-use mijia::{decode_value, MIJIA_SERVICE_DATA_UUID, SERVICE_CHARACTERISTIC_PATH};
+use mijia::CONNECTION_INTERVAL_CHARACTERISTIC_PATH;
+use mijia::{
+    decode_value, CONNECTION_INTERVAL_500_MS, MIJIA_SERVICE_DATA_UUID, SERVICE_CHARACTERISTIC_PATH,
+};
 use std::error::Error;
 use std::sync::Arc;
 use std::time::Duration;
+
 use std::time::Instant;
 
 #[tokio::main(core_threads = 3)]
@@ -33,8 +39,10 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     adapter.set_powered(true).await?;
     adapter.start_discovery().await?;
 
-    let sensors = get_sensors(conn.clone()).await?;
+    let mut sensors = get_sensors(conn.clone()).await?;
     println!("{:?}", sensors);
+
+    connect_start_sensor(conn.clone(), &mut sensors[0]).await?;
 
     let bluetooth_handle = service_bluetooth_event_queue(conn);
 
@@ -44,6 +52,58 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
         bluetooth_handle.map(|res| Ok(res?)),
     };
     res?;
+    Ok(())
+}
+async fn connect_start_sensor<'a>(
+    conn: Arc<SyncConnection>,
+    sensor: &mut Sensor,
+) -> Result<(), Box<dyn Error + Send + Sync>> {
+    let device = dbus::nonblock::Proxy::new(
+        "org.bluez",
+        sensor.device_path.to_owned(),
+        Duration::from_secs(10),
+        conn.clone(),
+    );
+    println!("Connecting");
+    device.connect().await?;
+    match start_notify_sensor(conn, sensor).await {
+        Ok(()) => {
+            sensor.last_update_timestamp = Instant::now();
+            Ok(())
+        }
+        Err(e) => {
+            // If starting notifications failed, disconnect so that we start again from a clean
+            // state next time.
+            device.disconnect().await?;
+            Err(e)
+        }
+    }
+}
+
+async fn start_notify_sensor<'a>(
+    conn: Arc<SyncConnection>,
+    sensor: &Sensor,
+) -> Result<(), Box<dyn Error + Send + Sync>> {
+    let temp_humidity_path: String = sensor.device_path.to_string() + SERVICE_CHARACTERISTIC_PATH;
+    let temp_humidity = dbus::nonblock::Proxy::new(
+        "org.bluez",
+        temp_humidity_path,
+        Duration::from_secs(10),
+        conn.clone(),
+    );
+    temp_humidity.start_notify().await?;
+
+    let connection_interval_path: String =
+        sensor.device_path.to_string() + CONNECTION_INTERVAL_CHARACTERISTIC_PATH;
+    let connection_interval = dbus::nonblock::Proxy::new(
+        "org.bluez",
+        connection_interval_path,
+        Duration::from_secs(10),
+        conn.clone(),
+    );
+    connection_interval
+        .write_value(CONNECTION_INTERVAL_500_MS.to_vec(), Default::default())
+        .await?;
     Ok(())
 }
 

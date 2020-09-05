@@ -17,9 +17,9 @@ const CONNECT_TIMEOUT_MS: i32 = 10_000;
 
 pub const MIJIA_SERVICE_DATA_UUID: &str = "0000fe95-0000-1000-8000-00805f9b34fb";
 pub const SERVICE_CHARACTERISTIC_PATH: &str = "/service0021/char0035";
-const CONNECTION_INTERVAL_CHARACTERISTIC_PATH: &str = "/service0021/char0045";
+pub const CONNECTION_INTERVAL_CHARACTERISTIC_PATH: &str = "/service0021/char0045";
 /// 500 in little-endian
-const CONNECTION_INTERVAL_500_MS: [u8; 3] = [0xF4, 0x01, 0x00];
+pub const CONNECTION_INTERVAL_500_MS: [u8; 3] = [0xF4, 0x01, 0x00];
 
 pub fn scan(bt_session: &BluetoothSession) -> Result<Vec<String>, Box<dyn Error>> {
     let adapter: BluetoothAdapter = BluetoothAdapter::init(bt_session)?;
