@@ -1,6 +1,10 @@
+use anyhow::Context;
 use bluez_generated::bluetooth_event::BluetoothEvent;
+use bluez_generated::generated::adapter1::OrgBluezAdapter1;
+use bluez_generated::generated::device1::OrgBluezDevice1;
 use core::fmt::Debug;
 use core::future::Future;
+use core::time::Duration;
 use dbus::{nonblock::SyncConnection, Message};
 use futures::{FutureExt, Stream, StreamExt};
 use std::sync::Arc;
@@ -78,7 +82,25 @@ impl MijiaSession {
         ))
     }
 
-    pub async fn event_stream(self) -> Result<impl Stream<Item = MijiaEvent>, anyhow::Error> {
+    pub async fn start_discovery(&self) -> Result<(), anyhow::Error> {
+        let adapter = dbus::nonblock::Proxy::new(
+            "org.bluez",
+            "/org/bluez/hci0",
+            Duration::from_secs(30),
+            self.connection.clone(),
+        );
+        adapter
+            .set_powered(true)
+            .await
+            .with_context(|| std::line!().to_string())?;
+        adapter
+            .start_discovery()
+            .await
+            .unwrap_or_else(|err| println!("starting discovery failed {:?}", err));
+        Ok(())
+    }
+
+    pub async fn event_stream(&self) -> Result<impl Stream<Item = MijiaEvent>, anyhow::Error> {
         let mut rule = dbus::message::MatchRule::new();
         rule.msg_type = Some(dbus::message::MessageType::Signal);
         rule.sender =
@@ -91,5 +113,28 @@ impl MijiaSession {
         Ok(Box::pin(events.filter_map(|event| async move {
             MijiaEvent::from(event)
         })))
+    }
+
+    fn device(&self, object_path: &str) -> impl OrgBluezDevice1 {
+        dbus::nonblock::Proxy::new(
+            "org.bluez",
+            object_path.to_owned(),
+            Duration::from_secs(30),
+            self.connection.clone(),
+        )
+    }
+
+    pub async fn connect(&self, object_path: &str) -> Result<(), anyhow::Error> {
+        self.device(object_path)
+            .connect()
+            .await
+            .with_context(|| std::line!().to_string())
+    }
+
+    pub async fn disconnect(&self, object_path: &str) -> Result<(), anyhow::Error> {
+        self.device(object_path)
+            .disconnect()
+            .await
+            .with_context(|| std::line!().to_string())
     }
 }

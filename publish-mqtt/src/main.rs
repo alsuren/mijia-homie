@@ -1,6 +1,4 @@
 use anyhow::Context;
-use bluez_generated::generated::adapter1::OrgBluezAdapter1;
-use bluez_generated::generated::device1::OrgBluezDevice1;
 use futures::stream::StreamExt;
 use futures::FutureExt;
 use homie::{Datatype, HomieDevice, Node, Property};
@@ -132,15 +130,6 @@ impl Sensor {
 
     pub fn node_id(&self) -> String {
         self.mac_address.replace(":", "")
-    }
-
-    pub fn device(&self, bt_session: MijiaSession) -> impl OrgBluezDevice1 {
-        dbus::nonblock::Proxy::new(
-            "org.bluez",
-            self.object_path.to_owned(),
-            Duration::from_secs(30),
-            bt_session.connection.clone(),
-        )
     }
 
     fn as_node(&self) -> Node {
@@ -280,20 +269,7 @@ async fn check_for_sensors(
     bt_session: MijiaSession,
     sensor_names: &HashMap<String, String>,
 ) -> Result<(), anyhow::Error> {
-    let adapter = dbus::nonblock::Proxy::new(
-        "org.bluez",
-        "/org/bluez/hci0",
-        Duration::from_secs(30),
-        bt_session.connection.clone(),
-    );
-    adapter
-        .set_powered(true)
-        .await
-        .with_context(|| std::line!().to_string())?;
-    adapter
-        .start_discovery()
-        .await
-        .unwrap_or_else(|err| println!("starting discovery failed {:?}", err));
+    bt_session.start_discovery().await?;
 
     let sensors = get_sensors(bt_session.clone())
         .await
@@ -347,10 +323,9 @@ async fn connect_start_sensor<'a>(
     homie: &mut HomieDevice,
     sensor: &mut Sensor,
 ) -> Result<(), anyhow::Error> {
-    let device = sensor.device(bt_session.clone());
     println!("Connecting from status: {:?}", sensor.connection_status);
-    device
-        .connect()
+    bt_session
+        .connect(&sensor.object_path)
         .await
         .with_context(|| std::line!().to_string())?;
     match start_notify_sensor(bt_session.clone(), &sensor.object_path).await {
@@ -368,8 +343,8 @@ async fn connect_start_sensor<'a>(
             // state next time.
             match sensor.connection_status {
                 ConnectionStatus::SubscribingFailedOnce => {
-                    device
-                        .disconnect()
+                    bt_session
+                        .disconnect(&sensor.object_path)
                         .await
                         .with_context(|| std::line!().to_string())?;
                     sensor.connection_status = ConnectionStatus::Disconnected;
