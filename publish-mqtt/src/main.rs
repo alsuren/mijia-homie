@@ -24,7 +24,7 @@ const DEFAULT_DEVICE_NAME: &str = "Mijia bridge";
 const DEFAULT_HOST: &str = "test.mosquitto.org";
 const DEFAULT_PORT: u16 = 1883;
 const SCAN_INTERVAL: Duration = Duration::from_secs(15);
-const CONNECT_INTERVAL: Duration = Duration::from_secs(11);
+const CONNECT_INTERVAL: Duration = Duration::from_secs(1);
 const UPDATE_TIMEOUT: Duration = Duration::from_secs(60);
 const SENSOR_NAMES_FILENAME: &str = "sensor_names.conf";
 
@@ -98,11 +98,20 @@ async fn main() -> Result<(), anyhow::Error> {
 }
 
 #[derive(Debug)]
+enum ConnectionStatus {
+    Unknown,
+    SubscribingFailedOnce,
+    Disconnected,
+    Connected,
+}
+
+#[derive(Debug)]
 struct Sensor {
     object_path: String,
     mac_address: String,
     name: String,
     last_update_timestamp: Instant,
+    connection_status: ConnectionStatus,
 }
 
 impl Sensor {
@@ -123,6 +132,7 @@ impl Sensor {
             mac_address: props.mac_address,
             name,
             last_update_timestamp: Instant::now(),
+            connection_status: ConnectionStatus::Unknown,
         })
     }
 
@@ -344,7 +354,7 @@ async fn connect_start_sensor<'a>(
     sensor: &mut Sensor,
 ) -> Result<(), anyhow::Error> {
     let device = sensor.device(dbus_conn.clone());
-    println!("Connecting");
+    println!("Connecting from status: {:?}", sensor.connection_status);
     device
         .connect()
         .await
@@ -355,16 +365,25 @@ async fn connect_start_sensor<'a>(
                 .add_node(sensor.as_node())
                 .await
                 .with_context(|| std::line!().to_string())?;
+            sensor.connection_status = ConnectionStatus::Connected;
             sensor.last_update_timestamp = Instant::now();
             Ok(())
         }
         Err(e) => {
             // If starting notifications failed, disconnect so that we start again from a clean
             // state next time.
-            device
-                .disconnect()
-                .await
-                .with_context(|| std::line!().to_string())?;
+            match sensor.connection_status {
+                ConnectionStatus::SubscribingFailedOnce => {
+                    device
+                        .disconnect()
+                        .await
+                        .with_context(|| std::line!().to_string())?;
+                    sensor.connection_status = ConnectionStatus::Disconnected;
+                }
+                _ => {
+                    sensor.connection_status = ConnectionStatus::SubscribingFailedOnce;
+                }
+            };
             Err(e)
         }
     }
