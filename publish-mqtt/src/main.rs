@@ -1,14 +1,12 @@
 use anyhow::Context;
-use bluez_generated::bluetooth_event::BluetoothEvent;
 use bluez_generated::generated::adapter1::OrgBluezAdapter1;
 use bluez_generated::generated::device1::OrgBluezDevice1;
-use dbus::nonblock::SyncConnection;
 use futures::stream::StreamExt;
 use futures::FutureExt;
 use homie::{Datatype, HomieDevice, Node, Property};
 use mijia::{
-    decode_value, get_sensors, hashmap_from_file, start_notify_sensor, Readings, SensorProps,
-    SERVICE_CHARACTERISTIC_PATH,
+    get_sensors, hashmap_from_file, start_notify_sensor, MijiaEvent, MijiaSession, Readings,
+    SensorProps,
 };
 use rumqttc::MqttOptions;
 use rustls::ClientConfig;
@@ -74,10 +72,10 @@ async fn main() -> Result<(), anyhow::Error> {
     let local = task::LocalSet::new();
 
     // Connect a bluetooth session.
-    let (dbus_handle, bt_session) = mijia::session::BluetoothSession::new().await?;
+    let (dbus_handle, bt_session) = MijiaSession::new().await?;
 
     let bluetooth_handle =
-        local.run_until(async move { bluetooth_mainloop(homie, bt_session.connection).await });
+        local.run_until(async move { bluetooth_mainloop(homie, bt_session).await });
 
     // Poll everything to completion, until the first one bombs out.
     let res: Result<_, anyhow::Error> = try_join! {
@@ -136,12 +134,12 @@ impl Sensor {
         self.mac_address.replace(":", "")
     }
 
-    pub fn device(&self, dbus_conn: Arc<SyncConnection>) -> impl OrgBluezDevice1 {
+    pub fn device(&self, bt_session: MijiaSession) -> impl OrgBluezDevice1 {
         dbus::nonblock::Proxy::new(
             "org.bluez",
             self.object_path.to_owned(),
             Duration::from_secs(30),
-            dbus_conn.clone(),
+            bt_session.connection.clone(),
         )
     }
 
@@ -214,7 +212,7 @@ struct SensorState {
 
 async fn bluetooth_mainloop(
     mut homie: HomieDevice,
-    dbus_conn: Arc<SyncConnection>,
+    bt_session: MijiaSession,
 ) -> Result<(), anyhow::Error> {
     let sensor_names = hashmap_from_file(SENSOR_NAMES_FILENAME)?;
 
@@ -236,7 +234,7 @@ async fn bluetooth_mainloop(
             let now = Instant::now();
             if now > next_scan_due {
                 next_scan_due = now + SCAN_INTERVAL;
-                check_for_sensors(state.clone(), dbus_conn.clone(), &sensor_names)
+                check_for_sensors(state.clone(), bt_session.clone(), &sensor_names)
                     .await
                     .with_context(|| std::line!().to_string())?;
             }
@@ -244,7 +242,7 @@ async fn bluetooth_mainloop(
             {
                 let state = &mut *state.lock().await;
                 connect_first_sensor_in_queue(
-                    dbus_conn.clone(),
+                    bt_session.clone(),
                     &mut state.homie,
                     &mut state.sensors_connected,
                     &mut state.sensors_to_connect,
@@ -269,7 +267,7 @@ async fn bluetooth_mainloop(
         Ok(())
     };
     let t2 = async {
-        service_bluetooth_event_queue(state.clone(), dbus_conn.clone())
+        service_bluetooth_event_queue(state.clone(), bt_session.clone())
             .await
             .with_context(|| std::line!().to_string())?;
         Ok(())
@@ -279,14 +277,14 @@ async fn bluetooth_mainloop(
 
 async fn check_for_sensors(
     state: Arc<Mutex<SensorState>>,
-    dbus_conn: Arc<SyncConnection>,
+    bt_session: MijiaSession,
     sensor_names: &HashMap<String, String>,
 ) -> Result<(), anyhow::Error> {
     let adapter = dbus::nonblock::Proxy::new(
         "org.bluez",
         "/org/bluez/hci0",
         Duration::from_secs(30),
-        dbus_conn.clone(),
+        bt_session.connection.clone(),
     );
     adapter
         .set_powered(true)
@@ -297,7 +295,7 @@ async fn check_for_sensors(
         .await
         .unwrap_or_else(|err| println!("starting discovery failed {:?}", err));
 
-    let sensors = get_sensors(dbus_conn.clone())
+    let sensors = get_sensors(bt_session.clone())
         .await
         .with_context(|| std::line!().to_string())?;
     let state = &mut *state.lock().await;
@@ -321,7 +319,7 @@ async fn check_for_sensors(
 }
 
 async fn connect_first_sensor_in_queue(
-    dbus_conn: Arc<SyncConnection>,
+    bt_session: MijiaSession,
     homie: &mut HomieDevice,
     sensors_connected: &mut Vec<Sensor>,
     sensors_to_connect: &mut VecDeque<Sensor>,
@@ -330,7 +328,7 @@ async fn connect_first_sensor_in_queue(
     // Try to connect to a sensor.
     if let Some(mut sensor) = sensors_to_connect.pop_front() {
         println!("Trying to connect to {}", sensor.name);
-        match connect_start_sensor(dbus_conn.clone(), homie, &mut sensor).await {
+        match connect_start_sensor(bt_session.clone(), homie, &mut sensor).await {
             Err(e) => {
                 println!("Failed to connect to {}: {:?}", sensor.name, e);
                 sensors_to_connect.push_back(sensor);
@@ -345,17 +343,17 @@ async fn connect_first_sensor_in_queue(
 }
 
 async fn connect_start_sensor<'a>(
-    dbus_conn: Arc<SyncConnection>,
+    bt_session: MijiaSession,
     homie: &mut HomieDevice,
     sensor: &mut Sensor,
 ) -> Result<(), anyhow::Error> {
-    let device = sensor.device(dbus_conn.clone());
+    let device = sensor.device(bt_session.clone());
     println!("Connecting from status: {:?}", sensor.connection_status);
     device
         .connect()
         .await
         .with_context(|| std::line!().to_string())?;
-    match start_notify_sensor(dbus_conn.clone(), &sensor.object_path).await {
+    match start_notify_sensor(bt_session.clone(), &sensor.object_path).await {
         Ok(()) => {
             homie
                 .add_node(sensor.as_node())
@@ -414,66 +412,44 @@ async fn disconnect_first_stale_sensor(
 
 async fn service_bluetooth_event_queue(
     state: Arc<Mutex<SensorState>>,
-    dbus_conn: Arc<SyncConnection>,
+    bt_session: MijiaSession,
 ) -> Result<(), anyhow::Error> {
     println!("Subscribing to events");
-    let mut rule = dbus::message::MatchRule::new();
-    rule.msg_type = Some(dbus::message::MessageType::Signal);
-    rule.sender = Some(dbus::strings::BusName::new("org.bluez").map_err(|s| anyhow::anyhow!(s))?);
-
-    let (msg_match, mut events) = dbus_conn
-        .add_match(rule)
-        .await
-        .with_context(|| std::line!().to_string())?
-        .msg_stream();
+    let mut events = bt_session.event_stream().await?;
     println!("Processing events");
     // Process events until there are none available for the timeout.
-    while let Some(raw_event) = events.next().await {
-        if let Some(event) = BluetoothEvent::from(raw_event) {
-            handle_bluetooth_event(state.clone(), event)
-                .await
-                .with_context(|| std::line!().to_string())?
-        }
+    while let Some(event) = events.next().await {
+        handle_bluetooth_event(state.clone(), event)
+            .await
+            .with_context(|| std::line!().to_string())?
     }
-    // TODO: move this into a defer or scope guard or something.
-    dbus_conn.remove_match(msg_match.token()).await?;
     Ok(())
 }
 
 async fn handle_bluetooth_event(
     state: Arc<Mutex<SensorState>>,
-    event: BluetoothEvent,
+    event: MijiaEvent,
 ) -> Result<(), anyhow::Error> {
     let state = &mut *state.lock().await;
     let homie = &mut state.homie;
     let sensors_connected = &mut state.sensors_connected;
     let sensors_to_connect = &mut state.sensors_to_connect;
     match event {
-        BluetoothEvent::Value { object_path, value } => {
-            // TODO: Make this less hacky.
-            let object_path = match object_path.strip_suffix(SERVICE_CHARACTERISTIC_PATH) {
-                Some(path) => path,
-                None => return Ok(()),
-            };
+        MijiaEvent::Readings {
+            object_path,
+            readings,
+        } => {
             if let Some(sensor) = sensors_connected
                 .iter_mut()
                 .find(|s| s.object_path == object_path)
             {
-                sensor.last_update_timestamp = Instant::now();
-                if let Some(readings) = decode_value(&value) {
-                    sensor.publish_readings(homie, &readings).await?;
-                } else {
-                    println!("Invalid value from {}", sensor.name);
-                }
+                sensor.publish_readings(homie, &readings).await?;
             } else {
                 // TODO: Still send it, in case it is useful?
                 println!("Got update from unexpected device {}", object_path);
             }
         }
-        BluetoothEvent::Connected {
-            object_path,
-            connected: false,
-        } => {
+        MijiaEvent::Disconnected { object_path } => {
             if let Some(sensor_index) = sensors_connected
                 .iter()
                 .position(|s| s.object_path == object_path)
@@ -488,9 +464,6 @@ async fn handle_bluetooth_event(
                     object_path
                 );
             }
-        }
-        _ => {
-            log::trace!("{:?}", event);
         }
     };
 

@@ -1,7 +1,6 @@
 use bluez_generated::generated::gattcharacteristic1::OrgBluezGattCharacteristic1;
 use dbus::arg::RefArg;
 use dbus::nonblock::stdintf::org_freedesktop_dbus::ObjectManager;
-use dbus::nonblock::SyncConnection;
 use itertools::Itertools;
 use std::cmp::max;
 use std::collections::HashMap;
@@ -9,10 +8,10 @@ use std::convert::TryInto;
 use std::fmt::{Display, Formatter};
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, ErrorKind};
-use std::sync::Arc;
 use std::time::Duration;
 
 pub mod session;
+pub use session::{MijiaEvent, MijiaSession};
 
 pub const MIJIA_SERVICE_DATA_UUID: &str = "0000fe95-0000-1000-8000-00805f9b34fb";
 pub const SERVICE_CHARACTERISTIC_PATH: &str = "/service0021/char0035";
@@ -25,11 +24,13 @@ pub struct SensorProps {
     pub mac_address: String,
 }
 
-pub async fn get_sensors(
-    dbus_conn: Arc<SyncConnection>,
-) -> Result<Vec<SensorProps>, anyhow::Error> {
-    let bluez_root =
-        dbus::nonblock::Proxy::new("org.bluez", "/", Duration::from_secs(30), dbus_conn.clone());
+pub async fn get_sensors(bt_session: MijiaSession) -> Result<Vec<SensorProps>, anyhow::Error> {
+    let bluez_root = dbus::nonblock::Proxy::new(
+        "org.bluez",
+        "/",
+        Duration::from_secs(30),
+        bt_session.connection.clone(),
+    );
     let tree = bluez_root.get_managed_objects().await?;
 
     let paths = tree
@@ -75,7 +76,7 @@ pub async fn get_sensors(
 }
 
 pub async fn start_notify_sensor(
-    dbus_conn: Arc<SyncConnection>,
+    bt_session: MijiaSession,
     device_path: &str,
 ) -> Result<(), anyhow::Error> {
     let temp_humidity_path: String = device_path.to_string() + SERVICE_CHARACTERISTIC_PATH;
@@ -83,7 +84,7 @@ pub async fn start_notify_sensor(
         "org.bluez",
         temp_humidity_path,
         Duration::from_secs(30),
-        dbus_conn.clone(),
+        bt_session.connection.clone(),
     );
     temp_humidity.start_notify().await?;
 
@@ -93,7 +94,7 @@ pub async fn start_notify_sensor(
         "org.bluez",
         connection_interval_path,
         Duration::from_secs(30),
-        dbus_conn.clone(),
+        bt_session.connection.clone(),
     );
     connection_interval
         .write_value(CONNECTION_INTERVAL_500_MS.to_vec(), Default::default())
