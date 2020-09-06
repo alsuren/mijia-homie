@@ -759,21 +759,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "read-all-devices"
-version = "0.1.0"
-dependencies = [
- "bluez-generated",
- "dbus",
- "dbus-tokio",
- "futures",
- "itertools",
- "lazy_static",
- "mijia",
- "regex",
- "tokio",
-]
-
-[[package]]
 name = "redox_syscall"
 version = "0.1.57"
 source = "registry+https://github.com/rust-lang/crates.io-index"
