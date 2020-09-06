@@ -24,7 +24,7 @@ const CONNECT_INTERVAL: Duration = Duration::from_secs(1);
 const UPDATE_TIMEOUT: Duration = Duration::from_secs(60);
 const SENSOR_NAMES_FILENAME: &str = "sensor_names.conf";
 
-#[tokio::main(core_threads = 3)]
+#[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
     dotenv::dotenv()?;
     pretty_env_logger::init();
