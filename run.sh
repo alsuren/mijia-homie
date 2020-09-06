@@ -27,5 +27,7 @@ time rsync --progress target/$TARGET/$PROFILE/$BIN $TARGET_SSH:$BIN$SUFFIX
 
 if [ $RUN -eq 1 ]
 then
+    ssh $TARGET_SSH sudo systemctl stop $BIN.service || echo "Oh. Nevermind."
+    ssh $TARGET_SSH killall $BIN $BIN$SUFFIX || echo "Oh. Nevermind."
     ssh $TARGET_SSH ./$BIN$SUFFIX
 fi
