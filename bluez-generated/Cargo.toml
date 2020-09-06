@@ -5,4 +5,4 @@ authors = ["Andrew Walbran <qwandor@google.com>", "David Laban <alsuren@gmail.co
 edition = "2018"
 
 [dependencies]
-dbus = {version = "0.8.4", features = ["futures"]}
+dbus = { version = "0.8.4", features = ["futures"] }

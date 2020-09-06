@@ -5,19 +5,16 @@ authors = ["David Laban <alsuren@gmail.com>"]
 edition = "2018"
 
 [dependencies]
+anyhow = "1.0.32"
 color-backtrace = "0.4.2"
-futures = "0.3"
+dotenv = "0.15.0"
+futures = "0.3.5"
+futures-channel = "0.3.5"
 homie = { path = "../homie" }
-log = "0.4"
+log = "0.4.11"
 mijia = { path = "../mijia" }
 pretty_env_logger = "0.4.0"
 rumqttc = "0.0.6"
 rustls = "0.17"
 rustls-native-certs = "0.3"
 tokio = "0.2.22"
-dotenv = "0.15.0"
-bluez-generated = { path = "../bluez-generated" }
-dbus-tokio = "*"
-dbus = {version = "0.8.4", features = ["futures"]}
-futures-channel = "*"
-anyhow = "*"

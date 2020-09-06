@@ -6,10 +6,10 @@ edition = "2018"
 license = "MIT OR Apache-2.0"
 
 [dependencies]
+anyhow = "1.0.32"
 bluez-generated = { path = "../bluez-generated" }
-dbus = {version = "0.8.4", features = ["futures"]}
-itertools = "*"
-anyhow = "*"
-dbus-tokio = "*"
+dbus = { version = "0.8.4", features = ["futures"] }
+dbus-tokio = "0.5.2"
+futures = "0.3.5"
+itertools = "0.9.0"
 tokio = "0.2.22"
-futures = "0.3"

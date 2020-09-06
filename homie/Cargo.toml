@@ -5,11 +5,11 @@ authors = ["Andrew Walbran <qwandor@google.com>", "David Laban <alsuren@gmail.co
 edition = "2018"
 
 [dependencies]
-async-channel = "1.4.0"
-futures = "0.3"
-local_ipaddress = "0.1"
-log = "0.4"
-mac_address = "1.0"
+anyhow = "1.0.32"
+async-channel = "1.4.2"
+futures = "0.3.5"
+local_ipaddress = "0.1.3"
+log = "0.4.11"
+mac_address = "1.0.3"
 rumqttc = "0.0.6"
 tokio = "0.2.22"
-anyhow = "*"
