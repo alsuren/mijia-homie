@@ -12,6 +12,8 @@ use std::io::{self, BufRead, BufReader, ErrorKind};
 use std::sync::Arc;
 use std::time::Duration;
 
+pub mod session;
+
 pub const MIJIA_SERVICE_DATA_UUID: &str = "0000fe95-0000-1000-8000-00805f9b34fb";
 pub const SERVICE_CHARACTERISTIC_PATH: &str = "/service0021/char0035";
 pub const CONNECTION_INTERVAL_CHARACTERISTIC_PATH: &str = "/service0021/char0045";

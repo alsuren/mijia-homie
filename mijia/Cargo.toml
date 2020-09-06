@@ -10,3 +10,6 @@ bluez-generated = { path = "../bluez-generated" }
 dbus = {version = "0.8.4", features = ["futures"]}
 itertools = "*"
 anyhow = "*"
+dbus-tokio = "*"
+tokio = "0.2.22"
+futures = "0.3"

@@ -503,7 +503,10 @@ dependencies = [
  "anyhow",
  "bluez-generated",
  "dbus",
+ "dbus-tokio",
+ "futures",
  "itertools",
+ "tokio",
 ]
 
 [[package]]

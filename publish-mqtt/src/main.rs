@@ -73,21 +73,17 @@ async fn main() -> Result<(), anyhow::Error> {
 
     let local = task::LocalSet::new();
 
-    // Connect to the D-Bus system bus (this is blocking, unfortunately).
-    let (dbus_resource, dbus_conn) = dbus_tokio::connection::new_system_sync()?;
-    let dbus_handle = tokio::spawn(async {
-        let err = dbus_resource.await;
-        Err::<(), anyhow::Error>(anyhow::anyhow!(err))
-    });
+    // Connect a bluetooth session.
+    let (dbus_handle, bt_session) = mijia::session::BluetoothSession::new().await?;
 
     let bluetooth_handle =
-        local.run_until(async move { bluetooth_mainloop(homie, dbus_conn).await });
+        local.run_until(async move { bluetooth_mainloop(homie, bt_session.connection).await });
 
     // Poll everything to completion, until the first one bombs out.
     let res: Result<_, anyhow::Error> = try_join! {
         // The resource is a task that should be spawned onto a tokio compatible
         // reactor ASAP. If the resource ever finishes, you lost connection to D-Bus.
-        dbus_handle.map(|res| Ok(res??)),
+        dbus_handle,
         // Bluetooth finished first. Convert error and get on with your life.
         bluetooth_handle.map(|res| Ok(res?)),
         // MQTT event loop finished first.
