@@ -59,7 +59,7 @@ pub async fn get_sensors(bt_session: MijiaSession) -> Result<Vec<SensorProps>, a
                 // InternalDict(...)
                 .as_iter()?
                 .tuples::<(_, _)>()
-                .map(|(k, v)| (k.as_str().unwrap().into(), v))
+                .filter_map(|(k, v)| Some((k.as_str()?.into(), v)))
                 .collect();
 
             if service_data.contains_key(MIJIA_SERVICE_DATA_UUID) {
