@@ -1,14 +1,26 @@
 #!/usr/bin/env bash
-# Bash >= 4 does not come with osx because of its GPLv3 license.
-# Install it via homebrew to get associative array support.
+# Script to introspect bluez into specs/*.xml and generate generated/*.rs from
+# them.
+#
+# Introspection requires a running bluez daemon that is connected to devices
+# with the features that you want to inspect. It also requires Bash >= 4 with
+# associative array support. Bash >= 4 does not come with osx because of its
+# GPLv3 license. Install it via homebrew.
+# Set GDBUS='ssh pi@raspberrypi.local gdbus' to use remote gdbus.
+# Set INTROSPECT=0 to skip introspection.
+#
+# Code generation requires dbus-codegen-rust from master.
+# Run `cargo install --git=https://github.com/diwic/dbus-rs` to install.
+# Set GENERATE=0 to skip code generation.
 
 set -euxo pipefail
 
 cd "$(dirname "$0")"
 
+GDBUS=${GDBUS:-gdbus}
+
 if [ ${INTROSPECT:-1} = 1 ]; then
-    ssh pi@raspberrypi.local \
-        gdbus introspect --system --dest org.bluez --object-path / --recurse \
+    $GDBUS introspect --system --dest org.bluez --object-path / --recurse \
         | grep -E '^ *(node|interface) .* {$' \
         | (
             declare -A interface_to_path
@@ -27,8 +39,7 @@ if [ ${INTROSPECT:-1} = 1 ]; then
 
             for interface in ${!interface_to_path[@]}; do
                 echo $interface -- ${interface_to_path[${interface}]}
-                ssh pi@raspberrypi.local \
-                    gdbus introspect \
+                $GDBUS introspect \
                     --system \
                     --dest=org.bluez \
                     --object-path=${interface_to_path[${interface}]} \
@@ -58,6 +69,6 @@ if [ ${GENERATE:-1} = 1 ]; then
             --client=nonblock \
             --methodtype=none \
             > src/generated/$modname.rs
-        echo "mod $modname;" >> src/generated/mod.rs
+        echo "pub mod $modname;" >> src/generated/mod.rs
     done
 fi
