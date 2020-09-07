@@ -83,7 +83,7 @@ async fn main() -> Result<(), anyhow::Error> {
         // Bluetooth finished first. Convert error and get on with your life.
         bluetooth_handle.map(|res| Ok(res?)),
         // MQTT event loop finished first.
-        mqtt_handle.map(|res| Ok(res?)),
+        mqtt_handle.map(|res| Ok(res.map_err(|err| anyhow::anyhow!(err))?)),
     };
     res?;
     Ok(())
