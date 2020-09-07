@@ -13,7 +13,7 @@
 # Run `cargo install --git=https://github.com/diwic/dbus-rs` to install.
 # Set GENERATE=0 to skip code generation.
 
-set -euxo pipefail
+set -euo pipefail
 
 cd "$(dirname "$0")"
 
@@ -30,7 +30,6 @@ if [ ${INTROSPECT:-1} = 1 ]; then
                     current_path=$value
                 elif [ $keyword = 'interface' ]; then
                     interface_to_path[${value}]=$current_path
-                    echo ${interface_to_path[${value}]}
                 else
                     echo "unexpected line $keyword $value $_bracket"
                     exit 1
@@ -38,6 +37,7 @@ if [ ${INTROSPECT:-1} = 1 ]; then
             done
 
             for interface in ${!interface_to_path[@]}; do
+                [[ $interface == org.bluez* ]] || continue
                 echo $interface -- ${interface_to_path[${interface}]}
                 $GDBUS introspect \
                     --system \
