@@ -180,7 +180,7 @@ impl HomieDeviceBuilder {
         ),
         SendError<Request>,
     > {
-        let (event_loop, mut homie, stats, firmware) = self.build().await;
+        let (event_loop, mut homie, stats, firmware) = self.build();
 
         // This needs to be spawned before we wait for anything to be sent, as the start() calls below do.
         let event_task = HomieDevice::spawn(event_loop);
@@ -196,7 +196,7 @@ impl HomieDeviceBuilder {
         Ok((homie, join_handle))
     }
 
-    async fn build(self) -> (EventLoop, HomieDevice, HomieStats, HomieFirmware) {
+    fn build(self) -> (EventLoop, HomieDevice, HomieStats, HomieFirmware) {
         let mut mqtt_options = self.mqtt_options;
         mqtt_options.set_last_will(LastWill::new(
             format!("{}/$state", self.device_base),
@@ -204,7 +204,7 @@ impl HomieDeviceBuilder {
             QoS::AtLeastOnce,
             true,
         ));
-        let event_loop = EventLoop::new(mqtt_options, REQUESTS_CAP).await;
+        let event_loop = EventLoop::new(mqtt_options, REQUESTS_CAP);
 
         let publisher = DevicePublisher::new(event_loop.handle(), self.device_base);
         let homie = HomieDevice::new(publisher.clone(), self.device_name, &EXTENSION_IDS);
@@ -647,7 +647,7 @@ mod tests {
             MqttOptions::new("client_id", "hostname", 1234),
         );
 
-        let (_event_loop, homie, _stats, firmware) = builder.build().await;
+        let (_event_loop, homie, _stats, firmware) = builder.build();
 
         assert_eq!(homie.device_name, "Test device");
         assert_eq!(homie.publisher.device_base, "homie/test-device");
@@ -667,7 +667,7 @@ mod tests {
 
         builder.set_firmware("firmware_name", "firmware_version");
 
-        let (_event_loop, homie, _stats, firmware) = builder.build().await;
+        let (_event_loop, homie, _stats, firmware) = builder.build();
 
         assert_eq!(homie.device_name, "Test device");
         assert_eq!(homie.publisher.device_base, "homie/test-device");
