@@ -1,7 +1,6 @@
 use homie::{Datatype, HomieDevice, Node, Property};
 use rumqttc::MqttOptions;
 use std::error::Error;
-use tokio::try_join;
 
 #[tokio::main(core_threads = 2)]
 async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
@@ -30,10 +29,6 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     homie.ready().await?;
     println!("Ready");
 
-    // Poll everything to completion, until the first one returns an error.
-    let res: Result<_, Box<dyn Error + Send + Sync>> = try_join! {
-        homie_handle,
-    };
-    res?;
-    Ok(())
+    // This will only resolve (with an error) if we lose connection to the MQTT server.
+    homie_handle.await
 }
