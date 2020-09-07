@@ -232,7 +232,7 @@ impl HomieDeviceBuilder {
         homie.start().await?;
 
         let stats_task = stats.spawn();
-        let join_handle = try_join(event_task, stats_task).map(|r| r.map(|((), ())| ()));
+        let join_handle = try_join(event_task, stats_task).map(simplify_unit_pair);
 
         Ok((homie, join_handle))
     }
@@ -393,7 +393,7 @@ impl HomieDevice {
                     }
                 }
             });
-        try_join_handles(mqtt_task, incoming_task).map(|r| r.map(|((), ())| ()))
+        try_join_unit_handles(mqtt_task, incoming_task)
     }
 
     /// Add a node to the Homie device. It will immediately be published.
@@ -674,6 +674,20 @@ where
 {
     // Unwrap the JoinHandle results to get to the real results.
     try_join(a.map(|res| Ok(res??)), b.map(|res| Ok(res??)))
+}
+
+fn try_join_unit_handles<E>(
+    a: JoinHandle<Result<(), E>>,
+    b: JoinHandle<Result<(), E>>,
+) -> impl Future<Output = Result<(), E>>
+where
+    E: From<JoinError>,
+{
+    try_join_handles(a, b).map(simplify_unit_pair)
+}
+
+fn simplify_unit_pair<E>(m: Result<((), ()), E>) -> Result<(), E> {
+    m.map(|((), ())| ())
 }
 
 #[cfg(test)]
