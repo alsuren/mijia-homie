@@ -164,8 +164,13 @@ impl HomieDeviceBuilder {
     /// connection. You should join on this future to handle any errors it returns.
     pub async fn spawn(
         self,
-    ) -> Result<(HomieDevice, impl Future<Output = Result<(), anyhow::Error>>), SendError<Request>>
-    {
+    ) -> Result<
+        (
+            HomieDevice,
+            impl Future<Output = Result<(), Box<dyn Error + Send + Sync>>>,
+        ),
+        SendError<Request>,
+    > {
         let (event_loop, mut homie, stats, firmware) = self.build().await;
 
         // This needs to be spawned before we wait for anything to be sent, as the start() calls below do.
@@ -268,7 +273,7 @@ impl HomieDevice {
     }
 
     /// Spawn a task to handle the EventLoop.
-    fn spawn(mut event_loop: EventLoop) -> JoinHandle<Result<(), anyhow::Error>> {
+    fn spawn(mut event_loop: EventLoop) -> JoinHandle<Result<(), Box<dyn Error + Send + Sync>>> {
         task::spawn(async move {
             loop {
                 let (incoming, outgoing) = event_loop.poll().await?;
@@ -437,7 +442,7 @@ impl HomieStats {
     }
 
     /// Periodically send stats.
-    fn spawn(self) -> JoinHandle<Result<(), anyhow::Error>> {
+    fn spawn(self) -> JoinHandle<Result<(), Box<dyn Error + Send + Sync>>> {
         task::spawn(async move {
             loop {
                 let uptime = Instant::now() - self.start_time;
