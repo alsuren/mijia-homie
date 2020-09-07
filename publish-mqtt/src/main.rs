@@ -91,9 +91,16 @@ async fn main() -> Result<(), anyhow::Error> {
 
 #[derive(Debug)]
 enum ConnectionStatus {
+    /// Not yet attempted to connect. Might already be connected from a previous
+    /// run of this program.
     Unknown,
+    /// Connected, but could not subscribe to updates. GATT characteristics
+    /// sometimes take a while to show up after connecting, so this retry is
+    /// a bit of a work-around.
     SubscribingFailedOnce,
+    /// We explicity disconnected because something went wrong.
     Disconnected,
+    /// Connected and subscribed to updates
     Connected,
 }
 
@@ -342,6 +349,9 @@ async fn connect_start_sensor<'a>(
             // If starting notifications failed, disconnect so that we start again from a clean
             // state next time.
             match sensor.connection_status {
+                ConnectionStatus::Unknown | ConnectionStatus::Disconnected => {
+                    sensor.connection_status = ConnectionStatus::SubscribingFailedOnce;
+                }
                 ConnectionStatus::SubscribingFailedOnce => {
                     bt_session
                         .disconnect(&sensor.object_path)
@@ -349,9 +359,7 @@ async fn connect_start_sensor<'a>(
                         .with_context(|| std::line!().to_string())?;
                     sensor.connection_status = ConnectionStatus::Disconnected;
                 }
-                _ => {
-                    sensor.connection_status = ConnectionStatus::SubscribingFailedOnce;
-                }
+                ConnectionStatus::Connected => panic!("This should never happen."),
             };
             Err(e)
         }
