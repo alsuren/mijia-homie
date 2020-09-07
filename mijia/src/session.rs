@@ -1,7 +1,6 @@
 use anyhow::Context;
 use bluez_generated::bluetooth_event::BluetoothEvent;
-use bluez_generated::generated::adapter1::OrgBluezAdapter1;
-use bluez_generated::generated::device1::OrgBluezDevice1;
+use bluez_generated::generated::{OrgBluezAdapter1, OrgBluezDevice1};
 use core::fmt::Debug;
 use core::future::Future;
 use core::time::Duration;

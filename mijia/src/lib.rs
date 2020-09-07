@@ -1,4 +1,4 @@
-use bluez_generated::generated::gattcharacteristic1::OrgBluezGattCharacteristic1;
+use bluez_generated::generated::OrgBluezGattCharacteristic1;
 use dbus::arg::RefArg;
 use dbus::nonblock::stdintf::org_freedesktop_dbus::ObjectManager;
 use itertools::Itertools;

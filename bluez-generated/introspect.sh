@@ -70,5 +70,6 @@ if [ ${GENERATE:-1} = 1 ]; then
             --methodtype=none \
             > src/generated/$modname.rs
         echo "pub mod $modname;" >> src/generated/mod.rs
+        echo "pub use $modname::*;" >> src/generated/mod.rs
     done
 fi
