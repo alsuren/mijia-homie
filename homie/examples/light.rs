@@ -11,7 +11,7 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     let mut builder = HomieDevice::builder("homie/example", "Homie light example", mqttoptions);
     builder.set_update_callback(|node_id, property_id, value| async move {
         println!("{}/{} is now {}", node_id, property_id, value);
-        true
+        Some(value)
     });
     let (mut homie, homie_handle) = builder.spawn().await?;
 

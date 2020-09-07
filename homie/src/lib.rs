@@ -157,7 +157,9 @@ impl Into<Vec<u8>> for State {
 }
 
 type UpdateCallback = Box<
-    dyn FnMut(String, String, String) -> Pin<Box<dyn Future<Output = bool> + Send>> + Send + Sync,
+    dyn FnMut(String, String, String) -> Pin<Box<dyn Future<Output = Option<String>> + Send>>
+        + Send
+        + Sync,
 >;
 
 /// Builder for `HomieDevice` and associated objects.
@@ -198,7 +200,7 @@ impl HomieDeviceBuilder {
     pub fn set_update_callback<F, Fut>(&mut self, mut update_callback: F)
     where
         F: (FnMut(String, String, String) -> Fut) + Send + Sync + 'static,
-        Fut: Future<Output = bool> + Send + 'static,
+        Fut: Future<Output = Option<String>> + Send + 'static,
     {
         self.update_callback = Some(Box::new(
             move |node_id: String, property_id: String, value: String| {
@@ -369,7 +371,7 @@ impl HomieDevice {
                                         payload
                                     );
                                     if let Some(callback) = update_callback.as_mut() {
-                                        if callback(
+                                        if let Some(value) = callback(
                                             node_id.to_string(),
                                             property_id.to_string(),
                                             payload.to_string(),
@@ -379,7 +381,7 @@ impl HomieDevice {
                                             publisher
                                                 .publish_retained(
                                                     &format!("{}/{}", node_id, property_id),
-                                                    payload,
+                                                    value,
                                                 )
                                                 .await?;
                                         }
