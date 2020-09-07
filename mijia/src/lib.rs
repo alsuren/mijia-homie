@@ -33,7 +33,7 @@ pub async fn get_sensors(bt_session: MijiaSession) -> Result<Vec<SensorProps>, a
     );
     let tree = bluez_root.get_managed_objects().await?;
 
-    let paths = tree
+    let sensors = tree
         .into_iter()
         .filter_map(|(path, interfaces)| {
             // FIXME: can we generate a strongly typed deserialiser for this,
@@ -72,7 +72,7 @@ pub async fn get_sensors(bt_session: MijiaSession) -> Result<Vec<SensorProps>, a
             }
         })
         .collect();
-    Ok(paths)
+    Ok(sensors)
 }
 
 pub async fn start_notify_sensor(
