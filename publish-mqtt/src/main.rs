@@ -98,7 +98,9 @@ enum ConnectionStatus {
     /// sometimes take a while to show up after connecting, so this retry is
     /// a bit of a work-around.
     SubscribingFailedOnce,
-    /// We explicity disconnected because something went wrong.
+    /// Disconnected because we stopped getting updates.
+    WatchdogTimeOut,
+    /// We explicity disconnected because something else went wrong.
     Disconnected,
     /// Connected and subscribed to updates
     Connected,
@@ -349,7 +351,9 @@ async fn connect_start_sensor<'a>(
             // If starting notifications failed, disconnect so that we start again from a clean
             // state next time.
             match sensor.connection_status {
-                ConnectionStatus::Unknown | ConnectionStatus::Disconnected => {
+                ConnectionStatus::Unknown
+                | ConnectionStatus::Disconnected
+                | ConnectionStatus::WatchdogTimeOut => {
                     sensor.connection_status = ConnectionStatus::SubscribingFailedOnce;
                 }
                 ConnectionStatus::SubscribingFailedOnce => {
@@ -378,12 +382,13 @@ async fn disconnect_first_stale_sensor(
         .iter()
         .position(|s| now - s.last_update_timestamp > UPDATE_TIMEOUT)
     {
-        let sensor = sensors_connected.remove(sensor_index);
+        let mut sensor = sensors_connected.remove(sensor_index);
         println!(
             "No update from {} for {:?}, reconnecting",
             sensor.name,
             now - sensor.last_update_timestamp
         );
+        sensor.connection_status = ConnectionStatus::WatchdogTimeOut;
         homie
             .remove_node(&sensor.node_id())
             .await
