@@ -403,7 +403,7 @@ async fn service_bluetooth_event_queue(
     bt_session: MijiaSession,
 ) -> Result<(), anyhow::Error> {
     println!("Subscribing to events");
-    let mut events = bt_session.event_stream().await?;
+    let (msg_match, mut events) = bt_session.event_stream().await?;
     println!("Processing events");
     // Process events until there are none available for the timeout.
     while let Some(event) = events.next().await {
@@ -411,7 +411,11 @@ async fn service_bluetooth_event_queue(
             .await
             .with_context(|| std::line!().to_string())?
     }
-    Ok(())
+    bt_session
+        .connection
+        .remove_match(msg_match.token())
+        .await?;
+    panic!("no more events");
 }
 
 async fn handle_bluetooth_event(

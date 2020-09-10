@@ -4,7 +4,10 @@ use bluez_generated::generated::{OrgBluezAdapter1, OrgBluezDevice1};
 use core::fmt::Debug;
 use core::future::Future;
 use core::time::Duration;
-use dbus::{nonblock::SyncConnection, Message};
+use dbus::{
+    nonblock::{MsgMatch, SyncConnection},
+    Message,
+};
 use futures::{FutureExt, Stream, StreamExt};
 use std::sync::Arc;
 
@@ -99,19 +102,23 @@ impl MijiaSession {
         Ok(())
     }
 
-    pub async fn event_stream(&self) -> Result<impl Stream<Item = MijiaEvent>, anyhow::Error> {
+    /// Get a stream of reading/disconnected events for all sensors.
+    ///
+    /// If the MsgMatch is dropped then the Stream will close.
+    pub async fn event_stream(
+        &self,
+    ) -> Result<(MsgMatch, impl Stream<Item = MijiaEvent>), anyhow::Error> {
         let mut rule = dbus::message::MatchRule::new();
         rule.msg_type = Some(dbus::message::MessageType::Signal);
         rule.sender =
             Some(dbus::strings::BusName::new("org.bluez").map_err(|s| anyhow::anyhow!(s))?);
 
-        // TODO: run this in a scope guard or something when the event stream is dropped:
-        //     self.connection.remove_match(msg_match.token()).await?;
-        let (_msg_match, events) = self.connection.add_match(rule).await?.msg_stream();
+        let (msg_match, events) = self.connection.add_match(rule).await?.msg_stream();
 
-        Ok(Box::pin(events.filter_map(|event| async move {
-            MijiaEvent::from(event)
-        })))
+        Ok((
+            msg_match,
+            Box::pin(events.filter_map(|event| async move { MijiaEvent::from(event) })),
+        ))
     }
 
     fn device(&self, object_path: &str) -> impl OrgBluezDevice1 {
