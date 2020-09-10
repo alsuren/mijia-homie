@@ -102,6 +102,10 @@ enum ConnectionStatus {
     WatchdogTimeOut,
     /// We explicity disconnected because something else went wrong.
     Disconnected,
+    /// We received a Disconnected event.
+    /// This should only be treated as informational, because disconnection
+    /// events might be received racily. The sensor might actually be Connected.
+    MarkedDisconnected,
     /// Connected and subscribed to updates
     Connected,
 }
@@ -353,6 +357,7 @@ async fn connect_start_sensor<'a>(
             match sensor.connection_status {
                 ConnectionStatus::Unknown
                 | ConnectionStatus::Disconnected
+                | ConnectionStatus::MarkedDisconnected
                 | ConnectionStatus::WatchdogTimeOut => {
                     sensor.connection_status = ConnectionStatus::SubscribingFailedOnce;
                 }
@@ -446,8 +451,9 @@ async fn handle_bluetooth_event(
                 .iter()
                 .position(|s| s.object_path == object_path)
             {
-                let sensor = sensors_connected.remove(sensor_index);
+                let mut sensor = sensors_connected.remove(sensor_index);
                 println!("{} disconnected", sensor.name);
+                sensor.connection_status = ConnectionStatus::MarkedDisconnected;
                 homie.remove_node(&sensor.node_id()).await?;
                 sensors_to_connect.push_back(sensor);
             } else {
