@@ -442,9 +442,17 @@ async fn handle_bluetooth_event(
                 .find(|s| s.object_path == object_path)
             {
                 sensor.publish_readings(homie, &readings).await?;
-            } else {
-                // TODO: Still send it, in case it is useful?
-                println!("Got update from unexpected device {}", object_path);
+            } else if let Some(sensor_index) = sensors_to_connect
+                .iter()
+                .position(|s| s.object_path == object_path)
+            {
+                let mut sensor = sensors_to_connect.remove(sensor_index).unwrap();
+                println!(
+                    "Got update from disconnected device {}. Connecting.",
+                    object_path
+                );
+                sensor.publish_readings(homie, &readings).await?;
+                sensors_connected.push(sensor);
             }
         }
         MijiaEvent::Disconnected { object_path } => {
