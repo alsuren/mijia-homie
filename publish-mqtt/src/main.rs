@@ -174,13 +174,14 @@ impl Sensor {
     }
 
     async fn publish_readings(
-        &self,
+        &mut self,
         homie: &HomieDevice,
         readings: &Readings,
     ) -> Result<(), anyhow::Error> {
         println!("{} {} ({})", self.mac_address, readings, self.name);
 
         let node_id = self.node_id();
+        self.last_update_timestamp = Instant::now();
         homie
             .publish_value(
                 &node_id,
