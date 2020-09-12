@@ -235,7 +235,9 @@ async fn bluetooth_mainloop(
     let t1 = async {
         loop {
             let now = Instant::now();
-            if now > next_scan_due {
+            if now > next_scan_due
+                && state.lock().await.sensors_connected.len() < sensor_names.len()
+            {
                 next_scan_due = now + SCAN_INTERVAL;
                 check_for_sensors(state.clone(), bt_session.clone(), &sensor_names)
                     .await
