@@ -77,8 +77,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
     // Poll everything to completion, until the first one bombs out.
     let res: Result<_, anyhow::Error> = try_join! {
-        // The resource is a task that should be spawned onto a tokio compatible
-        // reactor ASAP. If the resource ever finishes, you lost connection to D-Bus.
+        // If this ever finishes, we lost connection to D-Bus.
         dbus_handle,
         // Bluetooth finished first. Convert error and get on with your life.
         bluetooth_handle.map(|res| Ok(res?)),
