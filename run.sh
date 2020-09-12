@@ -8,7 +8,8 @@ set -euxo pipefail
 TARGET=${TARGET:-armv7-unknown-linux-gnueabihf}
 TARGET_SSH=${TARGET_SSH:-pi@raspberrypi.local}
 PROFILE=${PROFILE:-debug}
-RUN=${RUN:-1}
+RUN=${RUN:-0}
+DEPLOY=${DEPLOY:-1}
 SUFFIX=${SUFFIX:-}
 BIN=${BIN:-publish-mqtt}
 
@@ -25,8 +26,14 @@ time cross build $PROFILE_FLAG --target $TARGET --bin $BIN
 
 time rsync --progress target/$TARGET/$PROFILE/$BIN $TARGET_SSH:$BIN$SUFFIX
 
-if [ $RUN -eq 1 ]
-then
+if [ $DEPLOY = 1 ]; then
+    if [ $SUFFIX = '' ]; then
+        echo "can't deploy with suffix"
+        exit 1
+    fi
+    ssh $TARGET_SSH sudo systemctl restart $BIN.service
+    ssh pi@raspberrypi.local sudo journalctl -u publish-mqtt.service --output=cat --follow
+elif [ $RUN = 1 ]; then
     ssh $TARGET_SSH sudo systemctl stop $BIN.service || echo "Oh. Nevermind."
     ssh $TARGET_SSH killall $BIN $BIN$SUFFIX || echo "Oh. Nevermind."
     ssh $TARGET_SSH ./$BIN$SUFFIX
