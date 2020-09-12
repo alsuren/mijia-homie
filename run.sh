@@ -12,16 +12,16 @@ RUN=${RUN:-1}
 SUFFIX=${SUFFIX:-}
 BIN=${BIN:-publish-mqtt}
 
-if [ $PROFILE = release ]
-then
-    time cross build --target $TARGET --release
-elif [ $PROFILE = debug ]
-then
-    time cross build --target $TARGET --bin $BIN
+if [ $PROFILE = release ]; then
+    PROFILE_FLAG=--release
+elif [ $PROFILE = debug ]; then
+    PROFILE_FLAG=''
 else
     echo "Invalid profile '$PROFILE'"
     exit 1
 fi
+
+time cross build $PROFILE_FLAG --target $TARGET --bin $BIN
 
 time rsync --progress target/$TARGET/$PROFILE/$BIN $TARGET_SSH:$BIN$SUFFIX
 
