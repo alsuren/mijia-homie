@@ -86,11 +86,13 @@ async fn main() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 enum ConnectionStatus {
     /// Not yet attempted to connect. Might already be connected from a previous
     /// run of this program.
     Unknown,
+    /// Currently connecting. Don't try again until the timeout expires.
+    Connecting { reserved_until: Instant },
     /// Connected, but could not subscribe to updates. GATT characteristics
     /// sometimes take a while to show up after connecting, so this retry is
     /// a bit of a work-around.
@@ -206,13 +208,6 @@ impl Sensor {
     }
 }
 
-#[derive(Debug)]
-struct SensorState {
-    sensors_to_connect: VecDeque<Sensor>,
-    sensors_connected: Vec<Sensor>,
-    homie: HomieDevice,
-}
-
 async fn run_sensor_system(
     mut homie: HomieDevice,
     session: &MijiaSession,
@@ -226,6 +221,8 @@ async fn run_sensor_system(
         .with_context(|| std::line!().to_string())?;
 
     let state = Arc::new(Mutex::new(SensorState {
+        sensors: vec![],
+        next_idx: 0,
         sensors_to_connect: VecDeque::new(),
         sensors_connected: vec![],
         homie,
@@ -291,6 +288,60 @@ async fn bluetooth_connection_loop(
             .with_context(|| std::line!().to_string())?;
         }
         time::delay_for(CONNECT_INTERVAL).await;
+    }
+}
+
+#[derive(Debug)]
+struct SensorState {
+    sensors: Vec<Sensor>,
+    next_idx: usize,
+    sensors_to_connect: VecDeque<Sensor>,
+    sensors_connected: Vec<Sensor>,
+    homie: HomieDevice,
+}
+async fn action_next_sensor(
+    state: Arc<Mutex<SensorState>>,
+    session: &MijiaSession,
+) -> Result<(), anyhow::Error> {
+    let (idx, status) = match next_actionable_sensor(state).await {
+        Some(values) => values,
+        None => return Ok(()),
+    };
+    match status {
+        ConnectionStatus::Connecting { reserved_until } if reserved_until > Instant::now() => {
+            Ok(())
+        }
+        ConnectionStatus::Unknown
+        | ConnectionStatus::Connecting { .. }
+        | ConnectionStatus::SubscribingFailedOnce
+        | ConnectionStatus::Disconnected
+        | ConnectionStatus::MarkedDisconnected
+        | ConnectionStatus::WatchdogTimeOut => {
+            // connect_sensor_idx(state, session, idx)
+            Ok(())
+        }
+        ConnectionStatus::Connected => {
+            // check_for_stale_sensor(state, session, idx)
+            Ok(())
+        }
+    }
+}
+async fn next_actionable_sensor(
+    state: Arc<Mutex<SensorState>>,
+) -> Option<(usize, ConnectionStatus)> {
+    let mut state = state.lock().await;
+    let idx = state.next_idx;
+    let status = state.sensors.get(idx).map(|s| s.connection_status);
+
+    match status {
+        None => {
+            state.next_idx = 0;
+            None
+        }
+        Some(status) => {
+            state.next_idx += 1;
+            Some((idx, status))
+        }
     }
 }
 
@@ -377,6 +428,7 @@ async fn connect_start_sensor<'a>(
             // that we start again from a clean state next time.
             match sensor.connection_status {
                 ConnectionStatus::Unknown
+                | ConnectionStatus::Connecting { .. }
                 | ConnectionStatus::Disconnected
                 | ConnectionStatus::MarkedDisconnected
                 | ConnectionStatus::WatchdogTimeOut => {
