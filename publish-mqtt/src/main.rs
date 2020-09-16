@@ -345,8 +345,8 @@ async fn connect_start_sensor<'a>(
             Ok(())
         }
         Err(e) => {
-            // If starting notifications failed, disconnect so that we start again from a clean
-            // state next time.
+            // If starting notifications failed a second time, disconnect so
+            // that we start again from a clean state next time.
             match sensor.connection_status {
                 ConnectionStatus::Unknown
                 | ConnectionStatus::Disconnected
