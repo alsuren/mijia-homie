@@ -18,6 +18,7 @@ const SENSOR_READING_CHARACTERISTIC_PATH: &str = "/service0021/char0035";
 const CONNECTION_INTERVAL_CHARACTERISTIC_PATH: &str = "/service0021/char0045";
 /// 500 in little-endian
 const CONNECTION_INTERVAL_500_MS: [u8; 3] = [0xF4, 0x01, 0x00];
+const DBUS_METHOD_CALL_TIMEOUT: Duration = Duration::from_secs(30);
 
 pub struct SensorProps {
     pub object_path: String,
@@ -28,7 +29,7 @@ pub async fn get_sensors(bt_session: &MijiaSession) -> Result<Vec<SensorProps>, 
     let bluez_root = dbus::nonblock::Proxy::new(
         "org.bluez",
         "/",
-        Duration::from_secs(30),
+        DBUS_METHOD_CALL_TIMEOUT,
         bt_session.connection.clone(),
     );
     let tree = bluez_root.get_managed_objects().await?;
@@ -83,7 +84,7 @@ pub async fn start_notify_sensor(
     let temp_humidity = dbus::nonblock::Proxy::new(
         "org.bluez",
         temp_humidity_path,
-        Duration::from_secs(30),
+        DBUS_METHOD_CALL_TIMEOUT,
         bt_session.connection.clone(),
     );
     temp_humidity.start_notify().await?;
@@ -93,7 +94,7 @@ pub async fn start_notify_sensor(
     let connection_interval = dbus::nonblock::Proxy::new(
         "org.bluez",
         connection_interval_path,
-        Duration::from_secs(30),
+        DBUS_METHOD_CALL_TIMEOUT,
         bt_session.connection.clone(),
     );
     connection_interval

@@ -1,4 +1,4 @@
-use crate::{decode_value, Readings, SENSOR_READING_CHARACTERISTIC_PATH};
+use crate::{decode_value, Readings, DBUS_METHOD_CALL_TIMEOUT, SENSOR_READING_CHARACTERISTIC_PATH};
 use anyhow::Context;
 use bluez_generated::bluetooth_event::BluetoothEvent;
 use bluez_generated::generated::{OrgBluezAdapter1, OrgBluezDevice1};
@@ -89,7 +89,7 @@ impl MijiaSession {
         let adapter = dbus::nonblock::Proxy::new(
             "org.bluez",
             "/org/bluez/hci0",
-            Duration::from_secs(30),
+            DBUS_METHOD_CALL_TIMEOUT,
             self.connection.clone(),
         );
         adapter
@@ -126,7 +126,7 @@ impl MijiaSession {
         dbus::nonblock::Proxy::new(
             "org.bluez",
             object_path.to_owned(),
-            Duration::from_secs(30),
+            DBUS_METHOD_CALL_TIMEOUT,
             self.connection.clone(),
         )
     }
