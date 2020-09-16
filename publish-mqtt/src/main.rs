@@ -403,16 +403,19 @@ async fn service_bluetooth_event_queue(
     println!("Subscribing to events");
     let (msg_match, mut events) = bt_session.event_stream().await?;
     println!("Processing events");
-    // Process events until there are none available for the timeout.
+
     while let Some(event) = events.next().await {
         handle_bluetooth_event(state.clone(), event)
             .await
             .with_context(|| std::line!().to_string())?
     }
+
     bt_session
         .connection
         .remove_match(msg_match.token())
         .await?;
+    // This should be unreachable, because the events Stream should never end,
+    // unless something has gone horribly wrong (or msg_match got dropped?)
     panic!("no more events");
 }
 
