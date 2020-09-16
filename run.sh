@@ -8,33 +8,23 @@ set -euxo pipefail
 TARGET=${TARGET:-armv7-unknown-linux-gnueabihf}
 TARGET_SSH=${TARGET_SSH:-pi@raspberrypi.local}
 PROFILE=${PROFILE:-debug}
-RUN=${RUN:-0}
-DEPLOY=${DEPLOY:-1}
-SUFFIX=${SUFFIX:-}
-BIN=${BIN:-publish-mqtt}
+RUN=${RUN:-1}
 
-if [ $PROFILE = release ]; then
-    PROFILE_FLAG=--release
-elif [ $PROFILE = debug ]; then
-    PROFILE_FLAG=''
+if [ $PROFILE = release ]
+then
+    time cross build --target $TARGET --release
+elif [ $PROFILE = debug ]
+then
+    time cross build --target $TARGET
 else
     echo "Invalid profile '$PROFILE'"
     exit 1
 fi
 
-time cross build $PROFILE_FLAG --target $TARGET --bin $BIN
+time rsync --progress target/$TARGET/$PROFILE/read-all-devices $TARGET_SSH:read-all-devices-next
+time rsync --progress target/$TARGET/$PROFILE/publish-mqtt $TARGET_SSH:publish-mqtt
 
-time rsync --progress target/$TARGET/$PROFILE/$BIN $TARGET_SSH:$BIN$SUFFIX
-
-if [ $DEPLOY = 1 ]; then
-    if [ $SUFFIX = '' ]; then
-        echo "can't deploy with suffix"
-        exit 1
-    fi
-    ssh $TARGET_SSH sudo systemctl restart $BIN.service
-    ssh pi@raspberrypi.local sudo journalctl -u publish-mqtt.service --output=cat --follow
-elif [ $RUN = 1 ]; then
-    ssh $TARGET_SSH sudo systemctl stop $BIN.service || echo "Oh. Nevermind."
-    ssh $TARGET_SSH killall $BIN $BIN$SUFFIX || echo "Oh. Nevermind."
-    ssh $TARGET_SSH ./$BIN$SUFFIX
+if [ $RUN -eq 1 ]
+then
+    ssh $TARGET_SSH ./publish-mqtt
 fi
