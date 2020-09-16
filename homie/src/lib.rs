@@ -3,10 +3,14 @@ use futures::future::try_join;
 use futures::FutureExt;
 use local_ipaddress;
 use mac_address::get_mac_address;
-use rumqttc::{self, EventLoop, LastWill, MqttOptions, Publish, QoS, Request};
+use rumqttc::{
+    self, EventLoop, Incoming, LastWill, MqttOptions, Publish, QoS, Request, Subscribe, Unsubscribe,
+};
 use std::error::Error;
-use std::fmt::Display;
+use std::fmt::{self, Debug, Display, Formatter};
 use std::future::Future;
+use std::pin::Pin;
+use std::str;
 use std::time::{Duration, Instant};
 use tokio::task::{self, JoinError, JoinHandle};
 use tokio::time::delay_for;
@@ -49,7 +53,9 @@ pub struct Property {
     id: String,
     name: String,
     datatype: Datatype,
+    settable: bool,
     unit: Option<String>,
+    format: Option<String>,
 }
 
 impl Property {
@@ -60,15 +66,29 @@ impl Property {
     ///   [ID format](https://homieiot.github.io/specification/#topic-ids).
     /// * `name`: The human-readable name of the property.
     /// * `datatype`: The data type of the property.
+    /// * `settable`: Whether the property can be set by the Homie controller. This should be true
+    ///   for properties like the brightness or power state of a light, and false for things like
+    ///   the temperature reading of a sensor.
     /// * `unit`: The unit for the property, if any. This may be one of the
     ///   [recommended units](https://homieiot.github.io/specification/#property-attributes), or
     ///   any other custom unit.
-    pub fn new(id: &str, name: &str, datatype: Datatype, unit: Option<&str>) -> Property {
+    /// * `format`: The format for the property, if any. This must be specified if the datatype is
+    ///   `Enum` or `Color`, and may be specified if the datatype is `Integer` or `Float`.
+    pub fn new(
+        id: &str,
+        name: &str,
+        datatype: Datatype,
+        settable: bool,
+        unit: Option<&str>,
+        format: Option<&str>,
+    ) -> Property {
         Property {
             id: id.to_owned(),
             name: name.to_owned(),
             datatype,
+            settable,
             unit: unit.map(|s| s.to_owned()),
+            format: format.map(|s| s.to_owned()),
         }
     }
 }
@@ -91,11 +111,11 @@ impl Node {
     /// * `name`: The human-readable name of the node.
     /// * `type`: The type of the node. This is an arbitrary string.
     /// * `property`: The properties of the node. There should be at least one.
-    pub fn new(id: String, name: String, node_type: String, properties: Vec<Property>) -> Node {
+    pub fn new(id: &str, name: &str, node_type: &str, properties: Vec<Property>) -> Node {
         Node {
-            id,
-            name,
-            node_type,
+            id: id.to_owned(),
+            name: name.to_owned(),
+            node_type: node_type.to_owned(),
             properties,
         }
     }
@@ -136,24 +156,57 @@ impl Into<Vec<u8>> for State {
     }
 }
 
+type UpdateCallback = Box<
+    dyn FnMut(String, String, String) -> Pin<Box<dyn Future<Output = Option<String>> + Send>>
+        + Send
+        + Sync,
+>;
+
 /// Builder for `HomieDevice` and associated objects.
-#[derive(Debug)]
 pub struct HomieDeviceBuilder {
     device_base: String,
     device_name: String,
     firmware_name: String,
     firmware_version: String,
     mqtt_options: MqttOptions,
+    update_callback: Option<UpdateCallback>,
+}
+
+impl Debug for HomieDeviceBuilder {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("HomieDeviceBuilder")
+            .field("device_base", &self.device_base)
+            .field("device_name", &self.device_name)
+            .field("firmware_name", &self.firmware_name)
+            .field("firmware_version", &self.firmware_version)
+            .field("mqtt_options", &self.mqtt_options)
+            .field(
+                "update_callback",
+                &self.update_callback.as_ref().map(|_| "..."),
+            )
+            .finish()
+    }
 }
 
 impl HomieDeviceBuilder {
     /// Set the firmware name and version to be advertised for the Homie device.
     ///
     /// If this is not set, it will default to the cargo package name and version.
-    #[allow(dead_code)]
     pub fn set_firmware(&mut self, firmware_name: &str, firmware_version: &str) {
         self.firmware_name = firmware_name.to_string();
         self.firmware_version = firmware_version.to_string();
+    }
+
+    pub fn set_update_callback<F, Fut>(&mut self, mut update_callback: F)
+    where
+        F: (FnMut(String, String, String) -> Fut) + Send + Sync + 'static,
+        Fut: Future<Output = Option<String>> + Send + 'static,
+    {
+        self.update_callback = Some(Box::new(
+            move |node_id: String, property_id: String, value: String| {
+                update_callback(node_id, property_id, value).boxed()
+            },
+        ));
     }
 
     /// Create a new Homie device, connect to the MQTT server, and start a task to handle the MQTT
@@ -171,31 +224,38 @@ impl HomieDeviceBuilder {
         ),
         SendError<Request>,
     > {
-        let (event_loop, mut homie, stats, firmware) = self.build().await;
+        let (event_loop, mut homie, stats, firmware, update_callback) = self.build();
 
         // This needs to be spawned before we wait for anything to be sent, as the start() calls below do.
-        let event_task = HomieDevice::spawn(event_loop);
+        let event_task = homie.spawn(event_loop, update_callback);
 
         stats.start().await?;
         firmware.start().await?;
         homie.start().await?;
 
         let stats_task = stats.spawn();
-
-        let join_handle = try_join_handles(event_task, stats_task).map(|r| r.map(|((), ())| ()));
+        let join_handle = try_join(event_task, stats_task).map(simplify_unit_pair);
 
         Ok((homie, join_handle))
     }
 
-    async fn build(self) -> (EventLoop, HomieDevice, HomieStats, HomieFirmware) {
+    fn build(
+        self,
+    ) -> (
+        EventLoop,
+        HomieDevice,
+        HomieStats,
+        HomieFirmware,
+        Option<UpdateCallback>,
+    ) {
         let mut mqtt_options = self.mqtt_options;
-        mqtt_options.set_last_will(LastWill {
-            topic: format!("{}/$state", self.device_base),
-            message: State::Lost.to_string(),
-            qos: QoS::AtLeastOnce,
-            retain: true,
-        });
-        let event_loop = EventLoop::new(mqtt_options, REQUESTS_CAP).await;
+        mqtt_options.set_last_will(LastWill::new(
+            format!("{}/$state", self.device_base),
+            State::Lost,
+            QoS::AtLeastOnce,
+            true,
+        ));
+        let event_loop = EventLoop::new(mqtt_options, REQUESTS_CAP);
 
         let publisher = DevicePublisher::new(event_loop.handle(), self.device_base);
         let homie = HomieDevice::new(publisher.clone(), self.device_name, &EXTENSION_IDS);
@@ -203,7 +263,7 @@ impl HomieDeviceBuilder {
         let stats = HomieStats::new(publisher.clone());
         let firmware = HomieFirmware::new(publisher, self.firmware_name, self.firmware_version);
 
-        (event_loop, homie, stats, firmware)
+        (event_loop, homie, stats, firmware, self.update_callback)
     }
 }
 
@@ -241,6 +301,7 @@ impl HomieDevice {
             firmware_name: DEFAULT_FIRMWARE_NAME.to_string(),
             firmware_version: DEFAULT_FIRMWARE_VERSION.to_string(),
             mqtt_options,
+            update_callback: None,
         }
     }
 
@@ -273,13 +334,68 @@ impl HomieDevice {
     }
 
     /// Spawn a task to handle the EventLoop.
-    fn spawn(mut event_loop: EventLoop) -> JoinHandle<Result<(), Box<dyn Error + Send + Sync>>> {
-        task::spawn(async move {
+    fn spawn(
+        &self,
+        mut event_loop: EventLoop,
+        mut update_callback: Option<UpdateCallback>,
+    ) -> impl Future<Output = Result<(), Box<dyn Error + Send + Sync>>> {
+        let device_base = format!("{}/", self.publisher.device_base);
+        let (incoming_tx, incoming_rx) = async_channel::unbounded();
+
+        let mqtt_task = task::spawn(async move {
             loop {
                 let (incoming, outgoing) = event_loop.poll().await?;
                 log::trace!("Incoming = {:?}, Outgoing = {:?}", incoming, outgoing);
+
+                if let Some(incoming) = incoming {
+                    incoming_tx.send(incoming).await?;
+                }
             }
-        })
+        });
+
+        let publisher = self.publisher.clone();
+        let incoming_task: JoinHandle<Result<(), Box<dyn Error + Send + Sync>>> =
+            task::spawn(async move {
+                loop {
+                    match incoming_rx.recv().await? {
+                        Incoming::Publish(publish) => {
+                            if let Some(rest) = publish.topic.strip_prefix(&device_base) {
+                                if let ([node_id, property_id, "set"], Ok(payload)) = (
+                                    rest.split("/").collect::<Vec<&str>>().as_slice(),
+                                    str::from_utf8(&publish.payload),
+                                ) {
+                                    log::trace!(
+                                        "set node {:?} property {:?} to {:?}",
+                                        node_id,
+                                        property_id,
+                                        payload
+                                    );
+                                    if let Some(callback) = update_callback.as_mut() {
+                                        if let Some(value) = callback(
+                                            node_id.to_string(),
+                                            property_id.to_string(),
+                                            payload.to_string(),
+                                        )
+                                        .await
+                                        {
+                                            publisher
+                                                .publish_retained(
+                                                    &format!("{}/{}", node_id, property_id),
+                                                    value,
+                                                )
+                                                .await?;
+                                        }
+                                    }
+                                }
+                            } else {
+                                log::warn!("Unexpected publish: {:?}", publish);
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            });
+        try_join_unit_handles(mqtt_task, incoming_task)
     }
 
     /// Add a node to the Homie device. It will immediately be published.
@@ -302,7 +418,10 @@ impl HomieDevice {
 
     /// Remove the node with the given ID.
     pub async fn remove_node(&mut self, node_id: &str) -> Result<(), SendError<Request>> {
-        self.nodes.retain(|n| n.id != node_id);
+        // Panic on attempt to remove a node which was never added.
+        let index = self.nodes.iter().position(|n| n.id == node_id).unwrap();
+        self.unpublish_node(&self.nodes[index]).await?;
+        self.nodes.remove(index);
         self.publish_nodes().await
     }
 
@@ -328,15 +447,45 @@ impl HomieDevice {
                     property.datatype,
                 )
                 .await?;
+            self.publisher
+                .publish_retained(
+                    &format!("{}/{}/$settable", node.id, property.id),
+                    if property.settable { "true" } else { "false" },
+                )
+                .await?;
             if let Some(unit) = &property.unit {
                 self.publisher
                     .publish_retained(&format!("{}/{}/$unit", node.id, property.id), unit.as_str())
+                    .await?;
+            }
+            if let Some(format) = &property.format {
+                self.publisher
+                    .publish_retained(
+                        &format!("{}/{}/$format", node.id, property.id),
+                        format.as_str(),
+                    )
+                    .await?;
+            }
+            if property.settable {
+                self.publisher
+                    .subscribe(&format!("{}/{}/set", node.id, property.id))
                     .await?;
             }
         }
         self.publisher
             .publish_retained(&format!("{}/$properties", node.id), property_ids.join(","))
             .await?;
+        Ok(())
+    }
+
+    async fn unpublish_node(&self, node: &Node) -> Result<(), SendError<Request>> {
+        for property in &node.properties {
+            if property.settable {
+                self.publisher
+                    .unsubscribe(&format!("{}/{}/set", node.id, property.id))
+                    .await?;
+            }
+        }
         Ok(())
     }
 
@@ -378,6 +527,15 @@ impl HomieDevice {
         self.set_state(State::Alert).await
     }
 
+    /// Disconnect cleanly from the MQTT broker, after updating the state of the Homie device to
+    // 'disconnected'.
+    pub async fn disconnect(mut self) -> Result<(), SendError<Request>> {
+        self.set_state(State::Disconnected).await?;
+        self.publisher.disconnect().await
+    }
+
+    /// Publish a new value for the given property of the given node of this device. The caller is
+    /// responsible for ensuring that the value is of the correct type.
     pub async fn publish_value(
         &self,
         node_id: &str,
@@ -409,10 +567,26 @@ impl DevicePublisher {
         subtopic: &str,
         value: impl Into<Vec<u8>>,
     ) -> Result<(), SendError<Request>> {
-        let name = format!("{}/{}", self.device_base, subtopic);
-        let mut publish = Publish::new(name, QoS::AtLeastOnce, value);
+        let topic = format!("{}/{}", self.device_base, subtopic);
+        let mut publish = Publish::new(topic, QoS::AtLeastOnce, value);
         publish.set_retain(true);
         self.requests_tx.send(publish.into()).await
+    }
+
+    async fn disconnect(&self) -> Result<(), SendError<Request>> {
+        self.requests_tx.send(Request::Disconnect).await
+    }
+
+    async fn subscribe(&self, subtopic: &str) -> Result<(), SendError<Request>> {
+        let topic = format!("{}/{}", self.device_base, subtopic);
+        let subscribe = Subscribe::new(topic, QoS::AtLeastOnce);
+        self.requests_tx.send(subscribe.into()).await
+    }
+
+    async fn unsubscribe(&self, subtopic: &str) -> Result<(), SendError<Request>> {
+        let topic = format!("{}/{}", self.device_base, subtopic);
+        let unsubscribe = Unsubscribe::new(topic);
+        self.requests_tx.send(unsubscribe.into()).await
     }
 }
 
@@ -442,8 +616,8 @@ impl HomieStats {
     }
 
     /// Periodically send stats.
-    fn spawn(self) -> JoinHandle<Result<(), Box<dyn Error + Send + Sync>>> {
-        task::spawn(async move {
+    fn spawn(self) -> impl Future<Output = Result<(), Box<dyn Error + Send + Sync>>> {
+        let task: JoinHandle<Result<(), Box<dyn Error + Send + Sync>>> = task::spawn(async move {
             loop {
                 let uptime = Instant::now() - self.start_time;
                 self.publisher
@@ -451,7 +625,8 @@ impl HomieStats {
                     .await?;
                 delay_for(STATS_INTERVAL).await;
             }
-        })
+        });
+        task.map(|res| Ok(res??))
     }
 }
 
@@ -503,6 +678,20 @@ where
     try_join(a.map(|res| Ok(res??)), b.map(|res| Ok(res??)))
 }
 
+fn try_join_unit_handles<E>(
+    a: JoinHandle<Result<(), E>>,
+    b: JoinHandle<Result<(), E>>,
+) -> impl Future<Output = Result<(), E>>
+where
+    E: From<JoinError>,
+{
+    try_join_handles(a, b).map(simplify_unit_pair)
+}
+
+fn simplify_unit_pair<E>(m: Result<((), ()), E>) -> Result<(), E> {
+    m.map(|((), ())| ())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -521,21 +710,11 @@ mod tests {
         let (mut device, rx) = make_test_device();
 
         device
-            .add_node(Node::new(
-                "id".to_string(),
-                "Name".to_string(),
-                "type".to_string(),
-                vec![],
-            ))
+            .add_node(Node::new("id", "Name", "type", vec![]))
             .await
             .unwrap();
         device
-            .add_node(Node::new(
-                "id".to_string(),
-                "Name 2".to_string(),
-                "type2".to_string(),
-                vec![],
-            ))
+            .add_node(Node::new("id", "Name 2", "type2", vec![]))
             .await
             .unwrap();
 
@@ -595,6 +774,31 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn disconnect_succeeds_before_ready() -> Result<(), SendError<Request>> {
+        let (mut device, rx) = make_test_device();
+
+        device.start().await?;
+        device.disconnect().await?;
+
+        // Need to keep rx alive until here so that the channel isn't closed.
+        drop(rx);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn disconnect_succeeds_after_ready() -> Result<(), SendError<Request>> {
+        let (mut device, rx) = make_test_device();
+
+        device.start().await?;
+        device.ready().await?;
+        device.disconnect().await?;
+
+        // Need to keep rx alive until here so that the channel isn't closed.
+        drop(rx);
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn minimal_build_succeeds() -> Result<(), SendError<Request>> {
         let builder = HomieDevice::builder(
             "homie/test-device",
@@ -602,7 +806,7 @@ mod tests {
             MqttOptions::new("client_id", "hostname", 1234),
         );
 
-        let (_event_loop, homie, _stats, firmware) = builder.build().await;
+        let (_event_loop, homie, _stats, firmware, _callback) = builder.build();
 
         assert_eq!(homie.device_name, "Test device");
         assert_eq!(homie.publisher.device_base, "homie/test-device");
@@ -622,7 +826,7 @@ mod tests {
 
         builder.set_firmware("firmware_name", "firmware_version");
 
-        let (_event_loop, homie, _stats, firmware) = builder.build().await;
+        let (_event_loop, homie, _stats, firmware, _callback) = builder.build();
 
         assert_eq!(homie.device_name, "Test device");
         assert_eq!(homie.publisher.device_base, "homie/test-device");
@@ -637,12 +841,7 @@ mod tests {
         let (mut device, rx) = make_test_device();
 
         device
-            .add_node(Node::new(
-                "id".to_string(),
-                "Name".to_string(),
-                "type".to_string(),
-                vec![],
-            ))
+            .add_node(Node::new("id", "Name", "type", vec![]))
             .await?;
 
         device.start().await?;
@@ -650,12 +849,7 @@ mod tests {
 
         // Add another node after starting.
         device
-            .add_node(Node::new(
-                "id2".to_string(),
-                "Name 2".to_string(),
-                "type2".to_string(),
-                vec![],
-            ))
+            .add_node(Node::new("id2", "Name 2", "type2", vec![]))
             .await?;
 
         // Need to keep rx alive until here so that the channel isn't closed.
@@ -669,24 +863,14 @@ mod tests {
         let (mut device, rx) = make_test_device();
 
         device
-            .add_node(Node::new(
-                "id".to_string(),
-                "Name".to_string(),
-                "type".to_string(),
-                vec![],
-            ))
+            .add_node(Node::new("id", "Name", "type", vec![]))
             .await?;
 
         device.remove_node("id").await?;
 
         // Adding it back shouldn't give an error.
         device
-            .add_node(Node::new(
-                "id".to_string(),
-                "Name".to_string(),
-                "type".to_string(),
-                vec![],
-            ))
+            .add_node(Node::new("id", "Name", "type", vec![]))
             .await?;
 
         // Need to keep rx alive until here so that the channel isn't closed.

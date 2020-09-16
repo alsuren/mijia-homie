@@ -63,7 +63,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let mqtt_prefix =
         std::env::var("MQTT_PREFIX").unwrap_or_else(|_| DEFAULT_MQTT_PREFIX.to_string());
     let device_base = format!("{}/{}", mqtt_prefix, device_id);
-    let (homie, mqtt_handle) = HomieDevice::builder(&device_base, &device_name, mqttoptions)
+    let (homie, homie_handle) = HomieDevice::builder(&device_base, &device_name, mqttoptions)
         .spawn()
         .await?;
 
@@ -81,7 +81,7 @@ async fn main() -> Result<(), anyhow::Error> {
         // Bluetooth finished first. Convert error and get on with your life.
         sensor_handle.map(|res| Ok(res?)),
         // MQTT event loop finished first.
-        mqtt_handle.map_err(|err| anyhow::anyhow!(err)),
+        homie_handle.map_err(|err| anyhow::anyhow!(err)),
     };
     res?;
     Ok(())
@@ -142,27 +142,33 @@ impl Sensor {
 
     fn as_node(&self) -> Node {
         Node::new(
-            self.node_id(),
-            self.name.to_string(),
-            "Mijia sensor".to_string(),
+            &self.node_id(),
+            &self.name,
+            "Mijia sensor",
             vec![
                 Property::new(
                     Self::PROPERTY_ID_TEMPERATURE,
                     "Temperature",
                     Datatype::Float,
+                    false,
                     Some("ºC"),
+                    None,
                 ),
                 Property::new(
                     Self::PROPERTY_ID_HUMIDITY,
                     "Humidity",
                     Datatype::Integer,
+                    false,
                     Some("%"),
+                    None,
                 ),
                 Property::new(
                     Self::PROPERTY_ID_BATTERY,
                     "Battery level",
                     Datatype::Integer,
+                    false,
                     Some("%"),
+                    None,
                 ),
             ],
         )
