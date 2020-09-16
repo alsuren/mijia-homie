@@ -288,8 +288,6 @@ async fn check_for_sensors(
         .with_context(|| std::line!().to_string())?;
     let state = &mut *state.lock().await;
     for props in sensors {
-        // Race Condition: When connecting, we remove from
-        // sensors_to_connect before adding to sensors_connected
         if sensor_names.contains_key(&props.mac_address)
             && !state
                 .sensors_to_connect
