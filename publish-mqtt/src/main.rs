@@ -452,7 +452,12 @@ async fn handle_bluetooth_event(
                     "Got update from disconnected device {}. Connecting.",
                     object_path
                 );
+                homie
+                    .add_node(sensor.as_node())
+                    .await
+                    .with_context(|| std::line!().to_string())?;
                 sensor.publish_readings(homie, &readings).await?;
+                sensor.connection_status = ConnectionStatus::Connected;
                 sensors_connected.push(sensor);
             }
         }
