@@ -4,7 +4,6 @@ use bluez_generated::bluetooth_event::BluetoothEvent;
 use bluez_generated::generated::{OrgBluezAdapter1, OrgBluezDevice1};
 use core::fmt::Debug;
 use core::future::Future;
-use core::time::Duration;
 use dbus::{
     nonblock::{MsgMatch, SyncConnection},
     Message,
