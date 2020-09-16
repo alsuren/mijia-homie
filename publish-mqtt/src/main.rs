@@ -123,21 +123,18 @@ impl Sensor {
     const PROPERTY_ID_HUMIDITY: &'static str = "humidity";
     const PROPERTY_ID_BATTERY: &'static str = "battery";
 
-    pub fn new(
-        props: SensorProps,
-        sensor_names: &HashMap<String, String>,
-    ) -> Result<Self, anyhow::Error> {
+    pub fn new(props: SensorProps, sensor_names: &HashMap<String, String>) -> Self {
         let name = sensor_names
             .get(&props.mac_address)
             .cloned()
             .unwrap_or_else(|| props.mac_address.clone());
-        Ok(Self {
+        Self {
             object_path: props.object_path,
             mac_address: props.mac_address,
             name,
             last_update_timestamp: Instant::now(),
             connection_status: ConnectionStatus::Unknown,
-        })
+        }
     }
 
     pub fn node_id(&self) -> String {
@@ -303,7 +300,7 @@ async fn check_for_sensors(
         {
             state
                 .sensors_to_connect
-                .push_back(Sensor::new(props, &sensor_names)?)
+                .push_back(Sensor::new(props, &sensor_names))
         }
     }
     Ok(())
