@@ -1,3 +1,4 @@
+use crate::{decode_value, Readings, SENSOR_READING_CHARACTERISTIC_PATH};
 use anyhow::Context;
 use bluez_generated::bluetooth_event::BluetoothEvent;
 use bluez_generated::generated::{OrgBluezAdapter1, OrgBluezDevice1};
@@ -17,7 +18,7 @@ pub enum MijiaEvent {
     // FIXME: stop using object_path as primary key. Can we think of something better?
     Readings {
         object_path: String,
-        readings: crate::Readings,
+        readings: Readings,
     },
     Disconnected {
         object_path: String,
@@ -30,9 +31,9 @@ impl MijiaEvent {
             Some(BluetoothEvent::Value { object_path, value }) => {
                 // TODO: Make this less hacky.
                 let object_path = object_path
-                    .strip_suffix(crate::SENSOR_READING_CHARACTERISTIC_PATH)?
+                    .strip_suffix(SENSOR_READING_CHARACTERISTIC_PATH)?
                     .to_owned();
-                let readings = crate::decode_value(&value)?;
+                let readings = decode_value(&value)?;
                 Some(MijiaEvent::Readings {
                     object_path,
                     readings,
