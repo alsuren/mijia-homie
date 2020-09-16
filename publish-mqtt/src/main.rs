@@ -72,15 +72,14 @@ async fn main() -> Result<(), anyhow::Error> {
     // Connect a bluetooth session.
     let (dbus_handle, bt_session) = MijiaSession::new().await?;
 
-    let bluetooth_handle =
-        local.run_until(async move { bluetooth_mainloop(homie, bt_session).await });
+    let sensor_handle = local.run_until(async move { run_sensor_system(homie, bt_session).await });
 
     // Poll everything to completion, until the first one bombs out.
     let res: Result<_, anyhow::Error> = try_join! {
         // If this ever finishes, we lost connection to D-Bus.
         dbus_handle,
         // Bluetooth finished first. Convert error and get on with your life.
-        bluetooth_handle.map(|res| Ok(res?)),
+        sensor_handle.map(|res| Ok(res?)),
         // MQTT event loop finished first.
         mqtt_handle.map_err(|err| anyhow::anyhow!(err)),
     };
@@ -209,7 +208,7 @@ struct SensorState {
     homie: HomieDevice,
 }
 
-async fn bluetooth_mainloop(
+async fn run_sensor_system(
     mut homie: HomieDevice,
     bt_session: MijiaSession,
 ) -> Result<(), anyhow::Error> {
@@ -226,54 +225,51 @@ async fn bluetooth_mainloop(
         homie,
     }));
 
+    let connection_loop_handle =
+        bluetooth_connection_loop(state.clone(), bt_session.clone(), &sensor_names);
+    let event_loop_handle = service_bluetooth_event_queue(state.clone(), bt_session.clone());
+    try_join!(connection_loop_handle, event_loop_handle).map(|((), ())| ())
+}
+
+async fn bluetooth_connection_loop(
+    state: Arc<Mutex<SensorState>>,
+    bt_session: MijiaSession,
+    sensor_names: &HashMap<String, String>,
+) -> Result<(), anyhow::Error> {
     let mut next_scan_due = Instant::now();
-
-    let t1 = async {
-        loop {
-            let now = Instant::now();
-            if now > next_scan_due
-                && state.lock().await.sensors_connected.len() < sensor_names.len()
-            {
-                next_scan_due = now + SCAN_INTERVAL;
-                check_for_sensors(state.clone(), bt_session.clone(), &sensor_names)
-                    .await
-                    .with_context(|| std::line!().to_string())?;
-            }
-
-            {
-                let state = &mut *state.lock().await;
-                connect_first_sensor_in_queue(
-                    bt_session.clone(),
-                    &mut state.homie,
-                    &mut state.sensors_connected,
-                    &mut state.sensors_to_connect,
-                )
+    loop {
+        let now = Instant::now();
+        if now > next_scan_due && state.lock().await.sensors_connected.len() < sensor_names.len() {
+            next_scan_due = now + SCAN_INTERVAL;
+            check_for_sensors(state.clone(), bt_session.clone(), &sensor_names)
                 .await
                 .with_context(|| std::line!().to_string())?;
-            }
-
-            {
-                let state = &mut *state.lock().await;
-                disconnect_first_stale_sensor(
-                    &mut state.homie,
-                    &mut state.sensors_connected,
-                    &mut state.sensors_to_connect,
-                )
-                .await
-                .with_context(|| std::line!().to_string())?;
-            }
-            time::delay_for(CONNECT_INTERVAL).await;
         }
-        #[allow(unreachable_code)]
-        Ok(())
-    };
-    let t2 = async {
-        service_bluetooth_event_queue(state.clone(), bt_session.clone())
+
+        {
+            let state = &mut *state.lock().await;
+            connect_first_sensor_in_queue(
+                bt_session.clone(),
+                &mut state.homie,
+                &mut state.sensors_connected,
+                &mut state.sensors_to_connect,
+            )
             .await
             .with_context(|| std::line!().to_string())?;
-        Ok(())
-    };
-    try_join!(t1, t2).map(|((), ())| ())
+        }
+
+        {
+            let state = &mut *state.lock().await;
+            disconnect_first_stale_sensor(
+                &mut state.homie,
+                &mut state.sensors_connected,
+                &mut state.sensors_to_connect,
+            )
+            .await
+            .with_context(|| std::line!().to_string())?;
+        }
+        time::delay_for(CONNECT_INTERVAL).await;
+    }
 }
 
 async fn check_for_sensors(
