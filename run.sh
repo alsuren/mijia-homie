@@ -21,7 +21,6 @@ else
     exit 1
 fi
 
-time rsync --progress target/$TARGET/$PROFILE/read-all-devices $TARGET_SSH:read-all-devices-next
 time rsync --progress target/$TARGET/$PROFILE/publish-mqtt $TARGET_SSH:publish-mqtt
 
 if [ $RUN -eq 1 ]
