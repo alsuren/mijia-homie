@@ -13,11 +13,11 @@ use std::time::Duration;
 pub mod session;
 pub use session::{MijiaEvent, MijiaSession};
 
-pub const MIJIA_SERVICE_DATA_UUID: &str = "0000fe95-0000-1000-8000-00805f9b34fb";
-pub const SERVICE_CHARACTERISTIC_PATH: &str = "/service0021/char0035";
-pub const CONNECTION_INTERVAL_CHARACTERISTIC_PATH: &str = "/service0021/char0045";
+const MIJIA_SERVICE_DATA_UUID: &str = "0000fe95-0000-1000-8000-00805f9b34fb";
+const SERVICE_CHARACTERISTIC_PATH: &str = "/service0021/char0035";
+const CONNECTION_INTERVAL_CHARACTERISTIC_PATH: &str = "/service0021/char0045";
 /// 500 in little-endian
-pub const CONNECTION_INTERVAL_500_MS: [u8; 3] = [0xF4, 0x01, 0x00];
+const CONNECTION_INTERVAL_500_MS: [u8; 3] = [0xF4, 0x01, 0x00];
 
 pub struct SensorProps {
     pub object_path: String,
