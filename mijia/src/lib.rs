@@ -24,7 +24,7 @@ pub struct SensorProps {
     pub mac_address: String,
 }
 
-pub async fn get_sensors(bt_session: MijiaSession) -> Result<Vec<SensorProps>, anyhow::Error> {
+pub async fn get_sensors(bt_session: &MijiaSession) -> Result<Vec<SensorProps>, anyhow::Error> {
     let bluez_root = dbus::nonblock::Proxy::new(
         "org.bluez",
         "/",
@@ -76,7 +76,7 @@ pub async fn get_sensors(bt_session: MijiaSession) -> Result<Vec<SensorProps>, a
 }
 
 pub async fn start_notify_sensor(
-    bt_session: MijiaSession,
+    bt_session: &MijiaSession,
     device_path: &str,
 ) -> Result<(), anyhow::Error> {
     let temp_humidity_path: String = device_path.to_string() + SERVICE_CHARACTERISTIC_PATH;
