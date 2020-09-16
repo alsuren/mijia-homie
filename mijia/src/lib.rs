@@ -79,7 +79,7 @@ pub async fn start_notify_sensor(
     bt_session: &MijiaSession,
     device_path: &str,
 ) -> Result<(), anyhow::Error> {
-    let temp_humidity_path: String = device_path.to_string() + SENSOR_READING_CHARACTERISTIC_PATH;
+    let temp_humidity_path = device_path.to_string() + SENSOR_READING_CHARACTERISTIC_PATH;
     let temp_humidity = dbus::nonblock::Proxy::new(
         "org.bluez",
         temp_humidity_path,
@@ -88,7 +88,7 @@ pub async fn start_notify_sensor(
     );
     temp_humidity.start_notify().await?;
 
-    let connection_interval_path: String =
+    let connection_interval_path =
         device_path.to_string() + CONNECTION_INTERVAL_CHARACTERISTIC_PATH;
     let connection_interval = dbus::nonblock::Proxy::new(
         "org.bluez",
