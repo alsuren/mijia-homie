@@ -14,7 +14,7 @@ pub mod session;
 pub use session::{MijiaEvent, MijiaSession};
 
 const MIJIA_SERVICE_DATA_UUID: &str = "0000fe95-0000-1000-8000-00805f9b34fb";
-const SERVICE_CHARACTERISTIC_PATH: &str = "/service0021/char0035";
+const SENSOR_READING_CHARACTERISTIC_PATH: &str = "/service0021/char0035";
 const CONNECTION_INTERVAL_CHARACTERISTIC_PATH: &str = "/service0021/char0045";
 /// 500 in little-endian
 const CONNECTION_INTERVAL_500_MS: [u8; 3] = [0xF4, 0x01, 0x00];
@@ -79,7 +79,7 @@ pub async fn start_notify_sensor(
     bt_session: &MijiaSession,
     device_path: &str,
 ) -> Result<(), anyhow::Error> {
-    let temp_humidity_path: String = device_path.to_string() + SERVICE_CHARACTERISTIC_PATH;
+    let temp_humidity_path: String = device_path.to_string() + SENSOR_READING_CHARACTERISTIC_PATH;
     let temp_humidity = dbus::nonblock::Proxy::new(
         "org.bluez",
         temp_humidity_path,

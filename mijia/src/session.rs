@@ -30,7 +30,7 @@ impl MijiaEvent {
             Some(BluetoothEvent::Value { object_path, value }) => {
                 // TODO: Make this less hacky.
                 let object_path = object_path
-                    .strip_suffix(crate::SERVICE_CHARACTERISTIC_PATH)?
+                    .strip_suffix(crate::SENSOR_READING_CHARACTERISTIC_PATH)?
                     .to_owned();
                 let readings = crate::decode_value(&value)?;
                 Some(MijiaEvent::Readings {
