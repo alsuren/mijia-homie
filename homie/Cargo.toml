@@ -10,9 +10,9 @@ futures = "0.3.5"
 local_ipaddress = "0.1.3"
 log = "0.4.11"
 mac_address = "1.0.3"
-rumqttc = { git = "https://github.com/bytebeamio/rumqtt" }
+rumqttc = "0.0.7"
 tokio = "0.2.22"
 
 [dev-dependencies]
 pretty_env_logger = "0.4.0"
-rand = "0.7"
+rand = "0.7.3"

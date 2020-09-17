@@ -14,7 +14,7 @@ homie = { path = "../homie" }
 log = "0.4.11"
 mijia = { path = "../mijia" }
 pretty_env_logger = "0.4.0"
-rumqttc = { git = "https://github.com/bytebeamio/rumqtt" }
+rumqttc = "0.0.7"
 rustls = "0.17"
 rustls-native-certs = "0.3"
 tokio = "0.2.22"
