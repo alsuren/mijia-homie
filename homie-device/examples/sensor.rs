@@ -1,5 +1,5 @@
 use futures::FutureExt;
-use homie::{Datatype, HomieDevice, Node, Property};
+use homie_device::{Datatype, HomieDevice, Node, Property};
 use rand::random;
 use rumqttc::MqttOptions;
 use std::error::Error;

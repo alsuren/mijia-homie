@@ -1,5 +1,5 @@
 use futures::FutureExt;
-use homie::HomieDevice;
+use homie_device::HomieDevice;
 use rumqttc::MqttOptions;
 use std::error::Error;
 use std::time::Duration;

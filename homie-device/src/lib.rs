@@ -1,4 +1,4 @@
-//! `homie` is a library for creating devices implementing the
+//! `homie-device` is a library for creating devices implementing the
 //! [Homie convention](https://homieiot.github.io/) for IoT devices connecting to an MQTT broker.
 //!
 //! See the examples directory for examples of how to use it.

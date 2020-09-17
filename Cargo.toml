@@ -2,7 +2,7 @@
 
 members = [
     "bluez-generated",
-    "homie",
+    "homie-device",
     "mijia",
     "publish-mqtt",
 ]

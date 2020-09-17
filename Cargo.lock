@@ -402,7 +402,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "homie"
+name = "homie-device"
 version = "0.1.0"
 dependencies = [
  "async-channel",
@@ -758,7 +758,7 @@ dependencies = [
  "dotenv",
  "futures",
  "futures-channel",
- "homie",
+ "homie-device",
  "log",
  "mijia",
  "pretty_env_logger",

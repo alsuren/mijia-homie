@@ -1,7 +1,7 @@
 use anyhow::Context;
 use futures::stream::StreamExt;
 use futures::{FutureExt, TryFutureExt};
-use homie::{Datatype, HomieDevice, Node, Property};
+use homie_device::{Datatype, HomieDevice, Node, Property};
 use mijia::{
     get_sensors, hashmap_from_file, start_notify_sensor, MijiaEvent, MijiaSession, Readings,
     SensorProps,
