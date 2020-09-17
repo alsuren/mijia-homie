@@ -1,9 +1,10 @@
 [package]
 name = "mijia"
 version = "0.1.0"
-authors = ["Luis Félix <lcs.felix@gmail.com>", "Andrew Walbran <qwandor@google.com>"]
+authors = ["Luis Félix <lcs.felix@gmail.com>", "Andrew Walbran <qwandor@google.com>", "David Laban <alsuren@gmail.com>"]
 edition = "2018"
 license = "MIT OR Apache-2.0"
+repository = "https://github.com/alsuren/mijia-homie/"
 
 [dependencies]
 anyhow = "1.0.32"
