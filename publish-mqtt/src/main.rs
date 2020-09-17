@@ -26,7 +26,7 @@ const SENSOR_NAMES_FILENAME: &str = "sensor_names.conf";
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
-    dotenv::dotenv()?;
+    dotenv::dotenv().context("reading .env")?;
     pretty_env_logger::init();
     color_backtrace::install();
 
@@ -218,7 +218,8 @@ async fn run_sensor_system(
     mut homie: HomieDevice,
     bt_session: &MijiaSession,
 ) -> Result<(), anyhow::Error> {
-    let sensor_names = hashmap_from_file(SENSOR_NAMES_FILENAME)?;
+    let sensor_names = hashmap_from_file(SENSOR_NAMES_FILENAME)
+        .context(format!("reading {}", SENSOR_NAMES_FILENAME))?;
 
     homie
         .ready()
