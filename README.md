@@ -2,7 +2,7 @@
 
 This is a project for capturing BLE data from a Xiaomi Mijia 2
 hygrometer-thermometer. It includes a simple utility to dump data to standard
-output  for testing, and a tool to publish it to an MQTT server following the
+output  for testing, and a tool to publish it to an MQTT broker following the
 [Homie convention](https://homieiot.github.io/).
 
 The project originated from a

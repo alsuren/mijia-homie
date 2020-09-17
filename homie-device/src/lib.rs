@@ -214,7 +214,7 @@ impl HomieDeviceBuilder {
         ));
     }
 
-    /// Create a new Homie device, connect to the MQTT server, and start a task to handle the MQTT
+    /// Create a new Homie device, connect to the MQTT broker, and start a task to handle the MQTT
     /// connection.
     ///
     /// # Return value
@@ -292,7 +292,7 @@ impl HomieDevice {
     /// * `device_base`: The base topic ID for the device, including the Homie base topic. This
     ///   might be something like "homie/my-device-id" if you are using the default Homie
     ///   [base topic](https://homieiot.github.io/specification/#base-topic). This must be
-    ///   unique per MQTT server.
+    ///   unique per MQTT broker.
     /// * `device_name`: The human-readable name of the device.
     /// * `mqtt_options`: Options for the MQTT connection, including which server to connect to.
     pub fn builder(

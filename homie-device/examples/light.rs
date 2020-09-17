@@ -29,6 +29,6 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     homie.ready().await?;
     println!("Ready");
 
-    // This will only resolve (with an error) if we lose connection to the MQTT server.
+    // This will only resolve (with an error) if we lose connection to the MQTT broker.
     homie_handle.await
 }
