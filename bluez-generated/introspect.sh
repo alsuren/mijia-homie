@@ -72,4 +72,5 @@ if [ ${GENERATE:-1} = 1 ]; then
         echo "pub mod $modname;" >> src/generated/mod.rs
         echo "pub use $modname::*;" >> src/generated/mod.rs
     done
+    cargo fmt
 fi
