@@ -1,18 +1,17 @@
-use blurz::{
-    BluetoothAdapter, BluetoothDevice, BluetoothDiscoverySession, BluetoothEvent, BluetoothSession,
-};
-use futures::FutureExt;
+use anyhow::Context;
+use futures::stream::StreamExt;
+use futures::{FutureExt, TryFutureExt};
 use homie::{Datatype, HomieDevice, Node, Property};
 use mijia::{
-    decode_value, find_sensors, hashmap_from_file, print_sensors, start_notify_sensor, Readings,
-    SERVICE_CHARACTERISTIC_PATH,
+    get_sensors, hashmap_from_file, start_notify_sensor, MijiaEvent, MijiaSession, Readings,
+    SensorProps,
 };
 use rumqttc::MqttOptions;
 use rustls::ClientConfig;
 use std::collections::{HashMap, VecDeque};
-use std::error::Error;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+use tokio::sync::Mutex;
 use tokio::{task, time, try_join};
 
 const DEFAULT_MQTT_PREFIX: &str = "homie";
@@ -20,33 +19,13 @@ const DEFAULT_DEVICE_ID: &str = "mijia-bridge";
 const DEFAULT_DEVICE_NAME: &str = "Mijia bridge";
 const DEFAULT_HOST: &str = "test.mosquitto.org";
 const DEFAULT_PORT: u16 = 1883;
-const SCAN_DURATION: Duration = Duration::from_secs(15);
-const CONNECT_TIMEOUT_MS: i32 = 4_000;
-const INCOMING_TIMEOUT_MS: u32 = 1_000;
+const SCAN_INTERVAL: Duration = Duration::from_secs(15);
+const CONNECT_INTERVAL: Duration = Duration::from_secs(1);
 const UPDATE_TIMEOUT: Duration = Duration::from_secs(60);
 const SENSOR_NAMES_FILENAME: &str = "sensor_names.conf";
 
-async fn scan(bt_session: &BluetoothSession) -> Result<Vec<String>, Box<dyn Error>> {
-    let adapter: BluetoothAdapter = BluetoothAdapter::init(bt_session)?;
-    adapter.set_powered(true)?;
-
-    let discover_session =
-        BluetoothDiscoverySession::create_session(&bt_session, adapter.get_id())?;
-    discover_session.start_discovery()?;
-    println!("Scanning");
-    // Wait for the adapter to scan for a while.
-    time::delay_for(SCAN_DURATION).await;
-    let device_list = adapter.get_device_list()?;
-
-    discover_session.stop_discovery()?;
-
-    println!("{:?} devices found", device_list.len());
-
-    Ok(device_list)
-}
-
-#[tokio::main(core_threads = 2)]
-async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
+#[tokio::main]
+async fn main() -> Result<(), anyhow::Error> {
     dotenv::dotenv()?;
     pretty_env_logger::init();
     color_backtrace::install();
@@ -90,29 +69,52 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
 
     let local = task::LocalSet::new();
 
-    let bluetooth_handle = local.spawn_local(async move {
-        bluetooth_mainloop(homie).await.unwrap();
-    });
+    // Connect a bluetooth session.
+    let (dbus_handle, bt_session) = MijiaSession::new().await?;
+
+    let sensor_handle = local.run_until(async move { run_sensor_system(homie, &bt_session).await });
 
     // Poll everything to completion, until the first one bombs out.
-    let res: Result<_, Box<dyn Error + Send + Sync>> = try_join! {
-        // LocalSet finished first. Colour me confused.
-        local.map(|()| Ok(println!("WTF?"))),
+    let res: Result<_, anyhow::Error> = try_join! {
+        // If this ever finishes, we lost connection to D-Bus.
+        dbus_handle,
         // Bluetooth finished first. Convert error and get on with your life.
-        bluetooth_handle.map(|res| Ok(res?)),
+        sensor_handle.map(|res| Ok(res?)),
         // MQTT event loop finished first.
-        homie_handle,
+        homie_handle.map_err(|err| anyhow::anyhow!(err)),
     };
     res?;
     Ok(())
 }
 
 #[derive(Debug)]
+enum ConnectionStatus {
+    /// Not yet attempted to connect. Might already be connected from a previous
+    /// run of this program.
+    Unknown,
+    /// Connected, but could not subscribe to updates. GATT characteristics
+    /// sometimes take a while to show up after connecting, so this retry is
+    /// a bit of a work-around.
+    SubscribingFailedOnce,
+    /// Disconnected because we stopped getting updates.
+    WatchdogTimeOut,
+    /// We explicity disconnected because something else went wrong.
+    Disconnected,
+    /// We received a Disconnected event.
+    /// This should only be treated as informational, because disconnection
+    /// events might be received racily. The sensor might actually be Connected.
+    MarkedDisconnected,
+    /// Connected and subscribed to updates
+    Connected,
+}
+
+#[derive(Debug)]
 struct Sensor {
-    device_path: String,
+    object_path: String,
     mac_address: String,
     name: String,
     last_update_timestamp: Instant,
+    connection_status: ConnectionStatus,
 }
 
 impl Sensor {
@@ -120,29 +122,22 @@ impl Sensor {
     const PROPERTY_ID_HUMIDITY: &'static str = "humidity";
     const PROPERTY_ID_BATTERY: &'static str = "battery";
 
-    pub fn new(
-        device: &BluetoothDevice,
-        sensor_names: &HashMap<String, String>,
-    ) -> Result<Self, Box<dyn Error>> {
-        let mac_address = device.get_address()?;
+    pub fn new(props: SensorProps, sensor_names: &HashMap<String, String>) -> Self {
         let name = sensor_names
-            .get(&mac_address)
+            .get(&props.mac_address)
             .cloned()
-            .unwrap_or_else(|| mac_address.clone());
-        Ok(Self {
-            device_path: device.get_id(),
-            mac_address,
+            .unwrap_or_else(|| props.mac_address.clone());
+        Self {
+            object_path: props.object_path,
+            mac_address: props.mac_address,
             name,
             last_update_timestamp: Instant::now(),
-        })
+            connection_status: ConnectionStatus::Unknown,
+        }
     }
 
     pub fn node_id(&self) -> String {
         self.mac_address.replace(":", "")
-    }
-
-    pub fn device<'a>(&self, session: &'a BluetoothSession) -> BluetoothDevice<'a> {
-        BluetoothDevice::new(session, self.device_path.to_string())
     }
 
     fn as_node(&self) -> Node {
@@ -180,85 +175,143 @@ impl Sensor {
     }
 
     async fn publish_readings(
-        &self,
+        &mut self,
         homie: &HomieDevice,
         readings: &Readings,
-    ) -> Result<(), Box<dyn Error>> {
+    ) -> Result<(), anyhow::Error> {
         println!("{} {} ({})", self.mac_address, readings, self.name);
 
         let node_id = self.node_id();
+        self.last_update_timestamp = Instant::now();
         homie
             .publish_value(
                 &node_id,
                 Self::PROPERTY_ID_TEMPERATURE,
                 format!("{:.2}", readings.temperature),
             )
-            .await?;
+            .await
+            .with_context(|| std::line!().to_string())?;
         homie
             .publish_value(&node_id, Self::PROPERTY_ID_HUMIDITY, readings.humidity)
-            .await?;
+            .await
+            .with_context(|| std::line!().to_string())?;
         homie
             .publish_value(
                 &node_id,
                 Self::PROPERTY_ID_BATTERY,
                 readings.battery_percent,
             )
-            .await?;
+            .await
+            .with_context(|| std::line!().to_string())?;
         Ok(())
     }
 }
 
-async fn bluetooth_mainloop(mut homie: HomieDevice) -> Result<(), Box<dyn Error>> {
+#[derive(Debug)]
+struct SensorState {
+    sensors_to_connect: VecDeque<Sensor>,
+    sensors_connected: Vec<Sensor>,
+    homie: HomieDevice,
+}
+
+async fn run_sensor_system(
+    mut homie: HomieDevice,
+    bt_session: &MijiaSession,
+) -> Result<(), anyhow::Error> {
     let sensor_names = hashmap_from_file(SENSOR_NAMES_FILENAME)?;
 
-    let bt_session = BluetoothSession::create_session(None)?;
-    let device_list = scan(&bt_session).await?;
-    let sensors = find_sensors(&bt_session, &device_list);
-    print_sensors(&sensors, &sensor_names);
-    let (named_sensors, unnamed_sensors): (Vec<_>, Vec<_>) = sensors
-        .into_iter()
-        .map(|d| Sensor::new(&d, &sensor_names).unwrap())
-        .partition(|sensor| sensor_names.contains_key(&sensor.mac_address));
-    println!(
-        "{} named sensors, {} unnamed sensors",
-        named_sensors.len(),
-        unnamed_sensors.len()
-    );
+    homie
+        .ready()
+        .await
+        .with_context(|| std::line!().to_string())?;
 
-    let mut sensors_to_connect: VecDeque<_> = named_sensors.into();
+    let state = Arc::new(Mutex::new(SensorState {
+        sensors_to_connect: VecDeque::new(),
+        sensors_connected: vec![],
+        homie,
+    }));
 
-    homie.ready().await?;
+    let connection_loop_handle =
+        bluetooth_connection_loop(state.clone(), bt_session, &sensor_names);
+    let event_loop_handle = service_bluetooth_event_queue(state.clone(), bt_session);
+    try_join!(connection_loop_handle, event_loop_handle).map(|((), ())| ())
+}
 
-    let mut sensors_connected: Vec<Sensor> = vec![];
-
+async fn bluetooth_connection_loop(
+    state: Arc<Mutex<SensorState>>,
+    bt_session: &MijiaSession,
+    sensor_names: &HashMap<String, String>,
+) -> Result<(), anyhow::Error> {
+    let mut next_scan_due = Instant::now();
     loop {
-        connect_first_sensor_in_queue(
-            &bt_session,
-            &mut homie,
-            &mut sensors_connected,
-            &mut sensors_to_connect,
-        )
-        .await?;
+        let now = Instant::now();
+        if now > next_scan_due && state.lock().await.sensors_connected.len() < sensor_names.len() {
+            next_scan_due = now + SCAN_INTERVAL;
+            check_for_sensors(state.clone(), bt_session, &sensor_names)
+                .await
+                .with_context(|| std::line!().to_string())?;
+        }
 
-        disconnect_first_stale_sensor(&mut homie, &mut sensors_connected, &mut sensors_to_connect)
-            .await?;
+        {
+            let state = &mut *state.lock().await;
+            connect_first_sensor_in_queue(
+                bt_session,
+                &mut state.homie,
+                &mut state.sensors_connected,
+                &mut state.sensors_to_connect,
+            )
+            .await
+            .with_context(|| std::line!().to_string())?;
+        }
 
-        service_bluetooth_event_queue(
-            &bt_session,
-            &mut homie,
-            &mut sensors_connected,
-            &mut sensors_to_connect,
-        )
-        .await?;
+        {
+            let state = &mut *state.lock().await;
+            disconnect_first_stale_sensor(
+                &mut state.homie,
+                &mut state.sensors_connected,
+                &mut state.sensors_to_connect,
+            )
+            .await
+            .with_context(|| std::line!().to_string())?;
+        }
+        time::delay_for(CONNECT_INTERVAL).await;
     }
 }
 
+async fn check_for_sensors(
+    state: Arc<Mutex<SensorState>>,
+    bt_session: &MijiaSession,
+    sensor_names: &HashMap<String, String>,
+) -> Result<(), anyhow::Error> {
+    bt_session.start_discovery().await?;
+
+    let sensors = get_sensors(bt_session)
+        .await
+        .with_context(|| std::line!().to_string())?;
+    let state = &mut *state.lock().await;
+    for props in sensors {
+        if sensor_names.contains_key(&props.mac_address)
+            && !state
+                .sensors_to_connect
+                .iter()
+                .chain(state.sensors_connected.iter())
+                .find(|s| s.mac_address == props.mac_address)
+                .is_some()
+        {
+            state
+                .sensors_to_connect
+                .push_back(Sensor::new(props, &sensor_names))
+        }
+    }
+    Ok(())
+}
+
 async fn connect_first_sensor_in_queue(
-    bt_session: &BluetoothSession,
+    bt_session: &MijiaSession,
     homie: &mut HomieDevice,
     sensors_connected: &mut Vec<Sensor>,
     sensors_to_connect: &mut VecDeque<Sensor>,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<(), anyhow::Error> {
     println!("{} sensors in queue to connect.", sensors_to_connect.len());
     // Try to connect to a sensor.
     if let Some(mut sensor) = sensors_to_connect.pop_front() {
@@ -278,17 +331,47 @@ async fn connect_first_sensor_in_queue(
 }
 
 async fn connect_start_sensor<'a>(
-    bt_session: &'a BluetoothSession,
+    bt_session: &MijiaSession,
     homie: &mut HomieDevice,
     sensor: &mut Sensor,
-) -> Result<(), Box<dyn Error>> {
-    let device = sensor.device(bt_session);
-    device.connect(CONNECT_TIMEOUT_MS)?;
-    start_notify_sensor(bt_session, &device)?;
-
-    homie.add_node(sensor.as_node()).await?;
-    sensor.last_update_timestamp = Instant::now();
-    Ok(())
+) -> Result<(), anyhow::Error> {
+    println!("Connecting from status: {:?}", sensor.connection_status);
+    bt_session
+        .connect(&sensor.object_path)
+        .await
+        .with_context(|| std::line!().to_string())?;
+    match start_notify_sensor(bt_session, &sensor.object_path).await {
+        Ok(()) => {
+            homie
+                .add_node(sensor.as_node())
+                .await
+                .with_context(|| std::line!().to_string())?;
+            sensor.connection_status = ConnectionStatus::Connected;
+            sensor.last_update_timestamp = Instant::now();
+            Ok(())
+        }
+        Err(e) => {
+            // If starting notifications failed a second time, disconnect so
+            // that we start again from a clean state next time.
+            match sensor.connection_status {
+                ConnectionStatus::Unknown
+                | ConnectionStatus::Disconnected
+                | ConnectionStatus::MarkedDisconnected
+                | ConnectionStatus::WatchdogTimeOut => {
+                    sensor.connection_status = ConnectionStatus::SubscribingFailedOnce;
+                }
+                ConnectionStatus::SubscribingFailedOnce => {
+                    bt_session
+                        .disconnect(&sensor.object_path)
+                        .await
+                        .with_context(|| std::line!().to_string())?;
+                    sensor.connection_status = ConnectionStatus::Disconnected;
+                }
+                ConnectionStatus::Connected => panic!("This should never happen."),
+            };
+            Err(e)
+        }
+    }
 }
 
 /// If a sensor hasn't sent any updates in a while, disconnect it and add it back to the
@@ -297,78 +380,95 @@ async fn disconnect_first_stale_sensor(
     homie: &mut HomieDevice,
     sensors_connected: &mut Vec<Sensor>,
     sensors_to_connect: &mut VecDeque<Sensor>,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<(), anyhow::Error> {
     let now = Instant::now();
     if let Some(sensor_index) = sensors_connected
         .iter()
         .position(|s| now - s.last_update_timestamp > UPDATE_TIMEOUT)
     {
-        let sensor = sensors_connected.remove(sensor_index);
+        let mut sensor = sensors_connected.remove(sensor_index);
         println!(
             "No update from {} for {:?}, reconnecting",
             sensor.name,
             now - sensor.last_update_timestamp
         );
-        homie.remove_node(&sensor.node_id()).await?;
+        sensor.connection_status = ConnectionStatus::WatchdogTimeOut;
+        homie
+            .remove_node(&sensor.node_id())
+            .await
+            .with_context(|| std::line!().to_string())?;
         sensors_to_connect.push_back(sensor);
     }
     Ok(())
 }
 
 async fn service_bluetooth_event_queue(
-    bt_session: &BluetoothSession,
-    homie: &mut HomieDevice,
-    sensors_connected: &mut Vec<Sensor>,
-    sensors_to_connect: &mut VecDeque<Sensor>,
-) -> Result<(), Box<dyn Error>> {
-    // Process events until there are none available for the timeout.
-    for event in bt_session
-        .incoming(INCOMING_TIMEOUT_MS)
-        .filter_map(BluetoothEvent::from)
-    {
-        handle_bluetooth_event(homie, sensors_connected, sensors_to_connect, event).await?;
+    state: Arc<Mutex<SensorState>>,
+    bt_session: &MijiaSession,
+) -> Result<(), anyhow::Error> {
+    println!("Subscribing to events");
+    let (msg_match, mut events) = bt_session.event_stream().await?;
+    println!("Processing events");
+
+    while let Some(event) = events.next().await {
+        handle_bluetooth_event(state.clone(), event)
+            .await
+            .with_context(|| std::line!().to_string())?
     }
-    Ok(())
+
+    bt_session
+        .connection
+        .remove_match(msg_match.token())
+        .await?;
+    // This should be unreachable, because the events Stream should never end,
+    // unless something has gone horribly wrong (or msg_match got dropped?)
+    panic!("no more events");
 }
 
 async fn handle_bluetooth_event(
-    homie: &mut HomieDevice,
-    sensors_connected: &mut Vec<Sensor>,
-    sensors_to_connect: &mut VecDeque<Sensor>,
-    event: BluetoothEvent,
-) -> Result<(), Box<dyn Error>> {
+    state: Arc<Mutex<SensorState>>,
+    event: MijiaEvent,
+) -> Result<(), anyhow::Error> {
+    let state = &mut *state.lock().await;
+    let homie = &mut state.homie;
+    let sensors_connected = &mut state.sensors_connected;
+    let sensors_to_connect = &mut state.sensors_to_connect;
     match event {
-        BluetoothEvent::Value { object_path, value } => {
-            // TODO: Make this less hacky.
-            let device_path = match object_path.strip_suffix(SERVICE_CHARACTERISTIC_PATH) {
-                Some(path) => path,
-                None => return Ok(()),
-            };
+        MijiaEvent::Readings {
+            object_path,
+            readings,
+        } => {
             if let Some(sensor) = sensors_connected
                 .iter_mut()
-                .find(|s| s.device_path == device_path)
+                .find(|s| s.object_path == object_path)
             {
-                sensor.last_update_timestamp = Instant::now();
-                if let Some(readings) = decode_value(&value) {
-                    sensor.publish_readings(homie, &readings).await?;
-                } else {
-                    println!("Invalid value from {}", sensor.name);
-                }
-            } else {
-                // TODO: Still send it, in case it is useful?
-                println!("Got update from unexpected device {}", device_path);
+                sensor.publish_readings(homie, &readings).await?;
+            } else if let Some(sensor_index) = sensors_to_connect
+                .iter()
+                .position(|s| s.object_path == object_path)
+            {
+                let mut sensor = sensors_to_connect.remove(sensor_index).unwrap();
+                println!(
+                    "Got update from disconnected device {}. Connecting.",
+                    object_path
+                );
+                homie
+                    .add_node(sensor.as_node())
+                    .await
+                    .with_context(|| std::line!().to_string())?;
+                sensor.publish_readings(homie, &readings).await?;
+                sensor.connection_status = ConnectionStatus::Connected;
+                sensors_connected.push(sensor);
             }
         }
-        BluetoothEvent::Connected {
-            object_path,
-            connected: false,
-        } => {
+        MijiaEvent::Disconnected { object_path } => {
             if let Some(sensor_index) = sensors_connected
                 .iter()
-                .position(|s| s.device_path == object_path)
+                .position(|s| s.object_path == object_path)
             {
-                let sensor = sensors_connected.remove(sensor_index);
+                let mut sensor = sensors_connected.remove(sensor_index);
                 println!("{} disconnected", sensor.name);
+                sensor.connection_status = ConnectionStatus::MarkedDisconnected;
                 homie.remove_node(&sensor.node_id()).await?;
                 sensors_to_connect.push_back(sensor);
             } else {
@@ -378,9 +478,7 @@ async fn handle_bluetooth_event(
                 );
             }
         }
-        _ => {
-            log::trace!("{:?}", event);
-        }
     };
+
     Ok(())
 }
