@@ -6,8 +6,6 @@ use std::cmp::max;
 use std::collections::HashMap;
 use std::convert::TryInto;
 use std::fmt::{Display, Formatter};
-use std::fs::File;
-use std::io::{self, BufRead, BufReader, ErrorKind};
 use std::time::Duration;
 
 pub mod session;
@@ -142,26 +140,6 @@ pub fn decode_value(value: &[u8]) -> Option<Readings> {
         battery_voltage,
         battery_percent,
     })
-}
-
-/// Read the given file of key-value pairs into a hashmap.
-/// Returns an empty hashmap if the file doesn't exist, or an error if it is malformed.
-pub fn hashmap_from_file(filename: &str) -> Result<HashMap<String, String>, io::Error> {
-    let mut map: HashMap<String, String> = HashMap::new();
-    if let Ok(file) = File::open(filename) {
-        for line in BufReader::new(file).lines() {
-            let line = line?;
-            let parts: Vec<&str> = line.splitn(2, '=').collect();
-            if parts.len() != 2 {
-                return Err(io::Error::new(
-                    ErrorKind::Other,
-                    format!("Invalid line '{}'", line),
-                ));
-            }
-            map.insert(parts[0].to_string(), parts[1].to_string());
-        }
-    }
-    Ok(map)
 }
 
 #[cfg(test)]

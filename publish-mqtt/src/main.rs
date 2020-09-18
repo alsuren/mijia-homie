@@ -2,13 +2,12 @@ use anyhow::Context;
 use futures::stream::StreamExt;
 use futures::{FutureExt, TryFutureExt};
 use homie_device::{Datatype, HomieDevice, Node, Property};
-use mijia::{
-    get_sensors, hashmap_from_file, start_notify_sensor, MijiaEvent, MijiaSession, Readings,
-    SensorProps,
-};
+use mijia::{get_sensors, start_notify_sensor, MijiaEvent, MijiaSession, Readings, SensorProps};
 use rumqttc::MqttOptions;
 use rustls::ClientConfig;
 use std::collections::{HashMap, VecDeque};
+use std::fs::File;
+use std::io::{self, BufRead, BufReader, ErrorKind};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::Mutex;
@@ -236,6 +235,26 @@ async fn run_sensor_system(
         bluetooth_connection_loop(state.clone(), bt_session, &sensor_names);
     let event_loop_handle = service_bluetooth_event_queue(state.clone(), bt_session);
     try_join!(connection_loop_handle, event_loop_handle).map(|((), ())| ())
+}
+
+/// Read the given file of key-value pairs into a hashmap.
+/// Returns an empty hashmap if the file doesn't exist, or an error if it is malformed.
+pub fn hashmap_from_file(filename: &str) -> Result<HashMap<String, String>, io::Error> {
+    let mut map: HashMap<String, String> = HashMap::new();
+    if let Ok(file) = File::open(filename) {
+        for line in BufReader::new(file).lines() {
+            let line = line?;
+            let parts: Vec<&str> = line.splitn(2, '=').collect();
+            if parts.len() != 2 {
+                return Err(io::Error::new(
+                    ErrorKind::Other,
+                    format!("Invalid line '{}'", line),
+                ));
+            }
+            map.insert(parts[0].to_string(), parts[1].to_string());
+        }
+    }
+    Ok(map)
 }
 
 async fn bluetooth_connection_loop(
