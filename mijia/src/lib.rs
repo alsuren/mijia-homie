@@ -3,6 +3,9 @@ use dbus::arg::RefArg;
 use dbus::nonblock::stdintf::org_freedesktop_dbus::ObjectManager;
 use itertools::Itertools;
 use std::collections::HashMap;
+use std::error::Error;
+use std::fmt::{self, Display, Formatter};
+use std::str::FromStr;
 use std::time::Duration;
 
 pub mod decode;
@@ -17,9 +20,63 @@ const CONNECTION_INTERVAL_CHARACTERISTIC_PATH: &str = "/service0021/char0045";
 const CONNECTION_INTERVAL_500_MS: [u8; 3] = [0xF4, 0x01, 0x00];
 const DBUS_METHOD_CALL_TIMEOUT: Duration = Duration::from_secs(30);
 
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct SensorId {
+    object_path: String,
+}
+
+impl SensorId {
+    pub(crate) fn new(object_path: &str) -> Self {
+        Self {
+            object_path: object_path.to_owned(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct MacAddress(String);
+
+impl Display for MacAddress {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ParseMacAddressError();
+
+impl Display for ParseMacAddressError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "Invalid MAC address")
+    }
+}
+
+impl Error for ParseMacAddressError {}
+
+impl FromStr for MacAddress {
+    type Err = ParseMacAddressError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let octets: Vec<_> = s.split(":").collect();
+        if octets.len() != 6 {
+            return Err(ParseMacAddressError());
+        }
+        for octet in octets {
+            if octet.len() != 2 {
+                return Err(ParseMacAddressError());
+            }
+            if !octet.chars().all(|c| c.is_ascii_hexdigit()) {
+                return Err(ParseMacAddressError());
+            }
+        }
+        Ok(MacAddress(s.to_uppercase()))
+    }
+}
+
+#[derive(Clone, Debug)]
 pub struct SensorProps {
-    pub object_path: String,
-    pub mac_address: String,
+    pub id: SensorId,
+    pub mac_address: MacAddress,
 }
 
 pub async fn get_sensors(bt_session: &MijiaSession) -> Result<Vec<SensorProps>, anyhow::Error> {
@@ -62,8 +119,10 @@ pub async fn get_sensors(bt_session: &MijiaSession) -> Result<Vec<SensorProps>, 
 
             if service_data.contains_key(MIJIA_SERVICE_DATA_UUID) {
                 Some(SensorProps {
-                    object_path: path.to_string(),
-                    mac_address,
+                    id: SensorId {
+                        object_path: path.to_string(),
+                    },
+                    mac_address: MacAddress(mac_address),
                 })
             } else {
                 None
@@ -75,9 +134,9 @@ pub async fn get_sensors(bt_session: &MijiaSession) -> Result<Vec<SensorProps>, 
 
 pub async fn start_notify_sensor(
     bt_session: &MijiaSession,
-    device_path: &str,
+    id: &SensorId,
 ) -> Result<(), anyhow::Error> {
-    let temp_humidity_path = device_path.to_string() + SENSOR_READING_CHARACTERISTIC_PATH;
+    let temp_humidity_path = id.object_path.to_string() + SENSOR_READING_CHARACTERISTIC_PATH;
     let temp_humidity = dbus::nonblock::Proxy::new(
         "org.bluez",
         temp_humidity_path,
@@ -87,7 +146,7 @@ pub async fn start_notify_sensor(
     temp_humidity.start_notify().await?;
 
     let connection_interval_path =
-        device_path.to_string() + CONNECTION_INTERVAL_CHARACTERISTIC_PATH;
+        id.object_path.to_string() + CONNECTION_INTERVAL_CHARACTERISTIC_PATH;
     let connection_interval = dbus::nonblock::Proxy::new(
         "org.bluez",
         connection_interval_path,

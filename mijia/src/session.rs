@@ -1,4 +1,4 @@
-use crate::{Readings, DBUS_METHOD_CALL_TIMEOUT, SENSOR_READING_CHARACTERISTIC_PATH};
+use crate::{Readings, SensorId, DBUS_METHOD_CALL_TIMEOUT, SENSOR_READING_CHARACTERISTIC_PATH};
 use anyhow::Context;
 use bluez_generated::bluetooth_event::BluetoothEvent;
 use bluez_generated::generated::{OrgBluezAdapter1, OrgBluezDevice1};
@@ -14,14 +14,8 @@ use std::sync::Arc;
 // TODO before publishing to crates.io: annotate this enum as non-exhaustive.
 #[derive(Clone)]
 pub enum MijiaEvent {
-    // FIXME: stop using object_path as primary key. Can we think of something better?
-    Readings {
-        object_path: String,
-        readings: Readings,
-    },
-    Disconnected {
-        object_path: String,
-    },
+    Readings { id: SensorId, readings: Readings },
+    Disconnected { id: SensorId },
 }
 
 impl MijiaEvent {
@@ -29,19 +23,19 @@ impl MijiaEvent {
         match BluetoothEvent::from(conn_msg) {
             Some(BluetoothEvent::Value { object_path, value }) => {
                 // TODO: Make this less hacky.
-                let object_path = object_path
-                    .strip_suffix(SENSOR_READING_CHARACTERISTIC_PATH)?
-                    .to_owned();
+                let object_path = object_path.strip_suffix(SENSOR_READING_CHARACTERISTIC_PATH)?;
                 let readings = Readings::decode(&value)?;
                 Some(MijiaEvent::Readings {
-                    object_path,
+                    id: SensorId::new(object_path),
                     readings,
                 })
             }
             Some(BluetoothEvent::Connected {
                 object_path,
                 connected: false,
-            }) => Some(MijiaEvent::Disconnected { object_path }),
+            }) => Some(MijiaEvent::Disconnected {
+                id: SensorId { object_path },
+            }),
             _ => None,
         }
     }
@@ -122,26 +116,26 @@ impl MijiaSession {
         ))
     }
 
-    fn device(&self, object_path: &str) -> impl OrgBluezDevice1 {
+    fn device(&self, id: &SensorId) -> impl OrgBluezDevice1 {
         dbus::nonblock::Proxy::new(
             "org.bluez",
-            object_path.to_owned(),
+            id.object_path.to_owned(),
             DBUS_METHOD_CALL_TIMEOUT,
             self.connection.clone(),
         )
     }
 
     /// Connect to the bluetooth device with the given D-Bus object path.
-    pub async fn connect(&self, object_path: &str) -> Result<(), anyhow::Error> {
-        self.device(object_path)
+    pub async fn connect(&self, id: &SensorId) -> Result<(), anyhow::Error> {
+        self.device(id)
             .connect()
             .await
             .with_context(|| std::line!().to_string())
     }
 
     /// Disconnect from the bluetooth device with the given D-Bus object path.
-    pub async fn disconnect(&self, object_path: &str) -> Result<(), anyhow::Error> {
-        self.device(object_path)
+    pub async fn disconnect(&self, id: &SensorId) -> Result<(), anyhow::Error> {
+        self.device(id)
             .disconnect()
             .await
             .with_context(|| std::line!().to_string())
