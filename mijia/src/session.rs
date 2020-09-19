@@ -84,6 +84,7 @@ impl MijiaSession {
         ))
     }
 
+    /// Power on the bluetooth adapter adapter and start scanning for devices.
     pub async fn start_discovery(&self) -> Result<(), anyhow::Error> {
         let adapter = dbus::nonblock::Proxy::new(
             "org.bluez",
@@ -130,6 +131,7 @@ impl MijiaSession {
         )
     }
 
+    /// Connect to the bluetooth device with the given D-Bus object path.
     pub async fn connect(&self, object_path: &str) -> Result<(), anyhow::Error> {
         self.device(object_path)
             .connect()
@@ -137,6 +139,7 @@ impl MijiaSession {
             .with_context(|| std::line!().to_string())
     }
 
+    /// Disconnect from the bluetooth device with the given D-Bus object path.
     pub async fn disconnect(&self, object_path: &str) -> Result<(), anyhow::Error> {
         self.device(object_path)
             .disconnect()
