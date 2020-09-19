@@ -1,4 +1,4 @@
-use crate::{decode_value, Readings, DBUS_METHOD_CALL_TIMEOUT, SENSOR_READING_CHARACTERISTIC_PATH};
+use crate::{Readings, DBUS_METHOD_CALL_TIMEOUT, SENSOR_READING_CHARACTERISTIC_PATH};
 use anyhow::Context;
 use bluez_generated::bluetooth_event::BluetoothEvent;
 use bluez_generated::generated::{OrgBluezAdapter1, OrgBluezDevice1};
@@ -32,7 +32,7 @@ impl MijiaEvent {
                 let object_path = object_path
                     .strip_suffix(SENSOR_READING_CHARACTERISTIC_PATH)?
                     .to_owned();
-                let readings = decode_value(&value)?;
+                let readings = Readings::decode(&value)?;
                 Some(MijiaEvent::Readings {
                     object_path,
                     readings,

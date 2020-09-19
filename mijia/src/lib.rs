@@ -2,13 +2,12 @@ use bluez_generated::generated::OrgBluezGattCharacteristic1;
 use dbus::arg::RefArg;
 use dbus::nonblock::stdintf::org_freedesktop_dbus::ObjectManager;
 use itertools::Itertools;
-use std::cmp::max;
 use std::collections::HashMap;
-use std::convert::TryInto;
-use std::fmt::{Display, Formatter};
 use std::time::Duration;
 
+pub mod decode;
 pub mod session;
+pub use decode::Readings;
 pub use session::{MijiaEvent, MijiaSession};
 
 const MIJIA_SERVICE_DATA_UUID: &str = "0000fe95-0000-1000-8000-00805f9b34fb";
@@ -99,78 +98,4 @@ pub async fn start_notify_sensor(
         .write_value(CONNECTION_INTERVAL_500_MS.to_vec(), Default::default())
         .await?;
     Ok(())
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct Readings {
-    /// Temperature in ºC, with 2 decimal places of precision
-    pub temperature: f32,
-    /// Percent humidity
-    pub humidity: u8,
-    /// Voltage in millivolts
-    pub battery_voltage: u16,
-    /// Inferred from `battery_voltage` with a bit of hand-waving.
-    pub battery_percent: u16,
-}
-
-impl Display for Readings {
-    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "Temperature: {:.2}ºC Humidity: {:?}% Battery: {:?} mV ({:?}%)",
-            self.temperature, self.humidity, self.battery_voltage, self.battery_percent
-        )
-    }
-}
-
-pub fn decode_value(value: &[u8]) -> Option<Readings> {
-    if value.len() != 5 {
-        return None;
-    }
-
-    let mut temperature_array = [0; 2];
-    temperature_array.clone_from_slice(&value[..2]);
-    let temperature = i16::from_le_bytes(temperature_array) as f32 * 0.01;
-    let humidity = value[2];
-    let battery_voltage = u16::from_le_bytes(value[3..5].try_into().unwrap());
-    let battery_percent = (max(battery_voltage, 2100) - 2100) / 10;
-    Some(Readings {
-        temperature,
-        humidity,
-        battery_voltage,
-        battery_percent,
-    })
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn decode_empty() {
-        assert_eq!(decode_value(&[]), None);
-    }
-
-    #[test]
-    fn decode_too_short() {
-        assert_eq!(decode_value(&[1, 2, 3, 4]), None);
-    }
-
-    #[test]
-    fn decode_too_long() {
-        assert_eq!(decode_value(&[1, 2, 3, 4, 5, 6]), None);
-    }
-
-    #[test]
-    fn decode_valid() {
-        assert_eq!(
-            decode_value(&[1, 2, 3, 4, 10]),
-            Some(Readings {
-                temperature: 5.13,
-                humidity: 3,
-                battery_voltage: 2564,
-                battery_percent: 46
-            })
-        );
-    }
 }
