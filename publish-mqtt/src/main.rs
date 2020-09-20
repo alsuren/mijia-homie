@@ -332,7 +332,11 @@ async fn connect_first_sensor_in_queue(
     sensors_connected: &mut Vec<Sensor>,
     sensors_to_connect: &mut VecDeque<Sensor>,
 ) -> Result<(), anyhow::Error> {
-    println!("{} sensors in queue to connect.", sensors_to_connect.len());
+    println!(
+        "{} sensors in queue to connect, {} connected.",
+        sensors_to_connect.len(),
+        sensors_connected.len()
+    );
     // Try to connect to a sensor.
     if let Some(mut sensor) = sensors_to_connect.pop_front() {
         println!("Trying to connect to {}", sensor.name);
