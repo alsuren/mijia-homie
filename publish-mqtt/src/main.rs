@@ -2,10 +2,7 @@ use anyhow::Context;
 use futures::stream::StreamExt;
 use futures::{FutureExt, TryFutureExt};
 use homie_device::{Datatype, HomieDevice, Node, Property};
-use mijia::{
-    get_sensors, start_notify_sensor, MacAddress, MijiaEvent, MijiaSession, Readings, SensorId,
-    SensorProps,
-};
+use mijia::{DeviceId, MacAddress, MijiaEvent, MijiaSession, Readings, SensorProps};
 use rumqttc::MqttOptions;
 use rustls::ClientConfig;
 use std::collections::{HashMap, VecDeque};
@@ -112,7 +109,7 @@ enum ConnectionStatus {
 
 #[derive(Debug)]
 struct Sensor {
-    id: SensorId,
+    id: DeviceId,
     mac_address: MacAddress,
     name: String,
     last_update_timestamp: Instant,
@@ -303,9 +300,10 @@ async fn check_for_sensors(
     bt_session: &MijiaSession,
     sensor_names: &HashMap<MacAddress, String>,
 ) -> Result<(), anyhow::Error> {
-    bt_session.start_discovery().await?;
+    bt_session.bt_session.start_discovery().await?;
 
-    let sensors = get_sensors(bt_session)
+    let sensors = bt_session
+        .get_sensors()
         .await
         .with_context(|| std::line!().to_string())?;
     let state = &mut *state.lock().await;
@@ -361,10 +359,11 @@ async fn connect_start_sensor<'a>(
 ) -> Result<(), anyhow::Error> {
     println!("Connecting from status: {:?}", sensor.connection_status);
     bt_session
+        .bt_session
         .connect(&sensor.id)
         .await
         .with_context(|| std::line!().to_string())?;
-    match start_notify_sensor(bt_session, &sensor.id).await {
+    match bt_session.start_notify_sensor(&sensor.id).await {
         Ok(()) => {
             homie
                 .add_node(sensor.as_node())
@@ -386,6 +385,7 @@ async fn connect_start_sensor<'a>(
                 }
                 ConnectionStatus::SubscribingFailedOnce => {
                     bt_session
+                        .bt_session
                         .disconnect(&sensor.id)
                         .await
                         .with_context(|| std::line!().to_string())?;
@@ -441,6 +441,7 @@ async fn service_bluetooth_event_queue(
     }
 
     bt_session
+        .bt_session
         .connection
         .remove_match(msg_match.token())
         .await?;

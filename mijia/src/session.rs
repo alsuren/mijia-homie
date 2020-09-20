@@ -1,68 +1,97 @@
-use crate::{Readings, SensorId, DBUS_METHOD_CALL_TIMEOUT, SENSOR_READING_CHARACTERISTIC_PATH};
+use crate::DBUS_METHOD_CALL_TIMEOUT;
 use anyhow::Context;
-use bluez_generated::bluetooth_event::BluetoothEvent;
 use bluez_generated::generated::{OrgBluezAdapter1, OrgBluezDevice1};
 use core::fmt::Debug;
 use core::future::Future;
-use dbus::{
-    nonblock::{MsgMatch, SyncConnection},
-    Message,
-};
-use futures::{FutureExt, Stream, StreamExt};
+use dbus::arg::cast;
+use dbus::arg::RefArg;
+use dbus::nonblock::stdintf::org_freedesktop_dbus::ObjectManager;
+use dbus::nonblock::SyncConnection;
+use futures::FutureExt;
+use itertools::Itertools;
+use std::collections::HashMap;
+use std::error::Error;
+use std::fmt::{self, Display, Formatter};
+use std::str::FromStr;
 use std::sync::Arc;
 
-// TODO before publishing to crates.io: annotate this enum as non-exhaustive.
-#[derive(Clone)]
-pub enum MijiaEvent {
-    Readings { id: SensorId, readings: Readings },
-    Disconnected { id: SensorId },
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct DeviceId {
+    pub(crate) object_path: String,
 }
 
-impl MijiaEvent {
-    fn from(conn_msg: Message) -> Option<Self> {
-        match BluetoothEvent::from(conn_msg) {
-            Some(BluetoothEvent::Value { object_path, value }) => {
-                // TODO: Make this less hacky.
-                let object_path = object_path.strip_suffix(SENSOR_READING_CHARACTERISTIC_PATH)?;
-                let readings = Readings::decode(&value)?;
-                Some(MijiaEvent::Readings {
-                    id: SensorId::new(object_path),
-                    readings,
-                })
-            }
-            Some(BluetoothEvent::Connected {
-                object_path,
-                connected: false,
-            }) => Some(MijiaEvent::Disconnected {
-                id: SensorId { object_path },
-            }),
-            _ => None,
+impl DeviceId {
+    pub(crate) fn new(object_path: &str) -> Self {
+        Self {
+            object_path: object_path.to_owned(),
         }
     }
 }
 
-#[derive(Clone)]
-pub struct MijiaSession {
-    pub connection: Arc<SyncConnection>,
-}
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct MacAddress(String);
 
-impl Debug for MijiaSession {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "MijiaSession")
+impl Display for MacAddress {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.0)
     }
 }
 
-impl MijiaSession {
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ParseMacAddressError();
+
+impl Display for ParseMacAddressError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "Invalid MAC address")
+    }
+}
+
+impl Error for ParseMacAddressError {}
+
+impl FromStr for MacAddress {
+    type Err = ParseMacAddressError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let octets: Vec<_> = s.split(":").collect();
+        if octets.len() != 6 {
+            return Err(ParseMacAddressError());
+        }
+        for octet in octets {
+            if octet.len() != 2 {
+                return Err(ParseMacAddressError());
+            }
+            if !octet.chars().all(|c| c.is_ascii_hexdigit()) {
+                return Err(ParseMacAddressError());
+            }
+        }
+        Ok(MacAddress(s.to_uppercase()))
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct DeviceInfo {
+    pub id: DeviceId,
+    pub mac_address: MacAddress,
+    pub service_data: HashMap<String, Vec<u8>>,
+}
+
+#[derive(Clone)]
+pub struct BluetoothSession {
+    pub connection: Arc<SyncConnection>,
+}
+
+impl Debug for BluetoothSession {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "BluetoothSession")
+    }
+}
+
+impl BluetoothSession {
     /// Returns a tuple of (join handle, Self).
     /// If the join handle ever completes then you're in trouble and should
     /// probably restart the process.
-    pub async fn new() -> Result<
-        (
-            impl Future<Output = Result<(), anyhow::Error>>,
-            MijiaSession,
-        ),
-        anyhow::Error,
-    > {
+    pub async fn new(
+    ) -> Result<(impl Future<Output = Result<(), anyhow::Error>>, Self), anyhow::Error> {
         // Connect to the D-Bus system bus (this is blocking, unfortunately).
         let (dbus_resource, connection) = dbus_tokio::connection::new_system_sync()?;
         // The resource is a task that should be spawned onto a tokio compatible
@@ -74,7 +103,7 @@ impl MijiaSession {
         });
         Ok((
             dbus_handle.map(|res| Ok(res??)),
-            MijiaSession { connection },
+            BluetoothSession { connection },
         ))
     }
 
@@ -97,26 +126,62 @@ impl MijiaSession {
         Ok(())
     }
 
-    /// Get a stream of reading/disconnected events for all sensors.
-    ///
-    /// If the MsgMatch is dropped then the Stream will close.
-    pub async fn event_stream(
-        &self,
-    ) -> Result<(MsgMatch, impl Stream<Item = MijiaEvent>), anyhow::Error> {
-        let mut rule = dbus::message::MatchRule::new();
-        rule.msg_type = Some(dbus::message::MessageType::Signal);
-        rule.sender =
-            Some(dbus::strings::BusName::new("org.bluez").map_err(|s| anyhow::anyhow!(s))?);
+    pub async fn get_devices(&self) -> Result<Vec<DeviceInfo>, anyhow::Error> {
+        let bluez_root = dbus::nonblock::Proxy::new(
+            "org.bluez",
+            "/",
+            DBUS_METHOD_CALL_TIMEOUT,
+            self.connection.clone(),
+        );
+        let tree = bluez_root.get_managed_objects().await?;
 
-        let (msg_match, events) = self.connection.add_match(rule).await?.msg_stream();
+        let sensors = tree
+            .into_iter()
+            .filter_map(|(path, interfaces)| {
+                // FIXME: can we generate a strongly typed deserialiser for this,
+                // based on the introspection data?
+                let device_properties = interfaces.get("org.bluez.Device1")?;
 
-        Ok((
-            msg_match,
-            Box::pin(events.filter_map(|event| async move { MijiaEvent::from(event) })),
-        ))
+                let mac_address = device_properties
+                    .get("Address")?
+                    .as_iter()?
+                    .filter_map(|addr| addr.as_str())
+                    .next()?
+                    .to_string();
+                // UUIDs don't get populated until we connect. Use:
+                //     "ServiceData": Variant(InternalDict { data: [
+                //         ("0000fe95-0000-1000-8000-00805f9b34fb", Variant([48, 88, 91, 5, 1, 23, 33, 215, 56, 193, 164, 40, 1, 0])
+                //     )], outer_sig: Signature("a{sv}") })
+                // instead.
+                let service_data: HashMap<String, Vec<u8>> = device_properties
+                    .get("ServiceData")?
+                    // Variant(...)
+                    .as_iter()?
+                    .next()?
+                    // InternalDict(...)
+                    .as_iter()?
+                    .tuples::<(_, _)>()
+                    .filter_map(|(k, v)| {
+                        let k = k.as_str()?.into();
+                        let v = v.box_clone();
+                        let v = cast::<Vec<u8>>(&v)?.clone();
+                        Some((k, v))
+                    })
+                    .collect();
+
+                Some(DeviceInfo {
+                    id: DeviceId {
+                        object_path: path.to_string(),
+                    },
+                    mac_address: MacAddress(mac_address),
+                    service_data,
+                })
+            })
+            .collect();
+        Ok(sensors)
     }
 
-    fn device(&self, id: &SensorId) -> impl OrgBluezDevice1 {
+    fn device(&self, id: &DeviceId) -> impl OrgBluezDevice1 {
         dbus::nonblock::Proxy::new(
             "org.bluez",
             id.object_path.to_owned(),
@@ -126,7 +191,7 @@ impl MijiaSession {
     }
 
     /// Connect to the bluetooth device with the given D-Bus object path.
-    pub async fn connect(&self, id: &SensorId) -> Result<(), anyhow::Error> {
+    pub async fn connect(&self, id: &DeviceId) -> Result<(), anyhow::Error> {
         self.device(id)
             .connect()
             .await
@@ -134,7 +199,7 @@ impl MijiaSession {
     }
 
     /// Disconnect from the bluetooth device with the given D-Bus object path.
-    pub async fn disconnect(&self, id: &SensorId) -> Result<(), anyhow::Error> {
+    pub async fn disconnect(&self, id: &DeviceId) -> Result<(), anyhow::Error> {
         self.device(id)
             .disconnect()
             .await

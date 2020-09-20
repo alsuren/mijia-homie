@@ -1,17 +1,15 @@
+use bluez_generated::bluetooth_event::BluetoothEvent;
 use bluez_generated::generated::OrgBluezGattCharacteristic1;
-use dbus::arg::RefArg;
-use dbus::nonblock::stdintf::org_freedesktop_dbus::ObjectManager;
-use itertools::Itertools;
-use std::collections::HashMap;
-use std::error::Error;
-use std::fmt::{self, Display, Formatter};
-use std::str::FromStr;
+use core::future::Future;
+use dbus::nonblock::MsgMatch;
+use dbus::Message;
+use futures::{Stream, StreamExt};
 use std::time::Duration;
 
 pub mod decode;
 pub mod session;
 pub use decode::Readings;
-pub use session::{MijiaEvent, MijiaSession};
+pub use session::{BluetoothSession, DeviceId, MacAddress};
 
 const MIJIA_SERVICE_DATA_UUID: &str = "0000fe95-0000-1000-8000-00805f9b34fb";
 const SENSOR_READING_CHARACTERISTIC_PATH: &str = "/service0021/char0035";
@@ -20,141 +18,117 @@ const CONNECTION_INTERVAL_CHARACTERISTIC_PATH: &str = "/service0021/char0045";
 const CONNECTION_INTERVAL_500_MS: [u8; 3] = [0xF4, 0x01, 0x00];
 const DBUS_METHOD_CALL_TIMEOUT: Duration = Duration::from_secs(30);
 
-#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct SensorId {
-    object_path: String,
-}
-
-impl SensorId {
-    pub(crate) fn new(object_path: &str) -> Self {
-        Self {
-            object_path: object_path.to_owned(),
-        }
-    }
-}
-
-#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct MacAddress(String);
-
-impl Display for MacAddress {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.0)
-    }
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ParseMacAddressError();
-
-impl Display for ParseMacAddressError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "Invalid MAC address")
-    }
-}
-
-impl Error for ParseMacAddressError {}
-
-impl FromStr for MacAddress {
-    type Err = ParseMacAddressError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let octets: Vec<_> = s.split(":").collect();
-        if octets.len() != 6 {
-            return Err(ParseMacAddressError());
-        }
-        for octet in octets {
-            if octet.len() != 2 {
-                return Err(ParseMacAddressError());
-            }
-            if !octet.chars().all(|c| c.is_ascii_hexdigit()) {
-                return Err(ParseMacAddressError());
-            }
-        }
-        Ok(MacAddress(s.to_uppercase()))
-    }
-}
-
 #[derive(Clone, Debug)]
 pub struct SensorProps {
-    pub id: SensorId,
+    pub id: DeviceId,
     pub mac_address: MacAddress,
 }
 
-pub async fn get_sensors(bt_session: &MijiaSession) -> Result<Vec<SensorProps>, anyhow::Error> {
-    let bluez_root = dbus::nonblock::Proxy::new(
-        "org.bluez",
-        "/",
-        DBUS_METHOD_CALL_TIMEOUT,
-        bt_session.connection.clone(),
-    );
-    let tree = bluez_root.get_managed_objects().await?;
-
-    let sensors = tree
-        .into_iter()
-        .filter_map(|(path, interfaces)| {
-            // FIXME: can we generate a strongly typed deserialiser for this,
-            // based on the introspection data?
-            let device_properties = interfaces.get("org.bluez.Device1")?;
-
-            let mac_address = device_properties
-                .get("Address")?
-                .as_iter()?
-                .filter_map(|addr| addr.as_str())
-                .next()?
-                .to_string();
-            // UUIDs don't get populated until we connect. Use:
-            //     "ServiceData": Variant(InternalDict { data: [
-            //         ("0000fe95-0000-1000-8000-00805f9b34fb", Variant([48, 88, 91, 5, 1, 23, 33, 215, 56, 193, 164, 40, 1, 0])
-            //     )], outer_sig: Signature("a{sv}") })
-            // instead.
-            let service_data: HashMap<String, _> = device_properties
-                .get("ServiceData")?
-                // Variant(...)
-                .as_iter()?
-                .next()?
-                // InternalDict(...)
-                .as_iter()?
-                .tuples::<(_, _)>()
-                .filter_map(|(k, v)| Some((k.as_str()?.into(), v)))
-                .collect();
-
-            if service_data.contains_key(MIJIA_SERVICE_DATA_UUID) {
-                Some(SensorProps {
-                    id: SensorId {
-                        object_path: path.to_string(),
-                    },
-                    mac_address: MacAddress(mac_address),
-                })
-            } else {
-                None
-            }
-        })
-        .collect();
-    Ok(sensors)
+// TODO before publishing to crates.io: annotate this enum as non-exhaustive.
+#[derive(Clone)]
+pub enum MijiaEvent {
+    Readings { id: DeviceId, readings: Readings },
+    Disconnected { id: DeviceId },
 }
 
-pub async fn start_notify_sensor(
-    bt_session: &MijiaSession,
-    id: &SensorId,
-) -> Result<(), anyhow::Error> {
-    let temp_humidity_path = id.object_path.to_string() + SENSOR_READING_CHARACTERISTIC_PATH;
-    let temp_humidity = dbus::nonblock::Proxy::new(
-        "org.bluez",
-        temp_humidity_path,
-        DBUS_METHOD_CALL_TIMEOUT,
-        bt_session.connection.clone(),
-    );
-    temp_humidity.start_notify().await?;
+impl MijiaEvent {
+    fn from(conn_msg: Message) -> Option<Self> {
+        match BluetoothEvent::from(conn_msg) {
+            Some(BluetoothEvent::Value { object_path, value }) => {
+                // TODO: Make this less hacky.
+                let object_path = object_path.strip_suffix(SENSOR_READING_CHARACTERISTIC_PATH)?;
+                let readings = Readings::decode(&value)?;
+                Some(MijiaEvent::Readings {
+                    id: DeviceId::new(object_path),
+                    readings,
+                })
+            }
+            Some(BluetoothEvent::Connected {
+                object_path,
+                connected: false,
+            }) => Some(MijiaEvent::Disconnected {
+                id: DeviceId { object_path },
+            }),
+            _ => None,
+        }
+    }
+}
 
-    let connection_interval_path =
-        id.object_path.to_string() + CONNECTION_INTERVAL_CHARACTERISTIC_PATH;
-    let connection_interval = dbus::nonblock::Proxy::new(
-        "org.bluez",
-        connection_interval_path,
-        DBUS_METHOD_CALL_TIMEOUT,
-        bt_session.connection.clone(),
-    );
-    connection_interval
-        .write_value(CONNECTION_INTERVAL_500_MS.to_vec(), Default::default())
-        .await?;
-    Ok(())
+pub struct MijiaSession {
+    pub bt_session: BluetoothSession,
+}
+
+impl MijiaSession {
+    pub async fn new(
+    ) -> Result<(impl Future<Output = Result<(), anyhow::Error>>, Self), anyhow::Error> {
+        let (handle, bt_session) = BluetoothSession::new().await?;
+        Ok((handle, MijiaSession { bt_session }))
+    }
+
+    pub async fn get_sensors(&self) -> Result<Vec<SensorProps>, anyhow::Error> {
+        let devices = self.bt_session.get_devices().await?;
+
+        let sensors = devices
+            .into_iter()
+            .filter_map(|device| {
+                if device.service_data.contains_key(MIJIA_SERVICE_DATA_UUID) {
+                    Some(SensorProps {
+                        id: device.id,
+                        mac_address: device.mac_address,
+                    })
+                } else {
+                    None
+                }
+            })
+            .collect();
+        Ok(sensors)
+    }
+
+    pub async fn start_notify_sensor(&self, id: &DeviceId) -> Result<(), anyhow::Error> {
+        let temp_humidity_path = id.object_path.to_string() + SENSOR_READING_CHARACTERISTIC_PATH;
+        let temp_humidity = dbus::nonblock::Proxy::new(
+            "org.bluez",
+            temp_humidity_path,
+            DBUS_METHOD_CALL_TIMEOUT,
+            self.bt_session.connection.clone(),
+        );
+        temp_humidity.start_notify().await?;
+
+        let connection_interval_path =
+            id.object_path.to_string() + CONNECTION_INTERVAL_CHARACTERISTIC_PATH;
+        let connection_interval = dbus::nonblock::Proxy::new(
+            "org.bluez",
+            connection_interval_path,
+            DBUS_METHOD_CALL_TIMEOUT,
+            self.bt_session.connection.clone(),
+        );
+        connection_interval
+            .write_value(CONNECTION_INTERVAL_500_MS.to_vec(), Default::default())
+            .await?;
+        Ok(())
+    }
+
+    /// Get a stream of reading/disconnected events for all sensors.
+    ///
+    /// If the MsgMatch is dropped then the Stream will close.
+    pub async fn event_stream(
+        &self,
+    ) -> Result<(MsgMatch, impl Stream<Item = MijiaEvent>), anyhow::Error> {
+        let mut rule = dbus::message::MatchRule::new();
+        rule.msg_type = Some(dbus::message::MessageType::Signal);
+        rule.sender =
+            Some(dbus::strings::BusName::new("org.bluez").map_err(|s| anyhow::anyhow!(s))?);
+
+        let (msg_match, events) = self
+            .bt_session
+            .connection
+            .add_match(rule)
+            .await?
+            .msg_stream();
+
+        Ok((
+            msg_match,
+            Box::pin(events.filter_map(|event| async move { MijiaEvent::from(event) })),
+        ))
+    }
 }
