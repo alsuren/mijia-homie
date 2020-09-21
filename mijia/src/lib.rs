@@ -6,10 +6,10 @@ use dbus::Message;
 use futures::{Stream, StreamExt};
 use std::time::Duration;
 
+pub mod bluetooth;
 pub mod decode;
-pub mod session;
+pub use bluetooth::{BluetoothSession, DeviceId, MacAddress};
 pub use decode::Readings;
-pub use session::{BluetoothSession, DeviceId, MacAddress};
 
 const MIJIA_SERVICE_DATA_UUID: &str = "0000fe95-0000-1000-8000-00805f9b34fb";
 const SENSOR_READING_CHARACTERISTIC_PATH: &str = "/service0021/char0035";
