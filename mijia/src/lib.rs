@@ -25,6 +25,7 @@ pub struct SensorProps {
 }
 
 // TODO before publishing to crates.io: annotate this enum as non-exhaustive.
+/// An event from a Mijia sensor.
 #[derive(Clone)]
 pub enum MijiaEvent {
     Readings { id: DeviceId, readings: Readings },
@@ -54,17 +55,23 @@ impl MijiaEvent {
     }
 }
 
+/// A wrapper around a bluetooth session which adds some methods for dealing with Mijia sensors.
+/// The underlying bluetooth session may still be accessed.
 pub struct MijiaSession {
     pub bt_session: BluetoothSession,
 }
 
 impl MijiaSession {
+    /// Returns a tuple of (join handle, Self).
+    /// If the join handle ever completes then you're in trouble and should
+    /// probably restart the process.
     pub async fn new(
     ) -> Result<(impl Future<Output = Result<(), anyhow::Error>>, Self), anyhow::Error> {
         let (handle, bt_session) = BluetoothSession::new().await?;
         Ok((handle, MijiaSession { bt_session }))
     }
 
+    /// Get a list of all Mijia sensors which have currently been discovered.
     pub async fn get_sensors(&self) -> Result<Vec<SensorProps>, anyhow::Error> {
         let devices = self.bt_session.get_devices().await?;
 
@@ -84,6 +91,11 @@ impl MijiaSession {
         Ok(sensors)
     }
 
+    /// Assuming that the given device ID refers to a Mijia sensor device and that it has already
+    /// been connected, subscribe to notifications of temperature/humidity readings, and adjust the
+    /// connection interval to save power.
+    ///
+    /// Notifications will be delivered as events by `MijiaSession::event_stream()`.
     pub async fn start_notify_sensor(&self, id: &DeviceId) -> Result<(), anyhow::Error> {
         let temp_humidity_path = id.object_path.to_string() + SENSOR_READING_CHARACTERISTIC_PATH;
         let temp_humidity = dbus::nonblock::Proxy::new(

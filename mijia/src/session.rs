@@ -15,6 +15,7 @@ use std::fmt::{self, Display, Formatter};
 use std::str::FromStr;
 use std::sync::Arc;
 
+/// Opaque identifier for a bluetooth device which the system knows about.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct DeviceId {
     pub(crate) object_path: String,
@@ -28,6 +29,7 @@ impl DeviceId {
     }
 }
 
+/// MAC address of a bluetooth device.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct MacAddress(String);
 
@@ -126,6 +128,7 @@ impl BluetoothSession {
         Ok(())
     }
 
+    /// Get a list of all bluetooth devices which have been discovered so far.
     pub async fn get_devices(&self) -> Result<Vec<DeviceInfo>, anyhow::Error> {
         let bluez_root = dbus::nonblock::Proxy::new(
             "org.bluez",
