@@ -3,7 +3,7 @@ use anyhow::Context;
 use bluez_generated::generated::{OrgBluezAdapter1, OrgBluezDevice1};
 use core::fmt::Debug;
 use core::future::Future;
-use dbus::arg::{cast, RefArg, Variant};
+use dbus::arg::RefArg;
 use dbus::nonblock::stdintf::org_freedesktop_dbus::ObjectManager;
 use dbus::nonblock::SyncConnection;
 use futures::FutureExt;
@@ -165,8 +165,13 @@ impl BluetoothSession {
                     .tuples::<(_, _)>()
                     .filter_map(|(k, v)| {
                         let k = k.as_str()?.into();
-                        let v = v.box_clone();
-                        let v = cast::<Variant<Vec<u8>>>(&v)?.0.clone();
+                        let v: Option<Vec<u8>> = v
+                            .box_clone()
+                            .as_static_inner(0)?
+                            .as_iter()?
+                            .map(|el| Some(el.as_u64()? as u8))
+                            .collect();
+                        let v = v?;
                         Some((k, v))
                     })
                     .collect();
