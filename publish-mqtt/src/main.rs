@@ -5,7 +5,7 @@ use homie_device::{Datatype, HomieDevice, Node, Property};
 use mijia::{DeviceId, MacAddress, MijiaEvent, MijiaSession, Readings, SensorProps};
 use rumqttc::MqttOptions;
 use rustls::ClientConfig;
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::sync::Arc;
@@ -223,8 +223,6 @@ async fn run_sensor_system(
     let state = Arc::new(Mutex::new(SensorState {
         sensors: vec![],
         next_idx: 0,
-        sensors_to_connect: VecDeque::new(),
-        sensors_connected: vec![],
         homie,
     }));
 
@@ -258,7 +256,7 @@ async fn bluetooth_connection_loop(
     let mut next_scan_due = Instant::now();
     loop {
         let now = Instant::now();
-        if now > next_scan_due && state.lock().await.sensors_connected.len() < sensor_names.len() {
+        if now > next_scan_due && state.lock().await.sensors.len() < sensor_names.len() {
             next_scan_due = now + SCAN_INTERVAL;
             check_for_sensors(state.clone(), session, &sensor_names)
                 .await
@@ -266,20 +264,10 @@ async fn bluetooth_connection_loop(
         }
 
         {
+            // TODO: Iterate over sensors here rather than storing next_idx in SensorState.
             action_next_sensor(state.clone(), session.clone())
                 .await
                 .with_context(|| std::line!().to_string())?;
-        }
-
-        {
-            let state = &mut *state.lock().await;
-            disconnect_first_stale_sensor(
-                &mut state.homie,
-                &mut state.sensors_connected,
-                &mut state.sensors_to_connect,
-            )
-            .await
-            .with_context(|| std::line!().to_string())?;
         }
         time::delay_for(CONNECT_INTERVAL).await;
     }
@@ -289,8 +277,6 @@ async fn bluetooth_connection_loop(
 struct SensorState {
     sensors: Vec<Sensor>,
     next_idx: usize,
-    sensors_to_connect: VecDeque<Sensor>,
-    sensors_connected: Vec<Sensor>,
     homie: HomieDevice,
 }
 
@@ -302,6 +288,10 @@ async fn action_next_sensor(
         Some(values) => values,
         None => return Ok(()),
     };
+    {
+        let sensor = &state.lock().await.sensors[idx];
+        println!("State of {} is {:?}", sensor.name, status);
+    }
     match status {
         ConnectionStatus::Connecting { reserved_until } if reserved_until > Instant::now() => {
             Ok(())
@@ -312,49 +302,37 @@ async fn action_next_sensor(
         | ConnectionStatus::Disconnected
         | ConnectionStatus::MarkedDisconnected
         | ConnectionStatus::WatchdogTimeOut => {
-            connect_sensor_at_idx(state.clone(), session, idx).await?;
+            connect_sensor_at_idx(state, session, idx).await?;
             Ok(())
         }
         ConnectionStatus::Connected => {
-            // check_for_stale_sensor(state, session, idx)
+            check_for_stale_sensor(state, session, idx).await?;
             Ok(())
         }
     }
 }
 
+// TODO: If we make sensors in the state Vec<Arc<Mutex<Sensor>>>, then this can return the Arc<Mutex<Sensor>> rather than the index.
 async fn next_actionable_sensor(
     state: Arc<Mutex<SensorState>>,
 ) -> Option<(usize, ConnectionStatus)> {
-    let mut state = state.lock().await;
+    let mut state = &mut *state.lock().await;
     let idx = state.next_idx;
-    let status = state.sensors.get(idx).map(|s| s.connection_status);
 
-    match status {
+    match state.sensors.get(idx) {
         None => {
             state.next_idx = 0;
             None
         }
-        Some(status) => {
+        Some(sensor) => {
             state.next_idx += 1;
-            Some((idx, status))
+            Some((idx, sensor.connection_status))
         }
     }
 }
 
 async fn clone_sensor_at_idx(state: Arc<Mutex<SensorState>>, idx: usize) -> Sensor {
     state.lock().await.sensors[idx].clone()
-}
-
-async fn update_sensor_at_idx(
-    state: Arc<Mutex<SensorState>>,
-    idx: usize,
-    sensor: Sensor,
-) -> Result<(), anyhow::Error> {
-    let mut state = state.lock().await;
-    // FIXME: find a way to assert that nobody else has modified sensor in the meantime.
-    // Maybe give it version number and increment it whenever it is set?
-    state.sensors[idx] = sensor;
-    Ok(())
 }
 
 async fn check_for_sensors(
@@ -372,15 +350,12 @@ async fn check_for_sensors(
     for props in sensors {
         if sensor_names.contains_key(&props.mac_address)
             && !state
-                .sensors_to_connect
+                .sensors
                 .iter()
-                .chain(state.sensors_connected.iter())
                 .find(|s| s.mac_address == props.mac_address)
                 .is_some()
         {
-            state
-                .sensors_to_connect
-                .push_back(Sensor::new(props, &sensor_names))
+            state.sensors.push(Sensor::new(props, &sensor_names))
         }
     }
     Ok(())
@@ -399,15 +374,15 @@ async fn connect_sensor_at_idx(
     // Try to connect to a sensor.
     let mut sensor = clone_sensor_at_idx(state.clone(), idx).await;
     println!("Trying to connect to {}", sensor.name);
-    match connect_start_sensor(session, &mut sensor).await {
+    let status = connect_start_sensor(session, &mut sensor).await;
+    let mut state = state.lock().await;
+    match status {
         Err(e) => {
             println!("Failed to connect to {}: {:?}", sensor.name, e);
         }
         Ok(()) => {
             println!("Connected to {} and started notifications", sensor.name);
             state
-                .lock()
-                .await
                 .homie
                 .add_node(sensor.as_node())
                 .await
@@ -416,7 +391,7 @@ async fn connect_sensor_at_idx(
             sensor.last_update_timestamp = Instant::now();
         }
     }
-    update_sensor_at_idx(state, idx, sensor).await?;
+    state.sensors[idx] = sensor;
 
     Ok(())
 }
@@ -459,30 +434,28 @@ async fn connect_start_sensor<'a>(
     }
 }
 
-/// If a sensor hasn't sent any updates in a while, disconnect it and add it back to the
-/// connect queue.
-async fn disconnect_first_stale_sensor(
-    homie: &mut HomieDevice,
-    sensors_connected: &mut Vec<Sensor>,
-    sensors_to_connect: &mut VecDeque<Sensor>,
+/// If the sensor hasn't sent any updates in a while, disconnect it so we will try to reconnect.
+async fn check_for_stale_sensor(
+    state: Arc<Mutex<SensorState>>,
+    session: &MijiaSession,
+    idx: usize,
 ) -> Result<(), anyhow::Error> {
+    let state = &mut *state.lock().await;
+    let sensor = &mut state.sensors[idx];
     let now = Instant::now();
-    if let Some(sensor_index) = sensors_connected
-        .iter()
-        .position(|s| now - s.last_update_timestamp > UPDATE_TIMEOUT)
-    {
-        let mut sensor = sensors_connected.remove(sensor_index);
+    if now - sensor.last_update_timestamp > UPDATE_TIMEOUT {
         println!(
             "No update from {} for {:?}, reconnecting",
             sensor.name,
             now - sensor.last_update_timestamp
         );
+        // TODO: Should we disconnect the device first?
         sensor.connection_status = ConnectionStatus::WatchdogTimeOut;
-        homie
+        state
+            .homie
             .remove_node(&sensor.node_id())
             .await
             .with_context(|| std::line!().to_string())?;
-        sensors_to_connect.push_back(sensor);
     }
     Ok(())
 }
@@ -517,33 +490,39 @@ async fn handle_bluetooth_event(
 ) -> Result<(), anyhow::Error> {
     let state = &mut *state.lock().await;
     let homie = &mut state.homie;
-    let sensors_connected = &mut state.sensors_connected;
-    let sensors_to_connect = &mut state.sensors_to_connect;
+    let sensors = &mut state.sensors;
     match event {
         MijiaEvent::Readings { id, readings } => {
-            if let Some(sensor) = sensors_connected.iter_mut().find(|s| s.id == id) {
+            if let Some(sensor) = sensors.iter_mut().find(|s| s.id == id) {
                 sensor.publish_readings(homie, &readings).await?;
-            } else if let Some(sensor_index) = sensors_to_connect.iter().position(|s| s.id == id) {
-                let mut sensor = sensors_to_connect.remove(sensor_index).unwrap();
-                println!("Got update from disconnected device {:?}. Connecting.", id);
-                homie
-                    .add_node(sensor.as_node())
-                    .await
-                    .with_context(|| std::line!().to_string())?;
-                sensor.publish_readings(homie, &readings).await?;
-                sensor.connection_status = ConnectionStatus::Connected;
-                sensors_connected.push(sensor);
+                match sensor.connection_status {
+                    ConnectionStatus::Connected | ConnectionStatus::Connecting { .. } => {}
+                    _ => {
+                        println!("Got update from disconnected device {:?}. Connecting.", id);
+                        // TODO: Put this into a helper function, mark_connected.
+                        homie
+                            .add_node(sensor.as_node())
+                            .await
+                            .with_context(|| std::line!().to_string())?;
+                        sensor.connection_status = ConnectionStatus::Connected;
+                        // TODO: Make sure the connection interval is set.
+                    }
+                }
+            } else {
+                println!("Got update from unknown device {:?}.", id);
             }
         }
         MijiaEvent::Disconnected { id } => {
-            if let Some(sensor_index) = sensors_connected.iter().position(|s| s.id == id) {
-                let mut sensor = sensors_connected.remove(sensor_index);
-                println!("{} disconnected", sensor.name);
-                sensor.connection_status = ConnectionStatus::MarkedDisconnected;
-                homie.remove_node(&sensor.node_id()).await?;
-                sensors_to_connect.push_back(sensor);
+            if let Some(sensor) = sensors.iter_mut().find(|s| s.id == id) {
+                if sensor.connection_status == ConnectionStatus::Connected {
+                    println!("{} disconnected", sensor.name);
+                    sensor.connection_status = ConnectionStatus::MarkedDisconnected;
+                    homie.remove_node(&sensor.node_id()).await?;
+                } else {
+                    println!("{:?} disconnected but wasn't known to be connected.", id);
+                }
             } else {
-                println!("{:?} disconnected but wasn't known to be connected.", id);
+                println!("Unknown device {:?} disconnected.", id);
             }
         }
     };
