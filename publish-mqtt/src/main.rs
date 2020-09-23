@@ -2,6 +2,7 @@ use anyhow::Context;
 use futures::stream::StreamExt;
 use futures::{FutureExt, TryFutureExt};
 use homie_device::{Datatype, HomieDevice, Node, Property};
+use itertools::Itertools;
 use mijia::{DeviceId, MacAddress, MijiaEvent, MijiaSession, Readings, SensorProps};
 use rumqttc::MqttOptions;
 use rustls::ClientConfig;
@@ -86,7 +87,7 @@ async fn main() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
 enum ConnectionStatus {
     /// Not yet attempted to connect. Might already be connected from a previous
     /// run of this program.
@@ -255,6 +256,19 @@ async fn bluetooth_connection_loop(
 ) -> Result<(), anyhow::Error> {
     let mut next_scan_due = Instant::now();
     loop {
+        {
+            let counts = state
+                .lock()
+                .await
+                .sensors
+                .iter()
+                .map(|sensor| (sensor.connection_status, sensor.name.clone()))
+                .into_group_map();
+            for (state, names) in counts.iter().sorted() {
+                println!("{:?}: {} {:?}", state, names.len(), names);
+            }
+        }
+
         let now = Instant::now();
         if now > next_scan_due && state.lock().await.sensors.len() < sensor_names.len() {
             next_scan_due = now + SCAN_INTERVAL;
