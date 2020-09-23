@@ -392,7 +392,10 @@ async fn connect_sensor_at_idx(
     let mut state = state.lock().await;
     match status {
         Err(e) => {
-            println!("Failed to connect to {}: {:?}", sensor.name, e);
+            println!(
+                "Failed to connect to {} (now {:?}): {:?}",
+                sensor.name, sensor.connection_status, e
+            );
         }
         Ok(()) => {
             println!("Connected to {} and started notifications", sensor.name);
