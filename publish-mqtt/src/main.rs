@@ -22,6 +22,7 @@ const DEFAULT_PORT: u16 = 1883;
 const SCAN_INTERVAL: Duration = Duration::from_secs(15);
 const CONNECT_INTERVAL: Duration = Duration::from_secs(1);
 const UPDATE_TIMEOUT: Duration = Duration::from_secs(60);
+const SENSOR_CONNECT_RESERVATION_TIMEOUT: Duration = Duration::from_secs(5 * 60);
 const SENSOR_NAMES_FILENAME: &str = "sensor_names.conf";
 
 #[tokio::main]
@@ -382,7 +383,7 @@ async fn connect_sensor_at_idx(
 ) -> Result<(), anyhow::Error> {
     {
         state.lock().await.sensors[idx].connection_status = ConnectionStatus::Connecting {
-            reserved_until: Instant::now() + Duration::from_secs(5 * 60),
+            reserved_until: Instant::now() + SENSOR_CONNECT_RESERVATION_TIMEOUT,
         }
     }
     // Try to connect to a sensor.
