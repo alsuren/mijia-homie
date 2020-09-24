@@ -390,13 +390,13 @@ async fn connect_sensor_at_idx(
     session: &MijiaSession,
     idx: usize,
 ) -> Result<(), anyhow::Error> {
+    let mut sensor = clone_sensor_at_idx(state.clone(), idx).await;
     {
         state.lock().await.sensors[idx].connection_status = ConnectionStatus::Connecting {
             reserved_until: Instant::now() + SENSOR_CONNECT_RESERVATION_TIMEOUT,
         }
     }
     // Try to connect to a sensor.
-    let mut sensor = clone_sensor_at_idx(state.clone(), idx).await;
     println!("Trying to connect to {}", sensor.name);
     let status = connect_start_sensor(session, &mut sensor).await;
     let mut state = state.lock().await;
