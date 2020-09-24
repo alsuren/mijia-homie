@@ -208,6 +208,15 @@ impl Sensor {
             .with_context(|| std::line!().to_string())?;
         Ok(())
     }
+
+    async fn mark_connected(&mut self, homie: &mut HomieDevice) -> Result<(), anyhow::Error> {
+        homie
+            .add_node(self.as_node())
+            .await
+            .with_context(|| std::line!().to_string())?;
+        self.connection_status = ConnectionStatus::Connected;
+        Ok(())
+    }
 }
 
 async fn run_sensor_system(
@@ -400,12 +409,7 @@ async fn connect_sensor_at_idx(
         }
         Ok(()) => {
             println!("Connected to {} and started notifications", sensor.name);
-            state
-                .homie
-                .add_node(sensor.as_node())
-                .await
-                .with_context(|| std::line!().to_string())?;
-            sensor.connection_status = ConnectionStatus::Connected;
+            sensor.mark_connected(&mut state.homie).await?;
             sensor.last_update_timestamp = Instant::now();
         }
     }
@@ -517,12 +521,7 @@ async fn handle_bluetooth_event(
                     ConnectionStatus::Connected | ConnectionStatus::Connecting { .. } => {}
                     _ => {
                         println!("Got update from disconnected device {:?}. Connecting.", id);
-                        // TODO: Put this into a helper function, mark_connected.
-                        homie
-                            .add_node(sensor.as_node())
-                            .await
-                            .with_context(|| std::line!().to_string())?;
-                        sensor.connection_status = ConnectionStatus::Connected;
+                        sensor.mark_connected(homie).await?;
                         // TODO: Make sure the connection interval is set.
                     }
                 }
