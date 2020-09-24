@@ -358,10 +358,6 @@ async fn next_actionable_sensor(
     }
 }
 
-async fn clone_sensor_at_idx(state: Arc<Mutex<SensorState>>, idx: usize) -> Sensor {
-    state.lock().await.sensors[idx].clone()
-}
-
 async fn check_for_sensors(
     state: Arc<Mutex<SensorState>>,
     session: &MijiaSession,
@@ -393,12 +389,15 @@ async fn connect_sensor_at_idx(
     session: &MijiaSession,
     idx: usize,
 ) -> Result<(), anyhow::Error> {
-    let mut sensor = clone_sensor_at_idx(state.clone(), idx).await;
-    {
-        state.lock().await.sensors[idx].connection_status = ConnectionStatus::Connecting {
+    // Get a copy of the sensor, and update the state of the original to `Connecting`.
+    let mut sensor = {
+        let mut state = state.lock().await;
+        let sensor = state.sensors[idx].clone();
+        state.sensors[idx].connection_status = ConnectionStatus::Connecting {
             reserved_until: Instant::now() + SENSOR_CONNECT_RESERVATION_TIMEOUT,
-        }
-    }
+        };
+        sensor
+    };
     // Try to connect to a sensor.
     println!("Trying to connect to {}", sensor.name);
     let status = connect_start_sensor(session, &mut sensor).await;
