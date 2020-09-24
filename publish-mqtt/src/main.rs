@@ -266,6 +266,7 @@ async fn bluetooth_connection_loop(
 ) -> Result<(), anyhow::Error> {
     let mut next_scan_due = Instant::now();
     loop {
+        // Print count and list of sensors in each state.
         {
             let counts = state
                 .lock()
@@ -279,6 +280,7 @@ async fn bluetooth_connection_loop(
             }
         }
 
+        // Look for more sensors if enough time has elapsed since last time we tried.
         let now = Instant::now();
         if now > next_scan_due && state.lock().await.sensors.len() < sensor_names.len() {
             next_scan_due = now + SCAN_INTERVAL;
@@ -287,6 +289,7 @@ async fn bluetooth_connection_loop(
                 .with_context(|| std::line!().to_string())?;
         }
 
+        // Check the state of a single sensor and act on it if appropriate.
         {
             // TODO: Iterate over sensors here rather than storing next_idx in SensorState.
             action_next_sensor(state.clone(), session.clone())
