@@ -1,0 +1,14 @@
+[Unit]
+Description=publish-mqtt - send temperature readings to mqtt
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi
+Environment=RUST_BACKTRACE=1
+ExecStart=/home/pi/publish-mqtt
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
