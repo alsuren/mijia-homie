@@ -220,10 +220,14 @@ impl Sensor {
 }
 
 trait SensorStore {
+    fn get_by_id(&self, id: &DeviceId) -> Option<&Sensor>;
     fn get_mut_by_id(&mut self, id: &DeviceId) -> Option<&mut Sensor>;
 }
 
 impl SensorStore for Vec<Sensor> {
+    fn get_by_id(&self, id: &DeviceId) -> Option<&Sensor> {
+        self.iter().find(|s| &s.id == id)
+    }
     fn get_mut_by_id(&mut self, id: &DeviceId) -> Option<&mut Sensor> {
         self.iter_mut().find(|s| &s.id == id)
     }
