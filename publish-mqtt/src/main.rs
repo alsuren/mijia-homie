@@ -404,17 +404,17 @@ async fn connect_sensor_at_idx(
     let result = connect_and_subscribe_sensor_or_disconnect(session, &sensor.id).await;
     let mut state = state.lock().await;
     match result {
+        Ok(()) => {
+            println!("Connected to {} and started notifications", sensor.name);
+            sensor.mark_connected(&mut state.homie).await?;
+            sensor.last_update_timestamp = Instant::now();
+        }
         Err(e) => {
             println!(
                 "Failed to connect to {} (now {:?}): {:?}",
                 sensor.name, sensor.connection_status, e
             );
             sensor.connection_status = ConnectionStatus::Disconnected;
-        }
-        Ok(()) => {
-            println!("Connected to {} and started notifications", sensor.name);
-            sensor.mark_connected(&mut state.homie).await?;
-            sensor.last_update_timestamp = Instant::now();
         }
     }
     state.sensors[idx] = sensor;
