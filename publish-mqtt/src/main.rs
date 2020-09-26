@@ -219,6 +219,16 @@ impl Sensor {
     }
 }
 
+trait SensorStore {
+    fn get_mut_by_id(&mut self, id: &DeviceId) -> Option<&mut Sensor>;
+}
+
+impl SensorStore for Vec<Sensor> {
+    fn get_mut_by_id(&mut self, id: &DeviceId) -> Option<&mut Sensor> {
+        self.iter_mut().find(|s| &s.id == id)
+    }
+}
+
 async fn run_sensor_system(
     mut homie: HomieDevice,
     session: &MijiaSession,
@@ -311,14 +321,12 @@ async fn action_next_sensor(
     state: Arc<Mutex<SensorState>>,
     session: &MijiaSession,
 ) -> Result<(), anyhow::Error> {
-    let (idx, status, id) = match next_actionable_sensor(state.clone()).await {
+    let (name, status, id) = match next_actionable_sensor(state.clone()).await {
         Some(values) => values,
         None => return Ok(()),
     };
-    {
-        let sensor = &state.lock().await.sensors[idx];
-        println!("State of {} is {:?}", sensor.name, status);
-    }
+
+    println!("State of {} is {:?}", name, status);
     match status {
         ConnectionStatus::Connecting { reserved_until } if reserved_until > Instant::now() => {
             Ok(())
@@ -328,11 +336,11 @@ async fn action_next_sensor(
         | ConnectionStatus::Disconnected
         | ConnectionStatus::MarkedDisconnected
         | ConnectionStatus::WatchdogTimeOut => {
-            connect_sensor_at_idx(state, session, idx, id).await?;
+            connect_sensor_with_id(state, session, id).await?;
             Ok(())
         }
         ConnectionStatus::Connected => {
-            check_for_stale_sensor(state, session, idx).await?;
+            check_for_stale_sensor(state, session, id).await?;
             Ok(())
         }
     }
@@ -341,7 +349,7 @@ async fn action_next_sensor(
 // TODO: If we make sensors in the state Vec<Arc<Mutex<Sensor>>>, then this can return the Arc<Mutex<Sensor>> rather than the index.
 async fn next_actionable_sensor(
     state: Arc<Mutex<SensorState>>,
-) -> Option<(usize, ConnectionStatus, DeviceId)> {
+) -> Option<(String, ConnectionStatus, DeviceId)> {
     let mut state = &mut *state.lock().await;
     let idx = state.next_idx;
 
@@ -352,7 +360,11 @@ async fn next_actionable_sensor(
         }
         Some(sensor) => {
             state.next_idx += 1;
-            Some((idx, sensor.connection_status, sensor.id.clone()))
+            Some((
+                sensor.name.clone(),
+                sensor.connection_status,
+                sensor.id.clone(),
+            ))
         }
     }
 }
@@ -383,38 +395,37 @@ async fn check_for_sensors(
     Ok(())
 }
 
-async fn connect_sensor_at_idx(
+async fn connect_sensor_with_id(
     state: Arc<Mutex<SensorState>>,
     session: &MijiaSession,
-    idx: usize,
     id: DeviceId,
 ) -> Result<(), anyhow::Error> {
     // Update the state of the sensor to `Connecting`.
     {
         let mut state = state.lock().await;
+        let sensor = state.sensors.get_mut_by_id(&id).unwrap();
         println!(
             "Trying to connect to {} from status: {:?}",
-            state.sensors[idx].name, state.sensors[idx].connection_status
+            sensor.name, sensor.connection_status
         );
-        state.sensors[idx].connection_status = ConnectionStatus::Connecting {
+        sensor.connection_status = ConnectionStatus::Connecting {
             reserved_until: Instant::now() + SENSOR_CONNECT_RESERVATION_TIMEOUT,
         };
     };
     let result = connect_and_subscribe_sensor_or_disconnect(session, &id).await;
+
     let mut state = state.lock().await;
     let SensorState { sensors, homie, .. } = state.deref_mut();
+    let sensor = sensors.get_mut_by_id(&id).unwrap();
     match result {
         Ok(()) => {
-            println!(
-                "Connected to {} and started notifications",
-                sensors[idx].name
-            );
-            sensors[idx].mark_connected(homie).await?;
-            sensors[idx].last_update_timestamp = Instant::now();
+            println!("Connected to {} and started notifications", sensor.name);
+            sensor.mark_connected(homie).await?;
+            sensor.last_update_timestamp = Instant::now();
         }
         Err(e) => {
-            println!("Failed to connect to {}: {:?}", sensors[idx].name, e);
-            sensors[idx].connection_status = ConnectionStatus::Disconnected;
+            println!("Failed to connect to {}: {:?}", sensor.name, e);
+            sensor.connection_status = ConnectionStatus::Disconnected;
         }
     }
     Ok(())
@@ -451,10 +462,10 @@ async fn connect_and_subscribe_sensor_or_disconnect<'a>(
 async fn check_for_stale_sensor(
     state: Arc<Mutex<SensorState>>,
     session: &MijiaSession,
-    idx: usize,
+    id: DeviceId,
 ) -> Result<(), anyhow::Error> {
     let state = &mut *state.lock().await;
-    let sensor = &mut state.sensors[idx];
+    let sensor = state.sensors.get_mut_by_id(&id).unwrap();
     let now = Instant::now();
     if now - sensor.last_update_timestamp > UPDATE_TIMEOUT {
         println!(
@@ -506,7 +517,7 @@ async fn handle_bluetooth_event(
     let sensors = &mut state.sensors;
     match event {
         MijiaEvent::Readings { id, readings } => {
-            if let Some(sensor) = sensors.iter_mut().find(|s| s.id == id) {
+            if let Some(sensor) = sensors.get_mut_by_id(&id) {
                 sensor.publish_readings(homie, &readings).await?;
                 match sensor.connection_status {
                     ConnectionStatus::Connected | ConnectionStatus::Connecting { .. } => {}
@@ -521,7 +532,7 @@ async fn handle_bluetooth_event(
             }
         }
         MijiaEvent::Disconnected { id } => {
-            if let Some(sensor) = sensors.iter_mut().find(|s| s.id == id) {
+            if let Some(sensor) = sensors.get_mut_by_id(&id) {
                 if sensor.connection_status == ConnectionStatus::Connected {
                     println!("{} disconnected", sensor.name);
                     sensor.connection_status = ConnectionStatus::MarkedDisconnected;
