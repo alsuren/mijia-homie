@@ -1,9 +1,12 @@
 use anyhow::Context;
+use backoff::{future::FutureOperation as _, ExponentialBackoff};
 use futures::stream::StreamExt;
 use futures::{FutureExt, TryFutureExt};
 use homie_device::{Datatype, HomieDevice, Node, Property};
 use itertools::Itertools;
-use mijia::{DeviceId, MacAddress, MijiaEvent, MijiaSession, Readings, SensorProps};
+use mijia::{
+    DeviceId, MacAddress, MijiaEvent, MijiaSession, Readings, SensorProps, DBUS_METHOD_CALL_TIMEOUT,
+};
 use rumqttc::MqttOptions;
 use rustls::ClientConfig;
 use std::collections::HashMap;
@@ -95,10 +98,6 @@ enum ConnectionStatus {
     Unknown,
     /// Currently connecting. Don't try again until the timeout expires.
     Connecting { reserved_until: Instant },
-    /// Connected, but could not subscribe to updates. GATT characteristics
-    /// sometimes take a while to show up after connecting, so this retry is
-    /// a bit of a work-around.
-    SubscribingFailedOnce,
     /// Disconnected because we stopped getting updates.
     WatchdogTimeOut,
     /// We explicity disconnected because something else went wrong.
@@ -325,7 +324,6 @@ async fn action_next_sensor(
         }
         ConnectionStatus::Unknown
         | ConnectionStatus::Connecting { .. }
-        | ConnectionStatus::SubscribingFailedOnce
         | ConnectionStatus::Disconnected
         | ConnectionStatus::MarkedDisconnected
         | ConnectionStatus::WatchdogTimeOut => {
@@ -399,15 +397,19 @@ async fn connect_sensor_at_idx(
         sensor
     };
     // Try to connect to a sensor.
-    println!("Trying to connect to {}", sensor.name);
-    let status = connect_start_sensor(session, &mut sensor).await;
+    println!(
+        "Trying to connect to {} from status: {:?}",
+        sensor.name, sensor.connection_status
+    );
+    let result = connect_and_subscribe_sensor_or_disconnect(session, &sensor.id).await;
     let mut state = state.lock().await;
-    match status {
+    match result {
         Err(e) => {
             println!(
                 "Failed to connect to {} (now {:?}): {:?}",
                 sensor.name, sensor.connection_status, e
             );
+            sensor.connection_status = ConnectionStatus::Disconnected;
         }
         Ok(()) => {
             println!("Connected to {} and started notifications", sensor.name);
@@ -420,42 +422,31 @@ async fn connect_sensor_at_idx(
     Ok(())
 }
 
-async fn connect_start_sensor<'a>(
+async fn connect_and_subscribe_sensor_or_disconnect<'a>(
     session: &MijiaSession,
-    sensor: &mut Sensor,
+    id: &DeviceId,
 ) -> Result<(), anyhow::Error> {
-    println!("Connecting from status: {:?}", sensor.connection_status);
     session
         .bt_session
-        .connect(&sensor.id)
+        .connect(id)
         .await
         .with_context(|| std::line!().to_string())?;
-    match session.start_notify_sensor(&sensor.id).await {
-        Ok(()) => Ok(()),
-        Err(e) => {
-            // If starting notifications failed a second time, disconnect so
-            // that we start again from a clean state next time.
-            match sensor.connection_status {
-                ConnectionStatus::Unknown
-                | ConnectionStatus::Connecting { .. }
-                | ConnectionStatus::Disconnected
-                | ConnectionStatus::MarkedDisconnected
-                | ConnectionStatus::WatchdogTimeOut => {
-                    sensor.connection_status = ConnectionStatus::SubscribingFailedOnce;
-                }
-                ConnectionStatus::SubscribingFailedOnce => {
-                    session
-                        .bt_session
-                        .disconnect(&sensor.id)
-                        .await
-                        .with_context(|| std::line!().to_string())?;
-                    sensor.connection_status = ConnectionStatus::Disconnected;
-                }
-                ConnectionStatus::Connected => panic!("This should never happen."),
-            };
+
+    let mut backoff = ExponentialBackoff::default();
+    backoff.max_elapsed_time =
+        Some(SENSOR_CONNECT_RESERVATION_TIMEOUT - 2 * DBUS_METHOD_CALL_TIMEOUT);
+
+    (|| session.start_notify_sensor(id).map_err(Into::into))
+        .retry(backoff)
+        .or_else(|e| async {
+            session
+                .bt_session
+                .disconnect(id)
+                .await
+                .with_context(|| std::line!().to_string())?;
             Err(e)
-        }
-    }
+        })
+        .await
 }
 
 /// If the sensor hasn't sent any updates in a while, disconnect it so we will try to reconnect.
