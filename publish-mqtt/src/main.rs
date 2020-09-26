@@ -12,6 +12,7 @@ use rustls::ClientConfig;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
+use std::ops::DerefMut;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::Mutex;
@@ -310,7 +311,7 @@ async fn action_next_sensor(
     state: Arc<Mutex<SensorState>>,
     session: &MijiaSession,
 ) -> Result<(), anyhow::Error> {
-    let (idx, status) = match next_actionable_sensor(state.clone()).await {
+    let (idx, status, id) = match next_actionable_sensor(state.clone()).await {
         Some(values) => values,
         None => return Ok(()),
     };
@@ -327,7 +328,7 @@ async fn action_next_sensor(
         | ConnectionStatus::Disconnected
         | ConnectionStatus::MarkedDisconnected
         | ConnectionStatus::WatchdogTimeOut => {
-            connect_sensor_at_idx(state, session, idx).await?;
+            connect_sensor_at_idx(state, session, idx, id).await?;
             Ok(())
         }
         ConnectionStatus::Connected => {
@@ -340,7 +341,7 @@ async fn action_next_sensor(
 // TODO: If we make sensors in the state Vec<Arc<Mutex<Sensor>>>, then this can return the Arc<Mutex<Sensor>> rather than the index.
 async fn next_actionable_sensor(
     state: Arc<Mutex<SensorState>>,
-) -> Option<(usize, ConnectionStatus)> {
+) -> Option<(usize, ConnectionStatus, DeviceId)> {
     let mut state = &mut *state.lock().await;
     let idx = state.next_idx;
 
@@ -351,7 +352,7 @@ async fn next_actionable_sensor(
         }
         Some(sensor) => {
             state.next_idx += 1;
-            Some((idx, sensor.connection_status))
+            Some((idx, sensor.connection_status, sensor.id.clone()))
         }
     }
 }
@@ -386,39 +387,36 @@ async fn connect_sensor_at_idx(
     state: Arc<Mutex<SensorState>>,
     session: &MijiaSession,
     idx: usize,
+    id: DeviceId,
 ) -> Result<(), anyhow::Error> {
-    // Get a copy of the sensor, and update the state of the original to `Connecting`.
-    let mut sensor = {
+    // Update the state of the sensor to `Connecting`.
+    {
         let mut state = state.lock().await;
-        let sensor = state.sensors[idx].clone();
+        println!(
+            "Trying to connect to {} from status: {:?}",
+            state.sensors[idx].name, state.sensors[idx].connection_status
+        );
         state.sensors[idx].connection_status = ConnectionStatus::Connecting {
             reserved_until: Instant::now() + SENSOR_CONNECT_RESERVATION_TIMEOUT,
         };
-        sensor
     };
-    // Try to connect to a sensor.
-    println!(
-        "Trying to connect to {} from status: {:?}",
-        sensor.name, sensor.connection_status
-    );
-    let result = connect_and_subscribe_sensor_or_disconnect(session, &sensor.id).await;
+    let result = connect_and_subscribe_sensor_or_disconnect(session, &id).await;
     let mut state = state.lock().await;
+    let SensorState { sensors, homie, .. } = state.deref_mut();
     match result {
         Ok(()) => {
-            println!("Connected to {} and started notifications", sensor.name);
-            sensor.mark_connected(&mut state.homie).await?;
-            sensor.last_update_timestamp = Instant::now();
+            println!(
+                "Connected to {} and started notifications",
+                sensors[idx].name
+            );
+            sensors[idx].mark_connected(homie).await?;
+            sensors[idx].last_update_timestamp = Instant::now();
         }
         Err(e) => {
-            println!(
-                "Failed to connect to {} (now {:?}): {:?}",
-                sensor.name, sensor.connection_status, e
-            );
-            sensor.connection_status = ConnectionStatus::Disconnected;
+            println!("Failed to connect to {}: {:?}", sensors[idx].name, e);
+            sensors[idx].connection_status = ConnectionStatus::Disconnected;
         }
     }
-    state.sensors[idx] = sensor;
-
     Ok(())
 }
 
