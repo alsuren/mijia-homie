@@ -87,6 +87,44 @@ def mutate_smarthome_items_model(model, mac_to_name):
             assert model[key] == value
 
 
+def link_key(mac, title_suffix, homie_suffix):
+    return (
+        f"MijiaBridge_{mac}_{title_suffix} -> "
+        f"mqtt:homie300:19078e8a:mijia-bridge-raspi{mac}#{homie_suffix}"
+    )
+
+
+def new_link(mac, title_suffix, homie_suffix):
+    return {
+        "class": "org.eclipse.smarthome.core.thing.link.ItemChannelLink",
+        "value": {
+            "channelUID": {
+                "segments": [
+                    "mqtt",
+                    "homie300",
+                    "19078e8a",
+                    "mijia-bridge-raspi",
+                    f"{mac}#{homie_suffix}",
+                ]
+            },
+            "configuration": {"properties": {"profile": "system:default"}},
+            "itemName": f"MijiaBridge_{mac}_{title_suffix}",
+        },
+    }
+
+
+def mutate_smarthome_link_model(model, mac_to_name):
+    for mac, name in mac_to_name.items():
+        for title_suffix, homie_suffix in [
+            ("Temperature", "temperature"),
+            ("Humidity", "humidity"),
+            ("BatteryLevel", "battery"),
+        ]:
+            key = link_key(mac, title_suffix, homie_suffix)
+            if key not in model:
+                model[key] = new_link(mac, title_suffix, homie_suffix)
+
+
 def add_named_sensors_to_grafana(mac_to_name, infilename, outfilename):
     with open(infilename) as f:
         model = json.load(f)
@@ -103,6 +141,17 @@ def add_named_sensors_to_smarthome_items(mac_to_name, infilename, outfilename):
         model = json.load(f)
 
     mutate_smarthome_items_model(model, mac_to_name)
+
+    with open(outfilename, "w") as f:
+        json.dump(model, f, indent=2)
+        f.write("\n")
+
+
+def add_named_sensors_to_smarthome_link(mac_to_name, infilename, outfilename):
+    with open(infilename) as f:
+        model = json.load(f)
+
+    mutate_smarthome_link_model(model, mac_to_name)
 
     with open(outfilename, "w") as f:
         json.dump(model, f, indent=2)
@@ -137,4 +186,14 @@ if __name__ == "__main__":
             mac_to_name,
             f"{smarthome_jsondb_input}/org.eclipse.smarthome.core.items.Item.json",
             f"{smarthome_jsondb_output}/org.eclipse.smarthome.core.items.Item.json",
+        )
+        # TODO: org.eclipse.smarthome.core.items.Metadata.json
+
+        # TODO: maybe also org.eclipse.smarthome.core.thing.Thing.json?
+
+        # org.eclipse.smarthome.core.thing.link.ItemChannelLink.json
+        add_named_sensors_to_smarthome_link(
+            mac_to_name,
+            f"{smarthome_jsondb_input}/org.eclipse.smarthome.core.thing.link.ItemChannelLink.json",
+            f"{smarthome_jsondb_output}/org.eclipse.smarthome.core.thing.link.ItemChannelLink.json",
         )
