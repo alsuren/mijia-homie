@@ -87,6 +87,35 @@ def mutate_smarthome_items_model(model, mac_to_name):
             assert model[key] == value
 
 
+def metadata_key(mac, title):
+    return f"ga:{title}"
+
+
+def new_metadata(title, value):
+    return (
+        {
+            "class": "org.eclipse.smarthome.core.items.Metadata",
+            "value": {
+                "key": {"segments": ["ga", title]},
+                "value": value,
+                "configuration": {},
+            },
+        },
+    )
+
+
+def mutate_smarthome_metadata_model(model, mac_to_name):
+    for mac, name in mac_to_name.items():
+        for title, value in [
+            ("MijiaBridge_{mac}", "Thermostat"),
+            ("MijiaBridge_{mac}_Temperature", "thermostatTemperatureAmbient"),
+            ("MijiaBridge_{mac}_Humidity", "thermostatHumidityAmbient"),
+        ]:
+            key = metadata_key(mac, title)
+            if key not in model:
+                model[key] = new_metadata(title, value)
+
+
 def link_key(mac, title_suffix, homie_suffix):
     return (
         f"MijiaBridge_{mac}_{title_suffix} -> "
@@ -147,6 +176,17 @@ def add_named_sensors_to_smarthome_items(mac_to_name, infilename, outfilename):
         f.write("\n")
 
 
+def add_named_sensors_to_smarthome_metadata(mac_to_name, infilename, outfilename):
+    with open(infilename) as f:
+        model = json.load(f)
+
+    mutate_smarthome_metadata_model(model, mac_to_name)
+
+    with open(outfilename, "w") as f:
+        json.dump(model, f, indent=2)
+        f.write("\n")
+
+
 def add_named_sensors_to_smarthome_link(mac_to_name, infilename, outfilename):
     with open(infilename) as f:
         model = json.load(f)
@@ -188,7 +228,11 @@ if __name__ == "__main__":
             f"{smarthome_jsondb_output}/org.eclipse.smarthome.core.items.Item.json",
         )
         # TODO: org.eclipse.smarthome.core.items.Metadata.json
-
+        add_named_sensors_to_smarthome_metadata(
+            mac_to_name,
+            f"{smarthome_jsondb_input}/org.eclipse.smarthome.core.items.Metadata.json",
+            f"{smarthome_jsondb_output}/org.eclipse.smarthome.core.items.Metadata.json",
+        )
         # TODO: maybe also org.eclipse.smarthome.core.thing.Thing.json?
 
         # org.eclipse.smarthome.core.thing.link.ItemChannelLink.json
