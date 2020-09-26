@@ -98,7 +98,7 @@ def add_named_sensors_to_grafana(mac_to_name, infilename, outfilename):
         f.write("\n")
 
 
-def add_named_sensors_to_smarthome(mac_to_name, infilename, outfilename):
+def add_named_sensors_to_smarthome_items(mac_to_name, infilename, outfilename):
     with open(infilename) as f:
         model = json.load(f)
 
@@ -110,20 +110,31 @@ def add_named_sensors_to_smarthome(mac_to_name, infilename, outfilename):
 
 
 if __name__ == "__main__":
-    namesfilename = os.environ.get("NAMES_INPUT", "sensor_names.conf")
+    namesfilename = os.environ.get("NAMES_INPUT")
+    if not namesfilename:
+        print(
+            "Please set NAMES_INPUT and either GRAFANA_ or SMARTHOME_JSONDB_ "
+            "INPUT and OUTPUT."
+        )
+        exit(1)
 
     with open(namesfilename) as f:
         mac_to_name = dict(l.strip().replace(":", "").split("=") for l in f)
 
-    add_named_sensors_to_grafana(
-        mac_to_name,
-        os.environ.get("GRAFANA_INPUT", "grafana-home.json"),
-        os.environ.get("GRAFANA_OUPTUT", "new-grafana-home.json"),
-    )
-    add_named_sensors_to_smarthome(
-        mac_to_name,
-        os.environ.get("SMARTHOME_INPUT", "org.eclipse.smarthome.core.items.Item.json"),
-        os.environ.get(
-            "SMARTHOME_OUTPUT", "new-org.eclipse.smarthome.core.items.Item.json"
-        ),
-    )
+    grafana_input = os.environ.get("GRAFANA_INPUT")
+    grafana_output = os.environ.get("GRAFANA_OUPTUT")
+    if grafana_input and grafana_output:
+        add_named_sensors_to_grafana(
+            mac_to_name, grafana_input, grafana_output,
+        )
+
+    smarthome_jsondb_input = os.environ.get("SMARTHOME_JSONDB_INPUT")
+    smarthome_jsondb_output = os.environ.get("SMARTHOME_JSONDB_OUTPUT")
+    if smarthome_jsondb_input and smarthome_jsondb_output:
+        if not os.path.exists(smarthome_jsondb_output):
+            os.mkdir(smarthome_jsondb_output)
+        add_named_sensors_to_smarthome_items(
+            mac_to_name,
+            f"{smarthome_jsondb_input}/org.eclipse.smarthome.core.items.Item.json",
+            f"{smarthome_jsondb_output}/org.eclipse.smarthome.core.items.Item.json",
+        )
