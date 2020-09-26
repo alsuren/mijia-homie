@@ -53,7 +53,7 @@ def mutate_grafana_model(model, mac_to_name):
                 )
 
 
-def mutate_smarthome_model(model, mac_to_name):
+def mutate_smarthome_items_model(model, mac_to_name):
     for mac, name in mac_to_name.items():
         if f"MijiaBridge_{mac}" not in model:
             print(f"adding MijiaBridge_{mac} => {name}")
@@ -102,7 +102,7 @@ def add_named_sensors_to_smarthome_items(mac_to_name, infilename, outfilename):
     with open(infilename) as f:
         model = json.load(f)
 
-    mutate_smarthome_model(model, mac_to_name)
+    mutate_smarthome_items_model(model, mac_to_name)
 
     with open(outfilename, "w") as f:
         json.dump(model, f, indent=2)
