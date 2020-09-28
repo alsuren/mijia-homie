@@ -220,20 +220,6 @@ impl Sensor {
     }
 }
 
-trait SensorStore {
-    fn get_by_id(&self, id: &DeviceId) -> Option<&Sensor>;
-    fn get_mut_by_id(&mut self, id: &DeviceId) -> Option<&mut Sensor>;
-}
-
-impl SensorStore for Vec<Sensor> {
-    fn get_by_id(&self, id: &DeviceId) -> Option<&Sensor> {
-        self.iter().find(|s| &s.id == id)
-    }
-    fn get_mut_by_id(&mut self, id: &DeviceId) -> Option<&mut Sensor> {
-        self.iter_mut().find(|s| &s.id == id)
-    }
-}
-
 async fn run_sensor_system(
     mut homie: HomieDevice,
     session: &MijiaSession,
@@ -247,7 +233,7 @@ async fn run_sensor_system(
         .with_context(|| std::line!().to_string())?;
 
     let state = Arc::new(Mutex::new(SensorState {
-        sensors: vec![],
+        sensors: HashMap::new(),
         homie,
     }));
 
@@ -286,7 +272,7 @@ async fn bluetooth_connection_loop(
                 .lock()
                 .await
                 .sensors
-                .iter()
+                .values()
                 .map(|sensor| (sensor.connection_status, sensor.name.clone()))
                 .into_group_map();
             for (state, names) in counts.iter().sorted() {
@@ -305,15 +291,9 @@ async fn bluetooth_connection_loop(
 
         // Check the state of each sensor and act on it if appropriate.
         {
-            let ids: Vec<DeviceId> = state
-                .lock()
-                .await
-                .sensors
-                .iter()
-                .map(|sensor| sensor.id.clone())
-                .collect();
+            let ids: Vec<DeviceId> = state.lock().await.sensors.keys().cloned().collect();
             for id in ids {
-                let sensor_status = state.lock().await.sensors.get_by_id(&id).map(|sensor| {
+                let sensor_status = state.lock().await.sensors.get(&id).map(|sensor| {
                     log::trace!("State of {} is {:?}", sensor.name, sensor.connection_status);
                     sensor.connection_status
                 });
@@ -330,7 +310,7 @@ async fn bluetooth_connection_loop(
 
 #[derive(Debug)]
 struct SensorState {
-    sensors: Vec<Sensor>,
+    sensors: HashMap<DeviceId, Sensor>,
     homie: HomieDevice,
 }
 
@@ -375,11 +355,12 @@ async fn check_for_sensors(
         if sensor_names.contains_key(&props.mac_address)
             && !state
                 .sensors
-                .iter()
+                .values()
                 .find(|s| s.mac_address == props.mac_address)
                 .is_some()
         {
-            state.sensors.push(Sensor::new(props, &sensor_names))
+            let sensor = Sensor::new(props, &sensor_names);
+            state.sensors.insert(sensor.id.clone(), sensor);
         }
     }
     Ok(())
@@ -393,7 +374,7 @@ async fn connect_sensor_with_id(
     // Update the state of the sensor to `Connecting`.
     {
         let mut state = state.lock().await;
-        let sensor = state.sensors.get_mut_by_id(&id).unwrap();
+        let sensor = state.sensors.get_mut(&id).unwrap();
         println!(
             "Trying to connect to {} from status: {:?}",
             sensor.name, sensor.connection_status
@@ -405,7 +386,7 @@ async fn connect_sensor_with_id(
     let result = connect_and_subscribe_sensor_or_disconnect(session, &id).await;
 
     let state = &mut *state.lock().await;
-    let sensor = state.sensors.get_mut_by_id(&id).unwrap();
+    let sensor = state.sensors.get_mut(&id).unwrap();
     match result {
         Ok(()) => {
             println!("Connected to {} and started notifications", sensor.name);
@@ -455,7 +436,7 @@ async fn check_for_stale_sensor(
     id: DeviceId,
 ) -> Result<(), anyhow::Error> {
     let state = &mut *state.lock().await;
-    let sensor = state.sensors.get_mut_by_id(&id).unwrap();
+    let sensor = state.sensors.get_mut(&id).unwrap();
     let now = Instant::now();
     if now - sensor.last_update_timestamp > UPDATE_TIMEOUT {
         println!(
@@ -507,7 +488,7 @@ async fn handle_bluetooth_event(
     let sensors = &mut state.sensors;
     match event {
         MijiaEvent::Readings { id, readings } => {
-            if let Some(sensor) = sensors.get_mut_by_id(&id) {
+            if let Some(sensor) = sensors.get_mut(&id) {
                 sensor.publish_readings(homie, &readings).await?;
                 match sensor.connection_status {
                     ConnectionStatus::Connected | ConnectionStatus::Connecting { .. } => {}
@@ -522,7 +503,7 @@ async fn handle_bluetooth_event(
             }
         }
         MijiaEvent::Disconnected { id } => {
-            if let Some(sensor) = sensors.get_mut_by_id(&id) {
+            if let Some(sensor) = sensors.get_mut(&id) {
                 if sensor.connection_status == ConnectionStatus::Connected {
                     println!("{} disconnected", sensor.name);
                     sensor.connection_status = ConnectionStatus::MarkedDisconnected;
