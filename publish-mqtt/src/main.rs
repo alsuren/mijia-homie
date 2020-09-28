@@ -314,7 +314,7 @@ async fn bluetooth_connection_loop(
                 .collect();
             for id in ids {
                 let sensor_status = state.lock().await.sensors.get_by_id(&id).map(|sensor| {
-                    println!("State of {} is {:?}", sensor.name, sensor.connection_status);
+                    log::trace!("State of {} is {:?}", sensor.name, sensor.connection_status);
                     sensor.connection_status
                 });
                 if let Some(connection_status) = sensor_status {
