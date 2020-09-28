@@ -308,7 +308,7 @@ async fn bluetooth_connection_loop(
         // Check the state of a single sensor and act on it if appropriate.
         {
             // TODO: Iterate over sensors here rather than storing next_idx in SensorState.
-            action_next_sensor(state.clone(), session.clone())
+            action_next_sensor(state.clone(), session)
                 .await
                 .with_context(|| std::line!().to_string())?;
         }
