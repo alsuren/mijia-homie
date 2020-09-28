@@ -326,12 +326,21 @@ async fn action_next_sensor(
     state: Arc<Mutex<SensorState>>,
     session: &MijiaSession,
 ) -> Result<(), anyhow::Error> {
-    let (name, status, id) = match next_actionable_sensor(state.clone()).await {
-        Some(values) => values,
-        None => return Ok(()),
-    };
+    match next_actionable_sensor(state.clone()).await {
+        Some((name, status, id)) => {
+            println!("State of {} is {:?}", name, status);
+            action_sensor(state, session, id, status).await
+        }
+        None => Ok(()),
+    }
+}
 
-    println!("State of {} is {:?}", name, status);
+async fn action_sensor(
+    state: Arc<Mutex<SensorState>>,
+    session: &MijiaSession,
+    id: DeviceId,
+    status: ConnectionStatus,
+) -> Result<(), anyhow::Error> {
     match status {
         ConnectionStatus::Connecting { reserved_until } if reserved_until > Instant::now() => {
             Ok(())
