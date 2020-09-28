@@ -10,7 +10,6 @@ use rustls::ClientConfig;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
-use std::ops::DerefMut;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::Mutex;
@@ -420,13 +419,12 @@ async fn connect_sensor_with_id(
     };
     let result = connect_and_subscribe_sensor_or_disconnect(session, &id).await;
 
-    let mut state = state.lock().await;
-    let SensorState { sensors, homie, .. } = state.deref_mut();
-    let sensor = sensors.get_mut_by_id(&id).unwrap();
+    let state = &mut *state.lock().await;
+    let sensor = state.sensors.get_mut_by_id(&id).unwrap();
     match result {
         Ok(()) => {
             println!("Connected to {} and started notifications", sensor.name);
-            sensor.mark_connected(homie).await?;
+            sensor.mark_connected(&mut state.homie).await?;
             sensor.last_update_timestamp = Instant::now();
         }
         Err(e) => {
