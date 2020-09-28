@@ -248,7 +248,6 @@ async fn run_sensor_system(
 
     let state = Arc::new(Mutex::new(SensorState {
         sensors: vec![],
-        next_idx: 0,
         homie,
     }));
 
@@ -304,12 +303,26 @@ async fn bluetooth_connection_loop(
                 .with_context(|| std::line!().to_string())?;
         }
 
-        // Check the state of a single sensor and act on it if appropriate.
+        // Check the state of each sensor and act on it if appropriate.
         {
-            // TODO: Iterate over sensors here rather than storing next_idx in SensorState.
-            action_next_sensor(state.clone(), session)
+            let ids: Vec<DeviceId> = state
+                .lock()
                 .await
-                .with_context(|| std::line!().to_string())?;
+                .sensors
+                .iter()
+                .map(|sensor| sensor.id.clone())
+                .collect();
+            for id in ids {
+                let sensor_status = state.lock().await.sensors.get_by_id(&id).map(|sensor| {
+                    println!("State of {} is {:?}", sensor.name, sensor.connection_status);
+                    sensor.connection_status
+                });
+                if let Some(connection_status) = sensor_status {
+                    action_sensor(state.clone(), session, id, connection_status)
+                        .await
+                        .with_context(|| std::line!().to_string())?;
+                }
+            }
         }
         time::delay_for(CONNECT_INTERVAL).await;
     }
@@ -318,21 +331,7 @@ async fn bluetooth_connection_loop(
 #[derive(Debug)]
 struct SensorState {
     sensors: Vec<Sensor>,
-    next_idx: usize,
     homie: HomieDevice,
-}
-
-async fn action_next_sensor(
-    state: Arc<Mutex<SensorState>>,
-    session: &MijiaSession,
-) -> Result<(), anyhow::Error> {
-    match next_actionable_sensor(state.clone()).await {
-        Some((name, status, id)) => {
-            println!("State of {} is {:?}", name, status);
-            action_sensor(state, session, id, status).await
-        }
-        None => Ok(()),
-    }
 }
 
 async fn action_sensor(
@@ -356,29 +355,6 @@ async fn action_sensor(
         ConnectionStatus::Connected => {
             check_for_stale_sensor(state, session, id).await?;
             Ok(())
-        }
-    }
-}
-
-// TODO: If we make sensors in the state Vec<Arc<Mutex<Sensor>>>, then this can return the Arc<Mutex<Sensor>> rather than the index.
-async fn next_actionable_sensor(
-    state: Arc<Mutex<SensorState>>,
-) -> Option<(String, ConnectionStatus, DeviceId)> {
-    let mut state = &mut *state.lock().await;
-    let idx = state.next_idx;
-
-    match state.sensors.get(idx) {
-        None => {
-            state.next_idx = 0;
-            None
-        }
-        Some(sensor) => {
-            state.next_idx += 1;
-            Some((
-                sensor.name.clone(),
-                sensor.connection_status,
-                sensor.id.clone(),
-            ))
         }
     }
 }
