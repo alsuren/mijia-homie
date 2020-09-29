@@ -1,3 +1,5 @@
+#![type_length_limit = "1129369"]
+
 use backoff::{future::FutureOperation, ExponentialBackoff};
 use futures::stream::StreamExt;
 use futures::{FutureExt, TryFutureExt};
