@@ -3,14 +3,14 @@
 //!
 //! See the examples directory for examples of how to use it.
 
-use async_channel::{SendError, Sender};
+use async_channel::Sender;
 use futures::future::try_join;
 use futures::FutureExt;
 use local_ipaddress;
 use mac_address::get_mac_address;
 use rumqttc::{
-    self, Event, EventLoop, Incoming, LastWill, MqttOptions, Publish, QoS, Request, Subscribe,
-    Unsubscribe,
+    self, ClientError, Event, EventLoop, Incoming, LastWill, MqttOptions, Publish, QoS, Request,
+    Subscribe, Unsubscribe,
 };
 use std::error::Error;
 use std::fmt::{self, Debug, Display, Formatter};
@@ -228,7 +228,7 @@ impl HomieDeviceBuilder {
             HomieDevice,
             impl Future<Output = Result<(), Box<dyn Error + Send + Sync>>>,
         ),
-        SendError<Request>,
+        ClientError,
     > {
         let (event_loop, mut homie, stats, firmware, update_callback) = self.build();
 
@@ -321,7 +321,7 @@ impl HomieDevice {
         }
     }
 
-    async fn start(&mut self) -> Result<(), SendError<Request>> {
+    async fn start(&mut self) -> Result<(), ClientError> {
         assert_eq!(self.state, State::Disconnected);
         self.publisher
             .publish_retained("$homie", HOMIE_VERSION)
@@ -408,7 +408,7 @@ impl HomieDevice {
     ///
     /// This will panic if you attempt to add a node with the same ID as a node which was previously
     /// added.
-    pub async fn add_node(&mut self, node: Node) -> Result<(), SendError<Request>> {
+    pub async fn add_node(&mut self, node: Node) -> Result<(), ClientError> {
         // First check that there isn't already a node with the same ID.
         if self.nodes.iter().any(|n| n.id == node.id) {
             panic!("Tried to add node with duplicate ID: {:?}", node);
@@ -423,7 +423,7 @@ impl HomieDevice {
     }
 
     /// Remove the node with the given ID.
-    pub async fn remove_node(&mut self, node_id: &str) -> Result<(), SendError<Request>> {
+    pub async fn remove_node(&mut self, node_id: &str) -> Result<(), ClientError> {
         // Panic on attempt to remove a node which was never added.
         let index = self.nodes.iter().position(|n| n.id == node_id).unwrap();
         self.unpublish_node(&self.nodes[index]).await?;
@@ -431,7 +431,7 @@ impl HomieDevice {
         self.publish_nodes().await
     }
 
-    async fn publish_node(&self, node: &Node) -> Result<(), SendError<Request>> {
+    async fn publish_node(&self, node: &Node) -> Result<(), ClientError> {
         self.publisher
             .publish_retained(&format!("{}/$name", node.id), node.name.as_str())
             .await?;
@@ -484,7 +484,7 @@ impl HomieDevice {
         Ok(())
     }
 
-    async fn unpublish_node(&self, node: &Node) -> Result<(), SendError<Request>> {
+    async fn unpublish_node(&self, node: &Node) -> Result<(), ClientError> {
         for property in &node.properties {
             if property.settable {
                 self.publisher
@@ -495,7 +495,7 @@ impl HomieDevice {
         Ok(())
     }
 
-    async fn publish_nodes(&mut self) -> Result<(), SendError<Request>> {
+    async fn publish_nodes(&mut self) -> Result<(), ClientError> {
         let node_ids = self
             .nodes
             .iter()
@@ -505,7 +505,7 @@ impl HomieDevice {
         self.publisher.publish_retained("$nodes", node_ids).await
     }
 
-    async fn set_state(&mut self, state: State) -> Result<(), SendError<Request>> {
+    async fn set_state(&mut self, state: State) -> Result<(), ClientError> {
         self.state = state;
         self.publisher.publish_retained("$state", self.state).await
     }
@@ -513,14 +513,14 @@ impl HomieDevice {
     /// Update the [state](https://homieiot.github.io/specification/#device-lifecycle) of the Homie
     /// device to 'ready'. This should be called once it is ready to begin normal operation, or to
     /// return to normal operation after calling `sleep()` or `alert()`.
-    pub async fn ready(&mut self) -> Result<(), SendError<Request>> {
+    pub async fn ready(&mut self) -> Result<(), ClientError> {
         assert!(&[State::Init, State::Sleeping, State::Alert].contains(&self.state));
         self.set_state(State::Ready).await
     }
 
     /// Update the [state](https://homieiot.github.io/specification/#device-lifecycle) of the Homie
     /// device to 'sleeping'. This should be only be called after `ready()`, otherwise it will panic.
-    pub async fn sleep(&mut self) -> Result<(), SendError<Request>> {
+    pub async fn sleep(&mut self) -> Result<(), ClientError> {
         assert_eq!(self.state, State::Ready);
         self.set_state(State::Sleeping).await
     }
@@ -528,14 +528,14 @@ impl HomieDevice {
     /// Update the [state](https://homieiot.github.io/specification/#device-lifecycle) of the Homie
     /// device to 'alert', to indicate that something wrong is happening and manual intervention may
     /// be required. This should be only be called after `ready()`, otherwise it will panic.
-    pub async fn alert(&mut self) -> Result<(), SendError<Request>> {
+    pub async fn alert(&mut self) -> Result<(), ClientError> {
         assert_eq!(self.state, State::Ready);
         self.set_state(State::Alert).await
     }
 
     /// Disconnect cleanly from the MQTT broker, after updating the state of the Homie device to
     // 'disconnected'.
-    pub async fn disconnect(mut self) -> Result<(), SendError<Request>> {
+    pub async fn disconnect(mut self) -> Result<(), ClientError> {
         self.set_state(State::Disconnected).await?;
         self.publisher.disconnect().await
     }
@@ -547,7 +547,7 @@ impl HomieDevice {
         node_id: &str,
         property_id: &str,
         value: impl ToString,
-    ) -> Result<(), SendError<Request>> {
+    ) -> Result<(), ClientError> {
         self.publisher
             .publish_retained(&format!("{}/{}", node_id, property_id), value.to_string())
             .await
@@ -572,27 +572,31 @@ impl DevicePublisher {
         &self,
         subtopic: &str,
         value: impl Into<Vec<u8>>,
-    ) -> Result<(), SendError<Request>> {
+    ) -> Result<(), ClientError> {
         let topic = format!("{}/{}", self.device_base, subtopic);
         let mut publish = Publish::new(topic, QoS::AtLeastOnce, value);
         publish.retain = true;
-        self.requests_tx.send(publish.into()).await
+        self.requests_tx.send(publish.into()).await?;
+        Ok(())
     }
 
-    async fn disconnect(&self) -> Result<(), SendError<Request>> {
-        self.requests_tx.send(Request::Disconnect).await
+    async fn disconnect(&self) -> Result<(), ClientError> {
+        self.requests_tx.send(Request::Disconnect).await?;
+        Ok(())
     }
 
-    async fn subscribe(&self, subtopic: &str) -> Result<(), SendError<Request>> {
+    async fn subscribe(&self, subtopic: &str) -> Result<(), ClientError> {
         let topic = format!("{}/{}", self.device_base, subtopic);
         let subscribe = Subscribe::new(topic, QoS::AtLeastOnce);
-        self.requests_tx.send(subscribe.into()).await
+        self.requests_tx.send(subscribe.into()).await?;
+        Ok(())
     }
 
-    async fn unsubscribe(&self, subtopic: &str) -> Result<(), SendError<Request>> {
+    async fn unsubscribe(&self, subtopic: &str) -> Result<(), ClientError> {
         let topic = format!("{}/{}", self.device_base, subtopic);
         let unsubscribe = Unsubscribe::new(topic);
-        self.requests_tx.send(unsubscribe.into()).await
+        self.requests_tx.send(unsubscribe.into()).await?;
+        Ok(())
     }
 }
 
@@ -615,7 +619,7 @@ impl HomieStats {
     }
 
     /// Send initial topics.
-    async fn start(&self) -> Result<(), SendError<Request>> {
+    async fn start(&self) -> Result<(), ClientError> {
         self.publisher
             .publish_retained("$stats/interval", STATS_INTERVAL.as_secs().to_string())
             .await
@@ -656,7 +660,7 @@ impl HomieFirmware {
     }
 
     /// Send initial topics.
-    async fn start(&self) -> Result<(), SendError<Request>> {
+    async fn start(&self) -> Result<(), ClientError> {
         self.publisher
             .publish_retained("$localip", local_ipaddress::get().unwrap())
             .await?;
@@ -740,7 +744,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn start_succeeds_with_no_nodes() -> Result<(), SendError<Request>> {
+    async fn start_succeeds_with_no_nodes() -> Result<(), ClientError> {
         let (mut device, rx) = make_test_device();
 
         device.start().await?;
@@ -752,7 +756,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn sleep_then_ready_again_succeeds() -> Result<(), SendError<Request>> {
+    async fn sleep_then_ready_again_succeeds() -> Result<(), ClientError> {
         let (mut device, rx) = make_test_device();
 
         device.start().await?;
@@ -766,7 +770,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn alert_then_ready_again_succeeds() -> Result<(), SendError<Request>> {
+    async fn alert_then_ready_again_succeeds() -> Result<(), ClientError> {
         let (mut device, rx) = make_test_device();
 
         device.start().await?;
@@ -780,7 +784,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn disconnect_succeeds_before_ready() -> Result<(), SendError<Request>> {
+    async fn disconnect_succeeds_before_ready() -> Result<(), ClientError> {
         let (mut device, rx) = make_test_device();
 
         device.start().await?;
@@ -792,7 +796,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn disconnect_succeeds_after_ready() -> Result<(), SendError<Request>> {
+    async fn disconnect_succeeds_after_ready() -> Result<(), ClientError> {
         let (mut device, rx) = make_test_device();
 
         device.start().await?;
@@ -805,7 +809,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn minimal_build_succeeds() -> Result<(), SendError<Request>> {
+    async fn minimal_build_succeeds() -> Result<(), ClientError> {
         let builder = HomieDevice::builder(
             "homie/test-device",
             "Test device",
@@ -823,7 +827,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn set_firmware_build_succeeds() -> Result<(), SendError<Request>> {
+    async fn set_firmware_build_succeeds() -> Result<(), ClientError> {
         let mut builder = HomieDevice::builder(
             "homie/test-device",
             "Test device",
@@ -843,7 +847,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn add_node_succeeds_before_and_after_start() -> Result<(), SendError<Request>> {
+    async fn add_node_succeeds_before_and_after_start() -> Result<(), ClientError> {
         let (mut device, rx) = make_test_device();
 
         device
@@ -865,7 +869,7 @@ mod tests {
 
     /// Add a node, remove it, and add it back again.
     #[tokio::test]
-    async fn add_node_succeeds_after_remove() -> Result<(), SendError<Request>> {
+    async fn add_node_succeeds_after_remove() -> Result<(), ClientError> {
         let (mut device, rx) = make_test_device();
 
         device
