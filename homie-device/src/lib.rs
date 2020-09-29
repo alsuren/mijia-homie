@@ -9,7 +9,8 @@ use futures::FutureExt;
 use local_ipaddress;
 use mac_address::get_mac_address;
 use rumqttc::{
-    self, EventLoop, Incoming, LastWill, MqttOptions, Publish, QoS, Request, Subscribe, Unsubscribe,
+    self, Event, EventLoop, Incoming, LastWill, MqttOptions, Publish, QoS, Request, Subscribe,
+    Unsubscribe,
 };
 use std::error::Error;
 use std::fmt::{self, Debug, Display, Formatter};
@@ -349,10 +350,10 @@ impl HomieDevice {
 
         let mqtt_task = task::spawn(async move {
             loop {
-                let (incoming, outgoing) = event_loop.poll().await?;
-                log::trace!("Incoming = {:?}, Outgoing = {:?}", incoming, outgoing);
+                let notification = event_loop.poll().await?;
+                log::trace!("Notification = {:?}", notification);
 
-                if let Some(incoming) = incoming {
+                if let Event::Incoming(incoming) = notification {
                     incoming_tx.send(incoming).await?;
                 }
             }
@@ -574,7 +575,7 @@ impl DevicePublisher {
     ) -> Result<(), SendError<Request>> {
         let topic = format!("{}/{}", self.device_base, subtopic);
         let mut publish = Publish::new(topic, QoS::AtLeastOnce, value);
-        publish.set_retain(true);
+        publish.retain = true;
         self.requests_tx.send(publish.into()).await
     }
 
