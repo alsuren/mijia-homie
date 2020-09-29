@@ -759,6 +759,7 @@ dependencies = [
  "futures",
  "futures-channel",
  "homie-device",
+ "itertools",
  "log",
  "mijia",
  "pretty_env_logger",
