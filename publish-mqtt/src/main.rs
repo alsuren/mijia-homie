@@ -4,9 +4,7 @@ use futures::stream::StreamExt;
 use futures::{FutureExt, TryFutureExt};
 use homie_device::{Datatype, HomieDevice, Node, Property};
 use itertools::Itertools;
-use mijia::{
-    DeviceId, MacAddress, MijiaEvent, MijiaSession, Readings, SensorProps, DBUS_METHOD_CALL_TIMEOUT,
-};
+use mijia::{DeviceId, MacAddress, MijiaEvent, MijiaSession, Readings, SensorProps};
 use rumqttc::MqttOptions;
 use rustls::ClientConfig;
 use std::collections::HashMap;
@@ -26,7 +24,11 @@ const DEFAULT_PORT: u16 = 1883;
 const SCAN_INTERVAL: Duration = Duration::from_secs(15);
 const CONNECT_INTERVAL: Duration = Duration::from_secs(1);
 const UPDATE_TIMEOUT: Duration = Duration::from_secs(60);
+// SENSOR_CONNECT_RETRY_TIMEOUT must be smaller than
+// SENSOR_CONNECT_RESERVATION_TIMEOUT by at least a couple of dbus timeouts in
+// order to avoid races.
 const SENSOR_CONNECT_RESERVATION_TIMEOUT: Duration = Duration::from_secs(5 * 60);
+const SENSOR_CONNECT_RETRY_TIMEOUT: Duration = Duration::from_secs(60);
 const SENSOR_NAMES_FILENAME: &str = "sensor_names.conf";
 
 #[tokio::main]
@@ -446,8 +448,7 @@ async fn connect_and_subscribe_sensor_or_disconnect<'a>(
         .with_context(|| std::line!().to_string())?;
 
     let mut backoff = ExponentialBackoff::default();
-    backoff.max_elapsed_time =
-        Some(SENSOR_CONNECT_RESERVATION_TIMEOUT - 2 * DBUS_METHOD_CALL_TIMEOUT);
+    backoff.max_elapsed_time = Some(SENSOR_CONNECT_RETRY_TIMEOUT);
 
     (|| session.start_notify_sensor(id).map_err(Into::into))
         .retry(backoff)
