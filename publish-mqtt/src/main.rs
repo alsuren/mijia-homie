@@ -293,15 +293,19 @@ async fn bluetooth_connection_loop(
         {
             let ids: Vec<DeviceId> = state.lock().await.sensors.keys().cloned().collect();
             for id in ids {
-                let sensor_status = state.lock().await.sensors.get(&id).map(|sensor| {
-                    log::trace!("State of {} is {:?}", sensor.name, sensor.connection_status);
-                    sensor.connection_status
-                });
-                if let Some(connection_status) = sensor_status {
-                    action_sensor(state.clone(), session, id, connection_status)
-                        .await
-                        .with_context(|| std::line!().to_string())?;
-                }
+                let connection_status = state
+                    .lock()
+                    .await
+                    .sensors
+                    .get(&id)
+                    .map(|sensor| {
+                        log::trace!("State of {} is {:?}", sensor.name, sensor.connection_status);
+                        sensor.connection_status
+                    })
+                    .expect("sensors cannot be deleted");
+                action_sensor(state.clone(), session, id, connection_status)
+                    .await
+                    .with_context(|| std::line!().to_string())?;
             }
         }
         time::delay_for(CONNECT_INTERVAL).await;
