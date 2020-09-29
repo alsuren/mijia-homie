@@ -1,5 +1,5 @@
 use anyhow::Context;
-use backoff::{future::FutureOperation as _, ExponentialBackoff};
+use backoff::{future::FutureOperation, ExponentialBackoff};
 use futures::stream::StreamExt;
 use futures::{FutureExt, TryFutureExt};
 use homie_device::{Datatype, HomieDevice, Node, Property};
@@ -450,17 +450,19 @@ async fn connect_and_subscribe_sensor_or_disconnect<'a>(
     let mut backoff = ExponentialBackoff::default();
     backoff.max_elapsed_time = Some(SENSOR_CONNECT_RETRY_TIMEOUT);
 
-    (|| session.start_notify_sensor(id).map_err(Into::into))
-        .retry(backoff)
-        .or_else(|e| async {
-            session
-                .bt_session
-                .disconnect(id)
-                .await
-                .with_context(|| std::line!().to_string())?;
-            Err(e)
-        })
-        .await
+    FutureOperation::retry(
+        || session.start_notify_sensor(id).map_err(Into::into),
+        backoff,
+    )
+    .or_else(|e| async {
+        session
+            .bt_session
+            .disconnect(id)
+            .await
+            .with_context(|| std::line!().to_string())?;
+        Err(e)
+    })
+    .await
 }
 
 /// If the sensor hasn't sent any updates in a while, disconnect it so we will try to reconnect.
