@@ -1,4 +1,4 @@
-use futures::FutureExt;
+use futures::{FutureExt, TryFutureExt};
 use homie_device::{Datatype, HomieDevice, Node, Property};
 use rand::random;
 use rumqttc::MqttOptions;
@@ -63,7 +63,7 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
 
     // Poll everything to completion, until the first one bombs out.
     let res: Result<_, Box<dyn Error + Send + Sync>> = try_join! {
-        homie_handle,
+        homie_handle.err_into(),
         handle.map(|res| Ok(res??)),
     };
     res?;

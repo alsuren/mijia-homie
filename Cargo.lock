@@ -385,6 +385,7 @@ dependencies = [
  "pretty_env_logger",
  "rand",
  "rumqttc",
+ "thiserror",
  "tokio",
 ]
 

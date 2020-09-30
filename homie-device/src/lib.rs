@@ -9,15 +9,15 @@ use futures::FutureExt;
 use local_ipaddress;
 use mac_address::get_mac_address;
 use rumqttc::{
-    self, ClientError, Event, EventLoop, Incoming, LastWill, MqttOptions, Publish, QoS, Request,
-    Subscribe, Unsubscribe,
+    self, ClientError, ConnectionError, Event, EventLoop, Incoming, LastWill, MqttOptions, Publish,
+    QoS, Request, Subscribe, Unsubscribe,
 };
-use std::error::Error;
 use std::fmt::{self, Debug, Display, Formatter};
 use std::future::Future;
 use std::pin::Pin;
 use std::str;
 use std::time::{Duration, Instant};
+use thiserror::Error;
 use tokio::task::{self, JoinError, JoinHandle};
 use tokio::time::delay_for;
 
@@ -27,6 +27,19 @@ const DEFAULT_FIRMWARE_NAME: &str = env!("CARGO_PKG_NAME");
 const DEFAULT_FIRMWARE_VERSION: &str = env!("CARGO_PKG_VERSION");
 const STATS_INTERVAL: Duration = Duration::from_secs(60);
 const REQUESTS_CAP: usize = 10;
+
+/// Error type for futures representing tasks spawned by this crate.
+#[derive(Error, Debug)]
+pub enum SpawnError {
+    #[error("{0}")]
+    Client(#[from] ClientError),
+    #[error("{0}")]
+    Connection(#[from] ConnectionError),
+    #[error("Task failed: {0}")]
+    Join(#[from] JoinError),
+    #[error("Internal error: {0}")]
+    Internal(&'static str),
+}
 
 /// The data type for a Homie property.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -223,13 +236,7 @@ impl HomieDeviceBuilder {
     /// connection. You should join on this future to handle any errors it returns.
     pub async fn spawn(
         self,
-    ) -> Result<
-        (
-            HomieDevice,
-            impl Future<Output = Result<(), Box<dyn Error + Send + Sync>>>,
-        ),
-        ClientError,
-    > {
+    ) -> Result<(HomieDevice, impl Future<Output = Result<(), SpawnError>>), ClientError> {
         let (event_loop, mut homie, stats, firmware, update_callback) = self.build();
 
         // This needs to be spawned before we wait for anything to be sent, as the start() calls below do.
@@ -344,7 +351,7 @@ impl HomieDevice {
         &self,
         mut event_loop: EventLoop,
         mut update_callback: Option<UpdateCallback>,
-    ) -> impl Future<Output = Result<(), Box<dyn Error + Send + Sync>>> {
+    ) -> impl Future<Output = Result<(), SpawnError>> {
         let device_base = format!("{}/", self.publisher.device_base);
         let (incoming_tx, incoming_rx) = async_channel::unbounded();
 
@@ -354,16 +361,20 @@ impl HomieDevice {
                 log::trace!("Notification = {:?}", notification);
 
                 if let Event::Incoming(incoming) = notification {
-                    incoming_tx.send(incoming).await?;
+                    incoming_tx.send(incoming).await.map_err(|_| {
+                        SpawnError::Internal("Incoming event channel receiver closed.")
+                    })?;
                 }
             }
         });
 
         let publisher = self.publisher.clone();
-        let incoming_task: JoinHandle<Result<(), Box<dyn Error + Send + Sync>>> =
+        let incoming_task: JoinHandle<Result<(), SpawnError>> =
             task::spawn(async move {
                 loop {
-                    match incoming_rx.recv().await? {
+                    match incoming_rx.recv().await.map_err(|_| {
+                        SpawnError::Internal("Incoming event channel sender closed.")
+                    })? {
                         Incoming::Publish(publish) => {
                             if let Some(rest) = publish.topic.strip_prefix(&device_base) {
                                 if let ([node_id, property_id, "set"], Ok(payload)) = (
@@ -626,8 +637,8 @@ impl HomieStats {
     }
 
     /// Periodically send stats.
-    fn spawn(self) -> impl Future<Output = Result<(), Box<dyn Error + Send + Sync>>> {
-        let task: JoinHandle<Result<(), Box<dyn Error + Send + Sync>>> = task::spawn(async move {
+    fn spawn(self) -> impl Future<Output = Result<(), SpawnError>> {
+        let task: JoinHandle<Result<(), SpawnError>> = task::spawn(async move {
             loop {
                 let uptime = Instant::now() - self.start_time;
                 self.publisher

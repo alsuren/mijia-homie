@@ -1,9 +1,8 @@
-use homie_device::{Datatype, HomieDevice, Node, Property};
+use homie_device::{Datatype, HomieDevice, Node, Property, SpawnError};
 use rumqttc::MqttOptions;
-use std::error::Error;
 
 #[tokio::main(core_threads = 2)]
-async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
+async fn main() -> Result<(), SpawnError> {
     pretty_env_logger::init();
 
     let mqttoptions = MqttOptions::new("homie_example", "test.mosquitto.org", 1883);
