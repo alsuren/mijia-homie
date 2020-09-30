@@ -374,6 +374,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "homie-controller"
+version = "0.1.0"
+dependencies = [
+ "async-channel",
+ "futures",
+ "local_ipaddress",
+ "log",
+ "mac_address",
+ "pretty_env_logger",
+ "rand",
+ "rumqttc",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
 name = "homie-device"
 version = "0.1.0"
 dependencies = [
