@@ -46,6 +46,7 @@ impl HomieController {
     /// Spawn a task to handle the EventLoop.
     pub fn spawn(&self, mut event_loop: EventLoop) -> impl Future<Output = Result<(), SpawnError>> {
         let base_topic = format!("{}/", self.base_topic);
+        let client = self.mqtt_client.clone();
 
         let mqtt_task: JoinHandle<Result<(), SpawnError>> = task::spawn(async move {
             loop {
@@ -56,11 +57,15 @@ impl HomieController {
                     log::trace!("Incoming: {:?}", incoming);
                     match incoming {
                         Incoming::Publish(publish) => {
-                            if let Err(err) = handle_publish(publish, &base_topic) {
-                                // These error strings indicate some issue with parsing the publish
-                                // event from the network, perhaps due to a malfunctioning device,
-                                // so should just be logged and ignored.
-                                log::warn!("{}", err)
+                            match handle_publish(publish, &base_topic, &client).await {
+                                Err(HandleError::Warning(err)) => {
+                                    // These error strings indicate some issue with parsing the publish
+                                    // event from the network, perhaps due to a malfunctioning device,
+                                    // so should just be logged and ignored.
+                                    log::warn!("{}", err)
+                                }
+                                Err(HandleError::Fatal(e)) => Err(e)?,
+                                Ok(()) => {}
                             }
                         }
                         _ => {}
@@ -78,7 +83,25 @@ impl HomieController {
     }
 }
 
-fn handle_publish(publish: Publish, base_topic: &str) -> Result<(), String> {
+#[derive(Error, Debug)]
+enum HandleError {
+    #[error("{0}")]
+    Warning(String),
+    #[error("{0}")]
+    Fatal(#[from] ClientError),
+}
+
+impl From<String> for HandleError {
+    fn from(s: String) -> Self {
+        HandleError::Warning(s)
+    }
+}
+
+async fn handle_publish(
+    publish: Publish,
+    base_topic: &str,
+    client: &AsyncClient,
+) -> Result<(), HandleError> {
     let payload =
         str::from_utf8(&publish.payload).map_err(|e| format!("Payload not valid UTF-8: {}", e))?;
     let subtopic = publish
@@ -89,6 +112,9 @@ fn handle_publish(publish: Publish, base_topic: &str) -> Result<(), String> {
     match parts.as_slice() {
         [device_id, "$homie"] => {
             log::trace!("Homie device '{}' version '{}'", device_id, payload);
+            let topic = format!("{}+/+", base_topic);
+            log::trace!("Subscribe to {}", topic);
+            client.subscribe(topic, QoS::AtLeastOnce).await?;
         }
         _ => log::warn!("Unexpected subtopic {}", subtopic),
     }
