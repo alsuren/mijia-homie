@@ -43,8 +43,6 @@ impl HomieController {
 
     /// Poll the EventLoop.
     pub async fn poll(&mut self, event_loop: &mut EventLoop) -> Result<(), PollError> {
-        let base_topic = format!("{}/", self.base_topic);
-
         let notification = event_loop.poll().await?;
         log::trace!("Notification = {:?}", notification);
 
@@ -52,7 +50,7 @@ impl HomieController {
             log::trace!("Incoming: {:?}", incoming);
             match incoming {
                 Incoming::Publish(publish) => {
-                    match handle_publish(publish, &base_topic, &self.mqtt_client).await {
+                    match self.handle_publish(publish).await {
                         Err(HandleError::Warning(err)) => {
                             // These error strings indicate some issue with parsing the publish
                             // event from the network, perhaps due to a malfunctioning device,
@@ -65,6 +63,27 @@ impl HomieController {
                 }
                 _ => {}
             }
+        }
+        Ok(())
+    }
+
+    async fn handle_publish(&mut self, publish: Publish) -> Result<(), HandleError> {
+        let base_topic = format!("{}/", self.base_topic);
+        let payload = str::from_utf8(&publish.payload)
+            .map_err(|e| format!("Payload not valid UTF-8: {}", e))?;
+        let subtopic = publish
+            .topic
+            .strip_prefix(&base_topic)
+            .ok_or_else(|| format!("Publish with unexpected topic: {:?}", publish))?;
+        let parts = subtopic.split("/").collect::<Vec<&str>>();
+        match parts.as_slice() {
+            [device_id, "$homie"] => {
+                log::trace!("Homie device '{}' version '{}'", device_id, payload);
+                let topic = format!("{}{}/+", base_topic, device_id);
+                log::trace!("Subscribe to {}", topic);
+                self.mqtt_client.subscribe(topic, QoS::AtLeastOnce).await?;
+            }
+            _ => log::warn!("Unexpected subtopic {}", subtopic),
         }
         Ok(())
     }
@@ -88,28 +107,4 @@ impl From<String> for HandleError {
     fn from(s: String) -> Self {
         HandleError::Warning(s)
     }
-}
-
-async fn handle_publish(
-    publish: Publish,
-    base_topic: &str,
-    client: &AsyncClient,
-) -> Result<(), HandleError> {
-    let payload =
-        str::from_utf8(&publish.payload).map_err(|e| format!("Payload not valid UTF-8: {}", e))?;
-    let subtopic = publish
-        .topic
-        .strip_prefix(&base_topic)
-        .ok_or_else(|| format!("Publish with unexpected topic: {:?}", publish))?;
-    let parts = subtopic.split("/").collect::<Vec<&str>>();
-    match parts.as_slice() {
-        [device_id, "$homie"] => {
-            log::trace!("Homie device '{}' version '{}'", device_id, payload);
-            let topic = format!("{}{}/+", base_topic, device_id);
-            log::trace!("Subscribe to {}", topic);
-            client.subscribe(topic, QoS::AtLeastOnce).await?;
-        }
-        _ => log::warn!("Unexpected subtopic {}", subtopic),
-    }
-    Ok(())
 }
