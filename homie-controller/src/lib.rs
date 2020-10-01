@@ -1,21 +1,19 @@
 //! `homie-controller` is a library for creating controllers to interact via an MQTT broker with IoT
 //! devices implementing the [Homie convention](https://homieiot.github.io/).
 
-use futures::FutureExt;
 use rumqttc::{
     AsyncClient, ClientError, ConnectionError, Event, EventLoop, Incoming, MqttOptions, Publish,
     QoS,
 };
-use std::future::Future;
 use std::str;
 use thiserror::Error;
-use tokio::task::{self, JoinError, JoinHandle};
+use tokio::task::JoinError;
 
 const REQUESTS_CAP: usize = 10;
 
 /// Error type for futures representing tasks spawned by this crate.
 #[derive(Error, Debug)]
-pub enum SpawnError {
+pub enum PollError {
     #[error("{0}")]
     Client(#[from] ClientError),
     #[error("{0}")]
@@ -43,37 +41,32 @@ impl HomieController {
         (controller, event_loop)
     }
 
-    /// Spawn a task to handle the EventLoop.
-    pub fn spawn(&self, mut event_loop: EventLoop) -> impl Future<Output = Result<(), SpawnError>> {
+    /// Poll the EventLoop.
+    pub async fn poll(&mut self, event_loop: &mut EventLoop) -> Result<(), PollError> {
         let base_topic = format!("{}/", self.base_topic);
-        let client = self.mqtt_client.clone();
 
-        let mqtt_task: JoinHandle<Result<(), SpawnError>> = task::spawn(async move {
-            loop {
-                let notification = event_loop.poll().await?;
-                log::trace!("Notification = {:?}", notification);
+        let notification = event_loop.poll().await?;
+        log::trace!("Notification = {:?}", notification);
 
-                if let Event::Incoming(incoming) = notification {
-                    log::trace!("Incoming: {:?}", incoming);
-                    match incoming {
-                        Incoming::Publish(publish) => {
-                            match handle_publish(publish, &base_topic, &client).await {
-                                Err(HandleError::Warning(err)) => {
-                                    // These error strings indicate some issue with parsing the publish
-                                    // event from the network, perhaps due to a malfunctioning device,
-                                    // so should just be logged and ignored.
-                                    log::warn!("{}", err)
-                                }
-                                Err(HandleError::Fatal(e)) => Err(e)?,
-                                Ok(()) => {}
-                            }
+        if let Event::Incoming(incoming) = notification {
+            log::trace!("Incoming: {:?}", incoming);
+            match incoming {
+                Incoming::Publish(publish) => {
+                    match handle_publish(publish, &base_topic, &self.mqtt_client).await {
+                        Err(HandleError::Warning(err)) => {
+                            // These error strings indicate some issue with parsing the publish
+                            // event from the network, perhaps due to a malfunctioning device,
+                            // so should just be logged and ignored.
+                            log::warn!("{}", err)
                         }
-                        _ => {}
+                        Err(HandleError::Fatal(e)) => Err(e)?,
+                        Ok(()) => {}
                     }
                 }
+                _ => {}
             }
-        });
-        mqtt_task.map(|res| Ok(res??))
+        }
+        Ok(())
     }
 
     pub async fn start(&self) -> Result<(), ClientError> {

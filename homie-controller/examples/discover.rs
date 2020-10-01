@@ -1,18 +1,15 @@
-use homie_controller::{HomieController, SpawnError};
+use homie_controller::{HomieController, PollError};
 use rumqttc::MqttOptions;
 
 #[tokio::main(core_threads = 2)]
-async fn main() -> Result<(), SpawnError> {
+async fn main() -> Result<(), PollError> {
     pretty_env_logger::init();
 
     let mqttoptions = MqttOptions::new("homie_controller", "test.mosquitto.org", 1883);
 
-    let (controller, event_loop) = HomieController::new(mqttoptions, "homie");
-    let handle = controller.spawn(event_loop);
+    let (mut controller, mut event_loop) = HomieController::new(mqttoptions, "homie");
     controller.start().await?;
-
-    println!("Ready");
-
-    // This will only resolve (with an error) if we lose connection to the MQTT broker.
-    handle.await
+    loop {
+        controller.poll(&mut event_loop).await?;
+    }
 }
