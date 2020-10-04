@@ -268,6 +268,27 @@ impl HomieController {
                 })?;
                 property.settable = settable;
             }
+            [device_id, node_id, property_id, "$retained"] => {
+                let retained = payload
+                    .parse()
+                    .map_err(|_| format!("Invalid boolean '{}' for $retained.", payload))?;
+                let device = self.devices.get_mut(*device_id).ok_or_else(|| {
+                    format!("Got property retained for unknown device '{}'", device_id)
+                })?;
+                let node = device.nodes.get_mut(*node_id).ok_or_else(|| {
+                    format!(
+                        "Got property retained for unknown node '{}/{}'",
+                        device_id, node_id
+                    )
+                })?;
+                let property = node.properties.get_mut(*property_id).ok_or_else(|| {
+                    format!(
+                        "Got property retained for unknown property '{}/{}/{}'",
+                        device_id, node_id, property_id
+                    )
+                })?;
+                property.retained = retained;
+            }
             _ => log::warn!("Unexpected subtopic {} = {}", subtopic, payload),
         }
         Ok(())

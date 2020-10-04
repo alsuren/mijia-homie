@@ -94,6 +94,7 @@ pub struct Property {
     pub datatype: Option<Datatype>,
     // Optional attributes.
     pub settable: bool,
+    pub retained: bool,
     pub unit: Option<String>,
     pub format: Option<String>,
 }
@@ -105,6 +106,7 @@ impl Property {
             name: None,
             datatype: None,
             settable: false,
+            retained: true,
             unit: None,
             format: None,
         }
