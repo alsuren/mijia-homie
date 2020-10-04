@@ -234,6 +234,63 @@ impl HomieController {
                 })?;
                 property.datatype = Some(datatype);
             }
+            [device_id, node_id, property_id, "$unit"] => {
+                let device = self.devices.get_mut(*device_id).ok_or_else(|| {
+                    format!("Got property unit for unknown device '{}'", device_id)
+                })?;
+                let node = device.nodes.get_mut(*node_id).ok_or_else(|| {
+                    format!(
+                        "Got property unit for unknown node '{}/{}'",
+                        device_id, node_id
+                    )
+                })?;
+                let property = node.properties.get_mut(*property_id).ok_or_else(|| {
+                    format!(
+                        "Got property unit for unknown property '{}/{}/{}'",
+                        device_id, node_id, property_id
+                    )
+                })?;
+                property.unit = Some(payload.to_owned());
+            }
+            [device_id, node_id, property_id, "$format"] => {
+                let device = self.devices.get_mut(*device_id).ok_or_else(|| {
+                    format!("Got property format for unknown device '{}'", device_id)
+                })?;
+                let node = device.nodes.get_mut(*node_id).ok_or_else(|| {
+                    format!(
+                        "Got property format for unknown node '{}/{}'",
+                        device_id, node_id
+                    )
+                })?;
+                let property = node.properties.get_mut(*property_id).ok_or_else(|| {
+                    format!(
+                        "Got property format for unknown property '{}/{}/{}'",
+                        device_id, node_id, property_id
+                    )
+                })?;
+                property.format = Some(payload.to_owned());
+            }
+            [device_id, node_id, property_id, "$settable"] => {
+                let settable = payload
+                    .parse()
+                    .map_err(|_| format!("Invalid boolean '{}' for $settable.", payload))?;
+                let device = self.devices.get_mut(*device_id).ok_or_else(|| {
+                    format!("Got property settable for unknown device '{}'", device_id)
+                })?;
+                let node = device.nodes.get_mut(*node_id).ok_or_else(|| {
+                    format!(
+                        "Got property settable for unknown node '{}/{}'",
+                        device_id, node_id
+                    )
+                })?;
+                let property = node.properties.get_mut(*property_id).ok_or_else(|| {
+                    format!(
+                        "Got property settable for unknown property '{}/{}/{}'",
+                        device_id, node_id, property_id
+                    )
+                })?;
+                property.settable = settable;
+            }
             _ => log::warn!("Unexpected subtopic {} = {}", subtopic, payload),
         }
         Ok(())
