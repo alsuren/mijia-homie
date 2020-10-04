@@ -11,5 +11,6 @@ async fn main() -> Result<(), PollError> {
     controller.start().await?;
     loop {
         controller.poll(&mut event_loop).await?;
+        println!("Devices: {:?}", controller.devices);
     }
 }

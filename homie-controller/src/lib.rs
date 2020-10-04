@@ -5,9 +5,13 @@ use rumqttc::{
     AsyncClient, ClientError, ConnectionError, Event, EventLoop, Incoming, MqttOptions, Publish,
     QoS,
 };
+use std::collections::HashMap;
 use std::str;
 use thiserror::Error;
 use tokio::task::JoinError;
+
+mod types;
+pub use types::{Datatype, Node, State, StateParseError};
 
 const REQUESTS_CAP: usize = 10;
 
@@ -24,11 +28,33 @@ pub enum PollError {
     Internal(&'static str),
 }
 
+#[derive(Debug)]
+pub struct Device {
+    pub id: String,
+    pub homie_version: String,
+    pub name: Option<String>,
+    pub state: State,
+    pub nodes: HashMap<String, Node>,
+}
+
+impl Device {
+    fn new(id: &str, homie_version: &str) -> Device {
+        Device {
+            id: id.to_owned(),
+            homie_version: homie_version.to_owned(),
+            name: None,
+            state: State::Unknown,
+            nodes: HashMap::new(),
+        }
+    }
+}
+
 /// A Homie controller, which connects to an MQTT broker and interacts with Homie devices.
 #[derive(Debug)]
 pub struct HomieController {
     mqtt_client: AsyncClient,
     base_topic: String,
+    pub devices: HashMap<String, Device>,
 }
 
 impl HomieController {
@@ -37,6 +63,7 @@ impl HomieController {
         let controller = HomieController {
             mqtt_client,
             base_topic: base_topic.to_string(),
+            devices: HashMap::new(),
         };
         (controller, event_loop)
     }
@@ -78,14 +105,51 @@ impl HomieController {
         let parts = subtopic.split("/").collect::<Vec<&str>>();
         match parts.as_slice() {
             [device_id, "$homie"] => {
-                log::trace!("Homie device '{}' version '{}'", device_id, payload);
-                let topic = format!("{}{}/+", base_topic, device_id);
-                log::trace!("Subscribe to {}", topic);
-                self.mqtt_client.subscribe(topic, QoS::AtLeastOnce).await?;
+                if !self.devices.contains_key(*device_id) {
+                    self.new_device(device_id, payload).await?;
+                }
+            }
+            [device_id, "$name"] => {
+                self.devices
+                    .get_mut(*device_id)
+                    .ok_or_else(|| format!("Got name for unknown device '{}'", device_id))?
+                    .name = Some(payload.to_owned());
+            }
+            [device_id, "$state"] => {
+                let state = payload.parse()?;
+                self.devices
+                    .get_mut(*device_id)
+                    .ok_or_else(|| format!("Got state for unknown device '{}'", device_id))?
+                    .state = state;
+            }
+            [device_id, "$nodes"] => {
+                let nodes = payload.split(",");
+                let device = self
+                    .devices
+                    .get_mut(*device_id)
+                    .ok_or_else(|| format!("Got nodes for unknown device '{}'", device_id))?;
+                for node_id in nodes {
+                    if !device.nodes.contains_key(node_id) {
+                        device.nodes.insert(node_id.to_owned(), Node::new(node_id));
+                    }
+                }
             }
             _ => log::warn!("Unexpected subtopic {}", subtopic),
         }
         Ok(())
+    }
+
+    async fn new_device(
+        &mut self,
+        device_id: &str,
+        homie_version: &str,
+    ) -> Result<(), ClientError> {
+        log::trace!("Homie device '{}' version '{}'", device_id, homie_version);
+        self.devices
+            .insert(device_id.to_owned(), Device::new(device_id, homie_version));
+        let topic = format!("{}/{}/+", self.base_topic, device_id);
+        log::trace!("Subscribe to {}", topic);
+        self.mqtt_client.subscribe(topic, QoS::AtLeastOnce).await
     }
 
     pub async fn start(&self) -> Result<(), ClientError> {
@@ -106,5 +170,11 @@ enum HandleError {
 impl From<String> for HandleError {
     fn from(s: String) -> Self {
         HandleError::Warning(s)
+    }
+}
+
+impl From<StateParseError> for HandleError {
+    fn from(e: StateParseError) -> Self {
+        HandleError::Warning(e.to_string())
     }
 }
