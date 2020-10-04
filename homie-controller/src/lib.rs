@@ -11,7 +11,7 @@ use thiserror::Error;
 use tokio::task::JoinError;
 
 mod types;
-pub use types::{Datatype, Node, Property, State, StateParseError};
+pub use types::{Datatype, DatatypeParseError, Node, Property, State, StateParseError};
 
 const REQUESTS_CAP: usize = 10;
 
@@ -215,6 +215,25 @@ impl HomieController {
                 })?;
                 property.name = Some(payload.to_owned());
             }
+            [device_id, node_id, property_id, "$datatype"] => {
+                let datatype = payload.parse()?;
+                let device = self.devices.get_mut(*device_id).ok_or_else(|| {
+                    format!("Got property datatype for unknown device '{}'", device_id)
+                })?;
+                let node = device.nodes.get_mut(*node_id).ok_or_else(|| {
+                    format!(
+                        "Got property datatype for unknown node '{}/{}'",
+                        device_id, node_id
+                    )
+                })?;
+                let property = node.properties.get_mut(*property_id).ok_or_else(|| {
+                    format!(
+                        "Got property datatype for unknown property '{}/{}/{}'",
+                        device_id, node_id, property_id
+                    )
+                })?;
+                property.datatype = Some(datatype);
+            }
             _ => log::warn!("Unexpected subtopic {} = {}", subtopic, payload),
         }
         Ok(())
@@ -256,6 +275,12 @@ impl From<String> for HandleError {
 
 impl From<StateParseError> for HandleError {
     fn from(e: StateParseError) -> Self {
+        HandleError::Warning(e.to_string())
+    }
+}
+
+impl From<DatatypeParseError> for HandleError {
+    fn from(e: DatatypeParseError) -> Self {
         HandleError::Warning(e.to_string())
     }
 }

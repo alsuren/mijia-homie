@@ -65,6 +65,26 @@ pub enum Datatype {
     Color,
 }
 
+#[derive(Error, Debug)]
+#[error("Invalid datatype '{0}'")]
+pub struct DatatypeParseError(String);
+
+impl FromStr for Datatype {
+    type Err = DatatypeParseError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "integer" => Ok(Self::Integer),
+            "float" => Ok(Self::Float),
+            "boolean" => Ok(Self::Boolean),
+            "string" => Ok(Self::String),
+            "enum" => Ok(Self::Enum),
+            "color" => Ok(Self::Color),
+            _ => Err(DatatypeParseError(s.to_owned())),
+        }
+    }
+}
+
 /// A [property](https://homieiot.github.io/specification/#properties) of a Homie node.
 #[derive(Clone, Debug)]
 pub struct Property {
