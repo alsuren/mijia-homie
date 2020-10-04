@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fmt::{self, Debug, Display, Formatter};
 use std::str::FromStr;
 use thiserror::Error;
@@ -64,10 +65,37 @@ pub enum Datatype {
     Color,
 }
 
+/// A [property](https://homieiot.github.io/specification/#properties) of a Homie node.
+#[derive(Clone, Debug)]
+pub struct Property {
+    pub id: String,
+    pub name: Option<String>,
+    pub datatype: Option<Datatype>,
+    pub settable: bool,
+    pub unit: Option<String>,
+    pub format: Option<String>,
+}
+
+impl Property {
+    pub(crate) fn new(id: &str) -> Property {
+        Property {
+            id: id.to_owned(),
+            name: None,
+            datatype: None,
+            settable: false,
+            unit: None,
+            format: None,
+        }
+    }
+}
+
 /// A [node](https://homieiot.github.io/specification/#nodes) of a Homie device.
 #[derive(Clone, Debug)]
 pub struct Node {
     pub id: String,
+    pub name: Option<String>,
+    pub node_type: Option<String>,
+    pub properties: HashMap<String, Property>,
 }
 
 impl Node {
@@ -77,6 +105,11 @@ impl Node {
     /// * `id`: The topic ID for the node. This must be unique per device, and follow the Homie
     ///   [ID format](https://homieiot.github.io/specification/#topic-ids).
     pub(crate) fn new(id: &str) -> Node {
-        Node { id: id.to_owned() }
+        Node {
+            id: id.to_owned(),
+            name: None,
+            node_type: None,
+            properties: HashMap::new(),
+        }
     }
 }

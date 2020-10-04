@@ -11,7 +11,7 @@ use thiserror::Error;
 use tokio::task::JoinError;
 
 mod types;
-pub use types::{Datatype, Node, State, StateParseError};
+pub use types::{Datatype, Node, Property, State, StateParseError};
 
 const REQUESTS_CAP: usize = 10;
 
@@ -133,18 +133,89 @@ impl HomieController {
                     .implementation = Some(payload.to_owned());
             }
             [device_id, "$nodes"] => {
-                let nodes = payload.split(",");
+                let nodes: Vec<_> = payload.split(",").collect();
                 let device = self
                     .devices
                     .get_mut(*device_id)
                     .ok_or_else(|| format!("Got nodes for unknown device '{}'", device_id))?;
+                // Remove nodes which aren't in the new list.
+                device.nodes.retain(|k, _| nodes.contains(&k.as_ref()));
+                // Add new nodes.
                 for node_id in nodes {
                     if !device.nodes.contains_key(node_id) {
                         device.nodes.insert(node_id.to_owned(), Node::new(node_id));
+                        let topic = format!("{}/{}/{}/+", self.base_topic, device_id, node_id);
+                        self.mqtt_client.subscribe(topic, QoS::AtLeastOnce).await?;
                     }
                 }
             }
-            _ => log::warn!("Unexpected subtopic {}", subtopic),
+            [device_id, node_id, "$name"] => {
+                let device = self
+                    .devices
+                    .get_mut(*device_id)
+                    .ok_or_else(|| format!("Got node name for unknown device '{}'", device_id))?;
+                let node = device.nodes.get_mut(*node_id).ok_or_else(|| {
+                    format!("Got node name for unknown node '{}/{}'", device_id, node_id)
+                })?;
+                node.name = Some(payload.to_owned());
+            }
+            [device_id, node_id, "$type"] => {
+                let device = self
+                    .devices
+                    .get_mut(*device_id)
+                    .ok_or_else(|| format!("Got node type for unknown device '{}'", device_id))?;
+                let node = device.nodes.get_mut(*node_id).ok_or_else(|| {
+                    format!("Got node type for unknown node '{}/{}'", device_id, node_id)
+                })?;
+                node.node_type = Some(payload.to_owned());
+            }
+            [device_id, node_id, "$properties"] => {
+                let properties: Vec<_> = payload.split(",").collect();
+                let device = self
+                    .devices
+                    .get_mut(*device_id)
+                    .ok_or_else(|| format!("Got properties for unknown device '{}'", device_id))?;
+                let node = device.nodes.get_mut(*node_id).ok_or_else(|| {
+                    format!(
+                        "Got properties for unknown node '{}/{}'",
+                        device_id, node_id
+                    )
+                })?;
+                // Remove properties which aren't in the new list.
+                node.properties
+                    .retain(|k, _| properties.contains(&k.as_ref()));
+                // Add new properties.
+                for property_id in properties {
+                    if !node.properties.contains_key(property_id) {
+                        node.properties
+                            .insert(property_id.to_owned(), Property::new(property_id));
+                        let topic = format!(
+                            "{}/{}/{}/{}/+",
+                            self.base_topic, device_id, node_id, property_id
+                        );
+                        self.mqtt_client.subscribe(topic, QoS::AtLeastOnce).await?;
+                    }
+                }
+            }
+            [device_id, node_id, property_id, "$name"] => {
+                let device = self.devices.get_mut(*device_id).ok_or_else(|| {
+                    format!("Got property name for unknown device '{}'", device_id)
+                })?;
+                let node = device.nodes.get_mut(*node_id).ok_or_else(|| {
+                    format!(
+                        "Got property name for unknown node '{}/{}'",
+                        device_id, node_id
+                    )
+                })?;
+                let property = node.properties.get_mut(*property_id).ok_or_else(|| {
+                    format!(
+                        "Got property name for unknown property '{}/{}/{}'",
+                        device_id, node_id, property_id
+                    )
+                })?;
+                property.name = Some(payload.to_owned());
+            }
+            _ => log::warn!("Unexpected subtopic {} = {}", subtopic, payload),
         }
         Ok(())
     }
