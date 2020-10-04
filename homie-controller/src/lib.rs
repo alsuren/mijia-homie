@@ -11,7 +11,7 @@ use thiserror::Error;
 use tokio::task::JoinError;
 
 mod types;
-pub use types::{Datatype, DatatypeParseError, Node, Property, State, StateParseError};
+pub use types::{Datatype, DatatypeParseError, Device, Node, Property, State, StateParseError};
 
 const REQUESTS_CAP: usize = 10;
 
@@ -26,29 +26,6 @@ pub enum PollError {
     Join(#[from] JoinError),
     #[error("Internal error: {0}")]
     Internal(&'static str),
-}
-
-#[derive(Debug)]
-pub struct Device {
-    pub id: String,
-    pub homie_version: String,
-    pub name: Option<String>,
-    pub state: State,
-    pub implementation: Option<String>,
-    pub nodes: HashMap<String, Node>,
-}
-
-impl Device {
-    fn new(id: &str, homie_version: &str) -> Device {
-        Device {
-            id: id.to_owned(),
-            homie_version: homie_version.to_owned(),
-            name: None,
-            state: State::Unknown,
-            implementation: None,
-            nodes: HashMap::new(),
-        }
-    }
 }
 
 /// A Homie controller, which connects to an MQTT broker and interacts with Homie devices.

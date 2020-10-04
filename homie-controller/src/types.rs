@@ -88,9 +88,11 @@ impl FromStr for Datatype {
 /// A [property](https://homieiot.github.io/specification/#properties) of a Homie node.
 #[derive(Clone, Debug)]
 pub struct Property {
+    // Required attributes, but might not be available immediately.
     pub id: String,
     pub name: Option<String>,
     pub datatype: Option<Datatype>,
+    // Optional attributes.
     pub settable: bool,
     pub unit: Option<String>,
     pub format: Option<String>,
@@ -107,11 +109,19 @@ impl Property {
             format: None,
         }
     }
+
+    /// Returns whether all the required
+    /// [attributes](https://homieiot.github.io/specification/#property-attributes) of the property
+    /// are filled in.
+    pub fn has_required_attributes(&self) -> bool {
+        self.name.is_some() && self.datatype.is_some()
+    }
 }
 
 /// A [node](https://homieiot.github.io/specification/#nodes) of a Homie device.
 #[derive(Clone, Debug)]
 pub struct Node {
+    // All attributes are required, but might not be available immediately.
     pub id: String,
     pub name: Option<String>,
     pub node_type: Option<String>,
@@ -131,5 +141,53 @@ impl Node {
             node_type: None,
             properties: HashMap::new(),
         }
+    }
+
+    /// Returns whether all the required
+    /// [attributes](https://homieiot.github.io/specification/#node-attributes) of the node and its
+    /// properties are filled in.
+    pub fn has_required_attributes(&self) -> bool {
+        self.name.is_some()
+            && self.node_type.is_some()
+            && !self.properties.is_empty()
+            && self
+                .properties
+                .values()
+                .all(|property| property.has_required_attributes())
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Device {
+    pub id: String,
+    pub homie_version: String,
+    pub name: Option<String>,
+    pub state: State,
+    pub implementation: Option<String>,
+    pub nodes: HashMap<String, Node>,
+}
+
+impl Device {
+    pub(crate) fn new(id: &str, homie_version: &str) -> Device {
+        Device {
+            id: id.to_owned(),
+            homie_version: homie_version.to_owned(),
+            name: None,
+            state: State::Unknown,
+            implementation: None,
+            nodes: HashMap::new(),
+        }
+    }
+
+    /// Returns whether all the required
+    /// [attributes](https://homieiot.github.io/specification/#device-attributes) of the device and
+    /// all its nodes and properties are filled in.
+    pub fn has_required_attributes(&self) -> bool {
+        self.name.is_some()
+            && self.state != State::Unknown
+            && self
+                .nodes
+                .values()
+                .all(|node| node.has_required_attributes())
     }
 }

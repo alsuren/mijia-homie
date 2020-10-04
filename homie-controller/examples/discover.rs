@@ -11,6 +11,13 @@ async fn main() -> Result<(), PollError> {
     controller.start().await?;
     loop {
         controller.poll(&mut event_loop).await?;
-        println!("Devices: {:?}", controller.devices);
+        println!("Devices:");
+        for device in controller.devices.values() {
+            if device.has_required_attributes() {
+                println!(" * {:?}", device);
+            } else {
+                println!(" * {} not ready.", device.id);
+            }
+        }
     }
 }
