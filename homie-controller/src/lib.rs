@@ -34,6 +34,7 @@ pub struct Device {
     pub homie_version: String,
     pub name: Option<String>,
     pub state: State,
+    pub implementation: Option<String>,
     pub nodes: HashMap<String, Node>,
 }
 
@@ -44,6 +45,7 @@ impl Device {
             homie_version: homie_version.to_owned(),
             name: None,
             state: State::Unknown,
+            implementation: None,
             nodes: HashMap::new(),
         }
     }
@@ -121,6 +123,14 @@ impl HomieController {
                     .get_mut(*device_id)
                     .ok_or_else(|| format!("Got state for unknown device '{}'", device_id))?
                     .state = state;
+            }
+            [device_id, "$implementation"] => {
+                self.devices
+                    .get_mut(*device_id)
+                    .ok_or_else(|| {
+                        format!("Got implementation for unknown device '{}'", device_id)
+                    })?
+                    .implementation = Some(payload.to_owned());
             }
             [device_id, "$nodes"] => {
                 let nodes = payload.split(",");
