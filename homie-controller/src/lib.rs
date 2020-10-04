@@ -89,32 +89,20 @@ impl HomieController {
                 }
             }
             [device_id, "$name"] => {
-                self.devices
-                    .get_mut(*device_id)
-                    .ok_or_else(|| format!("Got name for unknown device '{}'", device_id))?
-                    .name = Some(payload.to_owned());
+                get_mut_device_for(&mut self.devices, "Got name for", device_id)?.name =
+                    Some(payload.to_owned());
             }
             [device_id, "$state"] => {
                 let state = payload.parse()?;
-                self.devices
-                    .get_mut(*device_id)
-                    .ok_or_else(|| format!("Got state for unknown device '{}'", device_id))?
-                    .state = state;
+                get_mut_device_for(&mut self.devices, "Got state for", device_id)?.state = state;
             }
             [device_id, "$implementation"] => {
-                self.devices
-                    .get_mut(*device_id)
-                    .ok_or_else(|| {
-                        format!("Got implementation for unknown device '{}'", device_id)
-                    })?
+                get_mut_device_for(&mut self.devices, "Got implementation for", device_id)?
                     .implementation = Some(payload.to_owned());
             }
             [device_id, "$nodes"] => {
                 let nodes: Vec<_> = payload.split(",").collect();
-                let device = self
-                    .devices
-                    .get_mut(*device_id)
-                    .ok_or_else(|| format!("Got nodes for unknown device '{}'", device_id))?;
+                let device = get_mut_device_for(&mut self.devices, "Got nodes for", device_id)?;
                 // Remove nodes which aren't in the new list.
                 device.nodes.retain(|k, _| nodes.contains(&k.as_ref()));
                 // Add new nodes.
@@ -127,37 +115,19 @@ impl HomieController {
                 }
             }
             [device_id, node_id, "$name"] => {
-                let device = self
-                    .devices
-                    .get_mut(*device_id)
-                    .ok_or_else(|| format!("Got node name for unknown device '{}'", device_id))?;
-                let node = device.nodes.get_mut(*node_id).ok_or_else(|| {
-                    format!("Got node name for unknown node '{}/{}'", device_id, node_id)
-                })?;
+                let node =
+                    get_mut_node_for(&mut self.devices, "Got node name for", device_id, node_id)?;
                 node.name = Some(payload.to_owned());
             }
             [device_id, node_id, "$type"] => {
-                let device = self
-                    .devices
-                    .get_mut(*device_id)
-                    .ok_or_else(|| format!("Got node type for unknown device '{}'", device_id))?;
-                let node = device.nodes.get_mut(*node_id).ok_or_else(|| {
-                    format!("Got node type for unknown node '{}/{}'", device_id, node_id)
-                })?;
+                let node =
+                    get_mut_node_for(&mut self.devices, "Got node type for", device_id, node_id)?;
                 node.node_type = Some(payload.to_owned());
             }
             [device_id, node_id, "$properties"] => {
                 let properties: Vec<_> = payload.split(",").collect();
-                let device = self
-                    .devices
-                    .get_mut(*device_id)
-                    .ok_or_else(|| format!("Got properties for unknown device '{}'", device_id))?;
-                let node = device.nodes.get_mut(*node_id).ok_or_else(|| {
-                    format!(
-                        "Got properties for unknown node '{}/{}'",
-                        device_id, node_id
-                    )
-                })?;
+                let node =
+                    get_mut_node_for(&mut self.devices, "Got properties for", device_id, node_id)?;
                 // Remove properties which aren't in the new list.
                 node.properties
                     .retain(|k, _| properties.contains(&k.as_ref()));
@@ -175,118 +145,70 @@ impl HomieController {
                 }
             }
             [device_id, node_id, property_id, "$name"] => {
-                let device = self.devices.get_mut(*device_id).ok_or_else(|| {
-                    format!("Got property name for unknown device '{}'", device_id)
-                })?;
-                let node = device.nodes.get_mut(*node_id).ok_or_else(|| {
-                    format!(
-                        "Got property name for unknown node '{}/{}'",
-                        device_id, node_id
-                    )
-                })?;
-                let property = node.properties.get_mut(*property_id).ok_or_else(|| {
-                    format!(
-                        "Got property name for unknown property '{}/{}/{}'",
-                        device_id, node_id, property_id
-                    )
-                })?;
+                let property = get_mut_property_for(
+                    &mut self.devices,
+                    "Got property name for",
+                    device_id,
+                    node_id,
+                    property_id,
+                )?;
                 property.name = Some(payload.to_owned());
             }
             [device_id, node_id, property_id, "$datatype"] => {
                 let datatype = payload.parse()?;
-                let device = self.devices.get_mut(*device_id).ok_or_else(|| {
-                    format!("Got property datatype for unknown device '{}'", device_id)
-                })?;
-                let node = device.nodes.get_mut(*node_id).ok_or_else(|| {
-                    format!(
-                        "Got property datatype for unknown node '{}/{}'",
-                        device_id, node_id
-                    )
-                })?;
-                let property = node.properties.get_mut(*property_id).ok_or_else(|| {
-                    format!(
-                        "Got property datatype for unknown property '{}/{}/{}'",
-                        device_id, node_id, property_id
-                    )
-                })?;
+                let property = get_mut_property_for(
+                    &mut self.devices,
+                    "Got property datatype for",
+                    device_id,
+                    node_id,
+                    property_id,
+                )?;
                 property.datatype = Some(datatype);
             }
             [device_id, node_id, property_id, "$unit"] => {
-                let device = self.devices.get_mut(*device_id).ok_or_else(|| {
-                    format!("Got property unit for unknown device '{}'", device_id)
-                })?;
-                let node = device.nodes.get_mut(*node_id).ok_or_else(|| {
-                    format!(
-                        "Got property unit for unknown node '{}/{}'",
-                        device_id, node_id
-                    )
-                })?;
-                let property = node.properties.get_mut(*property_id).ok_or_else(|| {
-                    format!(
-                        "Got property unit for unknown property '{}/{}/{}'",
-                        device_id, node_id, property_id
-                    )
-                })?;
+                let property = get_mut_property_for(
+                    &mut self.devices,
+                    "Got property unit for",
+                    device_id,
+                    node_id,
+                    property_id,
+                )?;
                 property.unit = Some(payload.to_owned());
             }
             [device_id, node_id, property_id, "$format"] => {
-                let device = self.devices.get_mut(*device_id).ok_or_else(|| {
-                    format!("Got property format for unknown device '{}'", device_id)
-                })?;
-                let node = device.nodes.get_mut(*node_id).ok_or_else(|| {
-                    format!(
-                        "Got property format for unknown node '{}/{}'",
-                        device_id, node_id
-                    )
-                })?;
-                let property = node.properties.get_mut(*property_id).ok_or_else(|| {
-                    format!(
-                        "Got property format for unknown property '{}/{}/{}'",
-                        device_id, node_id, property_id
-                    )
-                })?;
+                let property = get_mut_property_for(
+                    &mut self.devices,
+                    "Got property format for",
+                    device_id,
+                    node_id,
+                    property_id,
+                )?;
                 property.format = Some(payload.to_owned());
             }
             [device_id, node_id, property_id, "$settable"] => {
                 let settable = payload
                     .parse()
                     .map_err(|_| format!("Invalid boolean '{}' for $settable.", payload))?;
-                let device = self.devices.get_mut(*device_id).ok_or_else(|| {
-                    format!("Got property settable for unknown device '{}'", device_id)
-                })?;
-                let node = device.nodes.get_mut(*node_id).ok_or_else(|| {
-                    format!(
-                        "Got property settable for unknown node '{}/{}'",
-                        device_id, node_id
-                    )
-                })?;
-                let property = node.properties.get_mut(*property_id).ok_or_else(|| {
-                    format!(
-                        "Got property settable for unknown property '{}/{}/{}'",
-                        device_id, node_id, property_id
-                    )
-                })?;
+                let property = get_mut_property_for(
+                    &mut self.devices,
+                    "Got property settable for",
+                    device_id,
+                    node_id,
+                    property_id,
+                )?;
                 property.settable = settable;
             }
             [device_id, node_id, property_id, "$retained"] => {
                 let retained = payload
                     .parse()
                     .map_err(|_| format!("Invalid boolean '{}' for $retained.", payload))?;
-                let device = self.devices.get_mut(*device_id).ok_or_else(|| {
-                    format!("Got property retained for unknown device '{}'", device_id)
-                })?;
-                let node = device.nodes.get_mut(*node_id).ok_or_else(|| {
-                    format!(
-                        "Got property retained for unknown node '{}/{}'",
-                        device_id, node_id
-                    )
-                })?;
-                let property = node.properties.get_mut(*property_id).ok_or_else(|| {
-                    format!(
-                        "Got property retained for unknown property '{}/{}/{}'",
-                        device_id, node_id, property_id
-                    )
-                })?;
+                let property = get_mut_property_for(
+                    &mut self.devices,
+                    "Got property retained for",
+                    device_id,
+                    node_id,
+                    property_id,
+                )?;
                 property.retained = retained;
             }
             _ => log::warn!("Unexpected subtopic {} = {}", subtopic, payload),
@@ -312,6 +234,45 @@ impl HomieController {
         log::trace!("Subscribe to {}", topic);
         self.mqtt_client.subscribe(topic, QoS::AtLeastOnce).await
     }
+}
+
+fn get_mut_device_for<'a>(
+    devices: &'a mut HashMap<String, Device>,
+    err_prefix: &str,
+    device_id: &str,
+) -> Result<&'a mut Device, String> {
+    devices
+        .get_mut(device_id)
+        .ok_or_else(|| format!("{} unknown device '{}'", err_prefix, device_id))
+}
+
+fn get_mut_node_for<'a>(
+    devices: &'a mut HashMap<String, Device>,
+    err_prefix: &str,
+    device_id: &str,
+    node_id: &str,
+) -> Result<&'a mut Node, String> {
+    let device = get_mut_device_for(devices, err_prefix, device_id)?;
+    device
+        .nodes
+        .get_mut(node_id)
+        .ok_or_else(|| format!("{} unknown node '{}/{}'", err_prefix, device_id, node_id))
+}
+
+fn get_mut_property_for<'a>(
+    devices: &'a mut HashMap<String, Device>,
+    err_prefix: &str,
+    device_id: &str,
+    node_id: &str,
+    property_id: &str,
+) -> Result<&'a mut Property, String> {
+    let node = get_mut_node_for(devices, err_prefix, device_id, node_id)?;
+    node.properties.get_mut(property_id).ok_or_else(|| {
+        format!(
+            "{} unknown property '{}/{}/{}'",
+            err_prefix, device_id, node_id, property_id
+        )
+    })
 }
 
 #[derive(Error, Debug)]
