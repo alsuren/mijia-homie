@@ -112,7 +112,7 @@ async fn handle_publish(
     match parts.as_slice() {
         [device_id, "$homie"] => {
             log::trace!("Homie device '{}' version '{}'", device_id, payload);
-            let topic = format!("{}+/+", base_topic);
+            let topic = format!("{}{}/+", base_topic, device_id);
             log::trace!("Subscribe to {}", topic);
             client.subscribe(topic, QoS::AtLeastOnce).await?;
         }
