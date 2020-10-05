@@ -1,4 +1,4 @@
-use homie_controller::{HomieController, PollError};
+use homie_controller::{Event, HomieController, PollError};
 use rumqttc::MqttOptions;
 
 #[tokio::main(core_threads = 2)]
@@ -10,13 +10,27 @@ async fn main() -> Result<(), PollError> {
     let (mut controller, mut event_loop) = HomieController::new(mqttoptions, "homie");
     controller.start().await?;
     loop {
-        controller.poll(&mut event_loop).await?;
-        println!("Devices:");
-        for device in controller.devices.values() {
-            if device.has_required_attributes() {
-                println!(" * {:?}", device);
-            } else {
-                println!(" * {} not ready.", device.id);
+        if let Some(event) = controller.poll(&mut event_loop).await? {
+            match event {
+                Event::PropertyValueChanged {
+                    device_id,
+                    node_id,
+                    property_id,
+                    value,
+                } => {
+                    println!("{}/{}/{} = {}", device_id, node_id, property_id, value);
+                }
+                _ => {
+                    println!("Event: {:?}", event);
+                    println!("Devices:");
+                    for device in controller.devices.values() {
+                        if device.has_required_attributes() {
+                            println!(" * {:?}", device);
+                        } else {
+                            println!(" * {} not ready.", device.id);
+                        }
+                    }
+                }
             }
         }
     }

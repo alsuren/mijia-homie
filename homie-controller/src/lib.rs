@@ -2,8 +2,7 @@
 //! devices implementing the [Homie convention](https://homieiot.github.io/).
 
 use rumqttc::{
-    AsyncClient, ClientError, ConnectionError, Event, EventLoop, Incoming, MqttOptions, Publish,
-    QoS,
+    AsyncClient, ClientError, ConnectionError, EventLoop, Incoming, MqttOptions, Publish, QoS,
 };
 use std::collections::HashMap;
 use std::str;
@@ -28,6 +27,66 @@ pub enum PollError {
     Internal(&'static str),
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum Event {
+    DeviceUpdated {
+        device_id: String,
+        has_required_attributes: bool,
+    },
+    NodeUpdated {
+        device_id: String,
+        node_id: String,
+        has_required_attributes: bool,
+    },
+    PropertyUpdated {
+        device_id: String,
+        node_id: String,
+        property_id: String,
+        has_required_attributes: bool,
+    },
+    PropertyValueChanged {
+        device_id: String,
+        node_id: String,
+        property_id: String,
+        value: String,
+    },
+}
+
+impl Event {
+    fn device_updated(device: &Device) -> Self {
+        Event::DeviceUpdated {
+            device_id: device.id.to_owned(),
+            has_required_attributes: device.has_required_attributes(),
+        }
+    }
+
+    fn node_updated(device_id: &str, node: &Node) -> Self {
+        Event::NodeUpdated {
+            device_id: device_id.to_owned(),
+            node_id: node.id.to_owned(),
+            has_required_attributes: node.has_required_attributes(),
+        }
+    }
+
+    fn property_updated(device_id: &str, node_id: &str, property: &Property) -> Self {
+        Event::PropertyUpdated {
+            device_id: device_id.to_owned(),
+            node_id: node_id.to_owned(),
+            property_id: property.id.to_owned(),
+            has_required_attributes: property.has_required_attributes(),
+        }
+    }
+
+    fn property_value(device_id: &str, node_id: &str, property: &Property) -> Self {
+        Event::PropertyValueChanged {
+            device_id: device_id.to_owned(),
+            node_id: node_id.to_owned(),
+            property_id: property.id.to_owned(),
+            value: property.value.to_owned().unwrap(),
+        }
+    }
+}
+
 /// A Homie controller, which connects to an MQTT broker and interacts with Homie devices.
 #[derive(Debug)]
 pub struct HomieController {
@@ -47,12 +106,12 @@ impl HomieController {
         (controller, event_loop)
     }
 
-    /// Poll the EventLoop.
-    pub async fn poll(&mut self, event_loop: &mut EventLoop) -> Result<(), PollError> {
+    /// Poll the EventLoop, and maybe return a Homie event.
+    pub async fn poll(&mut self, event_loop: &mut EventLoop) -> Result<Option<Event>, PollError> {
         let notification = event_loop.poll().await?;
         log::trace!("Notification = {:?}", notification);
 
-        if let Event::Incoming(incoming) = notification {
+        if let rumqttc::Event::Incoming(incoming) = notification {
             log::trace!("Incoming: {:?}", incoming);
             match incoming {
                 Incoming::Publish(publish) => {
@@ -64,16 +123,16 @@ impl HomieController {
                             log::warn!("{}", err)
                         }
                         Err(HandleError::Fatal(e)) => Err(e)?,
-                        Ok(()) => {}
+                        Ok(event) => return Ok(event),
                     }
                 }
                 _ => {}
             }
         }
-        Ok(())
+        Ok(None)
     }
 
-    async fn handle_publish(&mut self, publish: Publish) -> Result<(), HandleError> {
+    async fn handle_publish(&mut self, publish: Publish) -> Result<Option<Event>, HandleError> {
         let base_topic = format!("{}/", self.base_topic);
         let payload = str::from_utf8(&publish.payload)
             .map_err(|e| format!("Payload not valid UTF-8: {}", e))?;
@@ -86,19 +145,28 @@ impl HomieController {
             [device_id, "$homie"] => {
                 if !self.devices.contains_key(*device_id) {
                     self.new_device(device_id, payload).await?;
+                    return Ok(Some(Event::DeviceUpdated {
+                        device_id: device_id.to_string(),
+                        has_required_attributes: false,
+                    }));
                 }
             }
             [device_id, "$name"] => {
-                get_mut_device_for(&mut self.devices, "Got name for", device_id)?.name =
-                    Some(payload.to_owned());
+                let device = get_mut_device_for(&mut self.devices, "Got name for", device_id)?;
+                device.name = Some(payload.to_owned());
+                return Ok(Some(Event::device_updated(device)));
             }
             [device_id, "$state"] => {
                 let state = payload.parse()?;
-                get_mut_device_for(&mut self.devices, "Got state for", device_id)?.state = state;
+                let device = get_mut_device_for(&mut self.devices, "Got state for", device_id)?;
+                device.state = state;
+                return Ok(Some(Event::device_updated(device)));
             }
             [device_id, "$implementation"] => {
-                get_mut_device_for(&mut self.devices, "Got implementation for", device_id)?
-                    .implementation = Some(payload.to_owned());
+                let device =
+                    get_mut_device_for(&mut self.devices, "Got implementation for", device_id)?;
+                device.implementation = Some(payload.to_owned());
+                return Ok(Some(Event::device_updated(device)));
             }
             [device_id, "$nodes"] => {
                 let nodes: Vec<_> = payload.split(",").collect();
@@ -113,16 +181,19 @@ impl HomieController {
                         self.mqtt_client.subscribe(topic, QoS::AtLeastOnce).await?;
                     }
                 }
+                return Ok(Some(Event::device_updated(device)));
             }
             [device_id, node_id, "$name"] => {
                 let node =
                     get_mut_node_for(&mut self.devices, "Got node name for", device_id, node_id)?;
                 node.name = Some(payload.to_owned());
+                return Ok(Some(Event::node_updated(device_id, node)));
             }
             [device_id, node_id, "$type"] => {
                 let node =
                     get_mut_node_for(&mut self.devices, "Got node type for", device_id, node_id)?;
                 node.node_type = Some(payload.to_owned());
+                return Ok(Some(Event::node_updated(device_id, node)));
             }
             [device_id, node_id, "$properties"] => {
                 let properties: Vec<_> = payload.split(",").collect();
@@ -143,6 +214,7 @@ impl HomieController {
                         self.mqtt_client.subscribe(topic, QoS::AtLeastOnce).await?;
                     }
                 }
+                return Ok(Some(Event::node_updated(device_id, node)));
             }
             [device_id, node_id, property_id, "$name"] => {
                 let property = get_mut_property_for(
@@ -153,6 +225,7 @@ impl HomieController {
                     property_id,
                 )?;
                 property.name = Some(payload.to_owned());
+                return Ok(Some(Event::property_updated(device_id, node_id, property)));
             }
             [device_id, node_id, property_id, "$datatype"] => {
                 let datatype = payload.parse()?;
@@ -164,6 +237,7 @@ impl HomieController {
                     property_id,
                 )?;
                 property.datatype = Some(datatype);
+                return Ok(Some(Event::property_updated(device_id, node_id, property)));
             }
             [device_id, node_id, property_id, "$unit"] => {
                 let property = get_mut_property_for(
@@ -174,6 +248,7 @@ impl HomieController {
                     property_id,
                 )?;
                 property.unit = Some(payload.to_owned());
+                return Ok(Some(Event::property_updated(device_id, node_id, property)));
             }
             [device_id, node_id, property_id, "$format"] => {
                 let property = get_mut_property_for(
@@ -184,6 +259,7 @@ impl HomieController {
                     property_id,
                 )?;
                 property.format = Some(payload.to_owned());
+                return Ok(Some(Event::property_updated(device_id, node_id, property)));
             }
             [device_id, node_id, property_id, "$settable"] => {
                 let settable = payload
@@ -197,6 +273,7 @@ impl HomieController {
                     property_id,
                 )?;
                 property.settable = settable;
+                return Ok(Some(Event::property_updated(device_id, node_id, property)));
             }
             [device_id, node_id, property_id, "$retained"] => {
                 let retained = payload
@@ -210,6 +287,7 @@ impl HomieController {
                     property_id,
                 )?;
                 property.retained = retained;
+                return Ok(Some(Event::property_updated(device_id, node_id, property)));
             }
             [device_id, node_id, property_id] if !property_id.starts_with("$") => {
                 let property = get_mut_property_for(
@@ -220,10 +298,11 @@ impl HomieController {
                     property_id,
                 )?;
                 property.value = Some(payload.to_owned());
+                return Ok(Some(Event::property_value(device_id, node_id, property)));
             }
             _ => log::warn!("Unexpected subtopic {} = {}", subtopic, payload),
         }
-        Ok(())
+        Ok(None)
     }
 
     async fn new_device(
