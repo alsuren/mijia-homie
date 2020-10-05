@@ -211,6 +211,16 @@ impl HomieController {
                 )?;
                 property.retained = retained;
             }
+            [device_id, node_id, property_id] if !property_id.starts_with("$") => {
+                let property = get_mut_property_for(
+                    &mut self.devices,
+                    "Got property value for",
+                    device_id,
+                    node_id,
+                    property_id,
+                )?;
+                property.value = Some(payload.to_owned());
+            }
             _ => log::warn!("Unexpected subtopic {} = {}", subtopic, payload),
         }
         Ok(())

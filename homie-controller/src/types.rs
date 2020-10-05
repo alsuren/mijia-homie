@@ -97,6 +97,8 @@ pub struct Property {
     pub retained: bool,
     pub unit: Option<String>,
     pub format: Option<String>,
+    // Value
+    pub value: Option<String>,
 }
 
 impl Property {
@@ -109,6 +111,7 @@ impl Property {
             retained: true,
             unit: None,
             format: None,
+            value: None,
         }
     }
 
