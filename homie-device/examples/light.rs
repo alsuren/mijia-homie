@@ -7,7 +7,8 @@ async fn main() -> Result<(), SpawnError> {
 
     let mqttoptions = MqttOptions::new("homie_example", "test.mosquitto.org", 1883);
 
-    let mut builder = HomieDevice::builder("homie/example", "Homie light example", mqttoptions);
+    let mut builder =
+        HomieDevice::builder("homie/example_light", "Homie light example", mqttoptions);
     builder.set_update_callback(|node_id, property_id, value| async move {
         println!("{}/{} is now {}", node_id, property_id, value);
         Some(value)

@@ -13,7 +13,7 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     let mqttoptions = MqttOptions::new("homie_example", "test.mosquitto.org", 1883);
 
     let (mut homie, homie_handle) =
-        HomieDevice::builder("homie/example", "Homie example", mqttoptions)
+        HomieDevice::builder("homie/example_lifecycle", "Homie lifecycle example", mqttoptions)
             .spawn()
             .await?;
 
