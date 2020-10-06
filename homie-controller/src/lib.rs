@@ -12,7 +12,7 @@ use tokio::sync::Mutex;
 use tokio::task::JoinError;
 
 mod types;
-pub use types::{Datatype, DatatypeParseError, Device, Node, Property, State, StateParseError};
+pub use types::{Datatype, Device, Node, ParseDatatypeError, ParseStateError, Property, State};
 
 const REQUESTS_CAP: usize = 10;
 
@@ -388,14 +388,14 @@ impl From<String> for HandleError {
     }
 }
 
-impl From<StateParseError> for HandleError {
-    fn from(e: StateParseError) -> Self {
+impl From<ParseStateError> for HandleError {
+    fn from(e: ParseStateError) -> Self {
         HandleError::Warning(e.to_string())
     }
 }
 
-impl From<DatatypeParseError> for HandleError {
-    fn from(e: DatatypeParseError) -> Self {
+impl From<ParseDatatypeError> for HandleError {
+    fn from(e: ParseDatatypeError) -> Self {
         HandleError::Warning(e.to_string())
     }
 }

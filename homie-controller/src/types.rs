@@ -45,10 +45,10 @@ impl State {
 /// [device lifecycle](https://homieiot.github.io/specification/#device-lifecycle) state.
 #[derive(Error, Debug)]
 #[error("Invalid state '{0}'")]
-pub struct StateParseError(String);
+pub struct ParseStateError(String);
 
 impl FromStr for State {
-    type Err = StateParseError;
+    type Err = ParseStateError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
@@ -58,7 +58,7 @@ impl FromStr for State {
             "sleeping" => Ok(Self::Sleeping),
             "lost" => Ok(Self::Lost),
             "alert" => Ok(Self::Alert),
-            _ => Err(StateParseError(s.to_owned())),
+            _ => Err(ParseStateError(s.to_owned())),
         }
     }
 }
@@ -84,10 +84,10 @@ pub enum Datatype {
 /// match a valid Homie `$datatype` attribute.
 #[derive(Error, Debug)]
 #[error("Invalid datatype '{0}'")]
-pub struct DatatypeParseError(String);
+pub struct ParseDatatypeError(String);
 
 impl FromStr for Datatype {
-    type Err = DatatypeParseError;
+    type Err = ParseDatatypeError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
@@ -97,7 +97,7 @@ impl FromStr for Datatype {
             "string" => Ok(Self::String),
             "enum" => Ok(Self::Enum),
             "color" => Ok(Self::Color),
-            _ => Err(DatatypeParseError(s.to_owned())),
+            _ => Err(ParseDatatypeError(s.to_owned())),
         }
     }
 }
