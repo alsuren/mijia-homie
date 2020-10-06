@@ -5,7 +5,7 @@ use core::future::Future;
 use dbus::arg::RefArg;
 use dbus::nonblock::stdintf::org_freedesktop_dbus::ObjectManager;
 use dbus::nonblock::SyncConnection;
-use eyre::Context;
+use eyre::WrapErr;
 use futures::FutureExt;
 use itertools::Itertools;
 use std::collections::HashMap;
@@ -116,10 +116,7 @@ impl BluetoothSession {
             DBUS_METHOD_CALL_TIMEOUT,
             self.connection.clone(),
         );
-        adapter
-            .set_powered(true)
-            .await
-            .with_context(|| std::line!().to_string())?;
+        adapter.set_powered(true).await?;
         adapter
             .start_discovery()
             .await
@@ -202,7 +199,7 @@ impl BluetoothSession {
         self.device(id)
             .connect()
             .await
-            .with_context(|| std::line!().to_string())
+            .wrap_err_with(|| format!("connecting to {:?}", id))
     }
 
     /// Disconnect from the bluetooth device with the given D-Bus object path.
@@ -210,6 +207,6 @@ impl BluetoothSession {
         self.device(id)
             .disconnect()
             .await
-            .with_context(|| std::line!().to_string())
+            .wrap_err_with(|| format!("disconnecting from {:?}", id))
     }
 }
