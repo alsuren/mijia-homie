@@ -100,9 +100,9 @@ enum ConnectionStatus {
     Unknown,
     /// Currently connecting. Don't try again until the timeout expires.
     Connecting { reserved_until: Instant },
-    /// Disconnected because we stopped getting updates.
-    WatchdogTimeOut,
-    /// We explicity disconnected because something else went wrong.
+    /// We explicity disconnected, either because we failed to connect or
+    /// because we stopped receiving updates. The device is definitely
+    /// disconnected now. Promise.
     Disconnected,
     /// We received a Disconnected event.
     /// This should only be treated as informational, because disconnection
@@ -331,8 +331,7 @@ async fn action_sensor(
         ConnectionStatus::Unknown
         | ConnectionStatus::Connecting { .. }
         | ConnectionStatus::Disconnected
-        | ConnectionStatus::MarkedDisconnected
-        | ConnectionStatus::WatchdogTimeOut => {
+        | ConnectionStatus::MarkedDisconnected => {
             connect_sensor_with_id(state, session, id).await?;
             Ok(())
         }
@@ -448,11 +447,18 @@ async fn check_for_stale_sensor(
             sensor.name,
             now - sensor.last_update_timestamp
         );
-        // TODO: Should we disconnect the device first?
-        sensor.connection_status = ConnectionStatus::WatchdogTimeOut;
+        sensor.connection_status = ConnectionStatus::Disconnected;
         state
             .homie
             .remove_node(&sensor.node_id())
+            .await
+            .with_context(|| std::line!().to_string())?;
+        // We could drop our state lock at this point, if it ends up taking
+        // too long. As it is, it's quite nice that we can't attempt to connect
+        // while we're in the middle of disconnecting.
+        session
+            .bt_session
+            .disconnect(&id)
             .await
             .with_context(|| std::line!().to_string())?;
     }
