@@ -121,22 +121,28 @@ impl HomieController {
         log::trace!("Notification = {:?}", notification);
 
         if let rumqttc::Event::Incoming(incoming) = notification {
-            log::trace!("Incoming: {:?}", incoming);
-            match incoming {
-                Incoming::Publish(publish) => {
-                    match self.handle_publish(publish).await {
-                        Err(HandleError::Warning(err)) => {
-                            // These error strings indicate some issue with parsing the publish
-                            // event from the network, perhaps due to a malfunctioning device,
-                            // so should just be logged and ignored.
-                            log::warn!("{}", err)
-                        }
-                        Err(HandleError::Fatal(e)) => Err(e)?,
-                        Ok(event) => return Ok(event),
+            self.handle_event(incoming).await
+        } else {
+            Ok(None)
+        }
+    }
+
+    async fn handle_event(&self, incoming: Incoming) -> Result<Option<Event>, PollError> {
+        log::trace!("Incoming: {:?}", incoming);
+        match incoming {
+            Incoming::Publish(publish) => {
+                match self.handle_publish(publish).await {
+                    Err(HandleError::Warning(err)) => {
+                        // These error strings indicate some issue with parsing the publish
+                        // event from the network, perhaps due to a malfunctioning device,
+                        // so should just be logged and ignored.
+                        log::warn!("{}", err)
                     }
+                    Err(HandleError::Fatal(e)) => Err(e)?,
+                    Ok(event) => return Ok(event),
                 }
-                _ => {}
             }
+            _ => {}
         }
         Ok(None)
     }
