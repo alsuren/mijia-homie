@@ -448,11 +448,18 @@ async fn check_for_stale_sensor(
             sensor.name,
             now - sensor.last_update_timestamp
         );
-        // TODO: Should we disconnect the device first?
         sensor.connection_status = ConnectionStatus::WatchdogTimeOut;
         state
             .homie
             .remove_node(&sensor.node_id())
+            .await
+            .with_context(|| std::line!().to_string())?;
+        // We could drop our state lock at this point, if it ends up taking
+        // too long. As it is, it's quite nice that we can't attempt to connect
+        // while we're in the middle of disconnecting.
+        session
+            .bt_session
+            .disconnect(&id)
             .await
             .with_context(|| std::line!().to_string())?;
     }
