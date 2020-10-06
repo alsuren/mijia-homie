@@ -94,10 +94,17 @@ impl Event {
 pub struct HomieController {
     mqtt_client: AsyncClient,
     base_topic: String,
+    /// The set of Homie devices which have been discovered so far, keyed by their IDs.
     pub devices: Arc<Mutex<HashMap<String, Device>>>,
 }
 
 impl HomieController {
+    /// Create a new `HomieController` connected to an MQTT broker.
+    ///
+    /// # Arguments
+    /// * `base_topic`: The Homie [base topic](https://homieiot.github.io/specification/#base-topic)
+    ///   under which to look for Homie devices. "homie" is the recommended default.
+    /// * `mqtt_options`: Options for the MQTT connection, including which broker to connect to.
     pub fn new(mqtt_options: MqttOptions, base_topic: &str) -> (HomieController, EventLoop) {
         let (mqtt_client, event_loop) = AsyncClient::new(mqtt_options, REQUESTS_CAP);
         let controller = HomieController {
@@ -108,7 +115,7 @@ impl HomieController {
         (controller, event_loop)
     }
 
-    /// Poll the EventLoop, and maybe return a Homie event.
+    /// Poll the `EventLoop`, and maybe return a Homie event.
     pub async fn poll(&self, event_loop: &mut EventLoop) -> Result<Option<Event>, PollError> {
         let notification = event_loop.poll().await?;
         log::trace!("Notification = {:?}", notification);
@@ -320,6 +327,7 @@ impl HomieController {
         self.mqtt_client.subscribe(topic, QoS::AtLeastOnce).await
     }
 
+    /// Start discovering Homie devices.
     pub async fn start(&self) -> Result<(), ClientError> {
         let topic = format!("{}/+/$homie", self.base_topic);
         log::trace!("Subscribe to {}", topic);
