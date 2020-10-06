@@ -752,6 +752,7 @@ dependencies = [
  "rumqttc",
  "rustls",
  "rustls-native-certs",
+ "stable-eyre",
  "tokio",
 ]
 
@@ -974,6 +975,17 @@ name = "spin"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6e63cff320ae2c57904679ba7cb63280a3dc4613885beafb148ee7bf9aa9042d"
+
+[[package]]
+name = "stable-eyre"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fe9c0eae7ec7851ac09ca1950554f5bd8f0ffaad39135045bc978ef7bcfbc21d"
+dependencies = [
+ "backtrace",
+ "eyre",
+ "indenter",
+]
 
 [[package]]
 name = "syn"

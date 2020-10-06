@@ -1,5 +1,4 @@
 use backoff::{future::FutureOperation, ExponentialBackoff};
-use eyre::Context;
 use futures::stream::StreamExt;
 use futures::{FutureExt, TryFutureExt};
 use homie_device::{Datatype, HomieDevice, Node, Property};
@@ -7,6 +6,8 @@ use itertools::Itertools;
 use mijia::{DeviceId, MacAddress, MijiaEvent, MijiaSession, Readings, SensorProps};
 use rumqttc::MqttOptions;
 use rustls::ClientConfig;
+use stable_eyre::eyre;
+use stable_eyre::eyre::WrapErr;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
@@ -31,8 +32,9 @@ const SENSOR_CONNECT_RETRY_TIMEOUT: Duration = Duration::from_secs(60);
 const SENSOR_NAMES_FILENAME: &str = "sensor_names.conf";
 
 #[tokio::main]
-async fn main() -> Result<(), eyre::Error> {
-    dotenv::dotenv().context("reading .env")?;
+async fn main() -> Result<(), eyre::Report> {
+    stable_eyre::install()?;
+    dotenv::dotenv().wrap_err("reading .env")?;
     pretty_env_logger::init();
     color_backtrace::install();
 
@@ -225,7 +227,7 @@ async fn run_sensor_system(
     session: &MijiaSession,
 ) -> Result<(), eyre::Error> {
     let sensor_names = hashmap_from_file(SENSOR_NAMES_FILENAME)
-        .context(format!("reading {}", SENSOR_NAMES_FILENAME))?;
+        .wrap_err(format!("reading {}", SENSOR_NAMES_FILENAME))?;
 
     homie
         .ready()
