@@ -1,11 +1,11 @@
 use crate::DBUS_METHOD_CALL_TIMEOUT;
-use anyhow::Context;
 use bluez_generated::generated::{OrgBluezAdapter1, OrgBluezDevice1};
 use core::fmt::Debug;
 use core::future::Future;
 use dbus::arg::RefArg;
 use dbus::nonblock::stdintf::org_freedesktop_dbus::ObjectManager;
 use dbus::nonblock::SyncConnection;
+use eyre::Context;
 use futures::FutureExt;
 use itertools::Itertools;
 use std::collections::HashMap;
@@ -91,16 +91,16 @@ impl BluetoothSession {
     /// Returns a tuple of (join handle, Self).
     /// If the join handle ever completes then you're in trouble and should
     /// probably restart the process.
-    pub async fn new(
-    ) -> Result<(impl Future<Output = Result<(), anyhow::Error>>, Self), anyhow::Error> {
+    pub async fn new() -> Result<(impl Future<Output = Result<(), eyre::Error>>, Self), eyre::Error>
+    {
         // Connect to the D-Bus system bus (this is blocking, unfortunately).
         let (dbus_resource, connection) = dbus_tokio::connection::new_system_sync()?;
         // The resource is a task that should be spawned onto a tokio compatible
         // reactor ASAP. If the resource ever finishes, you lost connection to D-Bus.
         let dbus_handle = tokio::spawn(async {
             let err = dbus_resource.await;
-            // TODO: work out why this err isn't 'static and use anyhow::Error::new instead
-            Err::<(), anyhow::Error>(anyhow::anyhow!(err))
+            // TODO: work out why this err isn't 'static and use eyre::Error::new instead
+            Err::<(), eyre::Error>(eyre::eyre!(err))
         });
         Ok((
             dbus_handle.map(|res| Ok(res??)),
@@ -109,7 +109,7 @@ impl BluetoothSession {
     }
 
     /// Power on the bluetooth adapter adapter and start scanning for devices.
-    pub async fn start_discovery(&self) -> Result<(), anyhow::Error> {
+    pub async fn start_discovery(&self) -> Result<(), eyre::Error> {
         let adapter = dbus::nonblock::Proxy::new(
             "org.bluez",
             "/org/bluez/hci0",
@@ -128,7 +128,7 @@ impl BluetoothSession {
     }
 
     /// Get a list of all bluetooth devices which have been discovered so far.
-    pub async fn get_devices(&self) -> Result<Vec<DeviceInfo>, anyhow::Error> {
+    pub async fn get_devices(&self) -> Result<Vec<DeviceInfo>, eyre::Error> {
         let bluez_root = dbus::nonblock::Proxy::new(
             "org.bluez",
             "/",
@@ -198,7 +198,7 @@ impl BluetoothSession {
     }
 
     /// Connect to the bluetooth device with the given D-Bus object path.
-    pub async fn connect(&self, id: &DeviceId) -> Result<(), anyhow::Error> {
+    pub async fn connect(&self, id: &DeviceId) -> Result<(), eyre::Error> {
         self.device(id)
             .connect()
             .await
@@ -206,7 +206,7 @@ impl BluetoothSession {
     }
 
     /// Disconnect from the bluetooth device with the given D-Bus object path.
-    pub async fn disconnect(&self, id: &DeviceId) -> Result<(), anyhow::Error> {
+    pub async fn disconnect(&self, id: &DeviceId) -> Result<(), eyre::Error> {
         self.device(id)
             .disconnect()
             .await
