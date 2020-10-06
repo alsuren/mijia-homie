@@ -7,6 +7,7 @@ Type=simple
 User=pi
 WorkingDirectory=/home/pi
 Environment=RUST_BACKTRACE=1
+Environment=RUST_LIB_BACKTRACE=1
 ExecStart=/home/pi/publish-mqtt
 Restart=always
 
