@@ -95,7 +95,8 @@ pub struct HomieController {
     mqtt_client: AsyncClient,
     base_topic: String,
     /// The set of Homie devices which have been discovered so far, keyed by their IDs.
-    pub devices: Arc<Mutex<HashMap<String, Device>>>,
+    // TODO: Consider using Mutex<im::HashMap<...>> instead.
+    devices: Mutex<Arc<HashMap<String, Device>>>,
 }
 
 impl HomieController {
@@ -110,9 +111,15 @@ impl HomieController {
         let controller = HomieController {
             mqtt_client,
             base_topic: base_topic.to_string(),
-            devices: Arc::new(Mutex::new(HashMap::new())),
+            devices: Mutex::new(Arc::new(HashMap::new())),
         };
         (controller, event_loop)
+    }
+
+    /// Get a snapshot of the set of Homie devices which have been discovered so far, keyed by their
+    /// IDs.
+    pub async fn devices(&self) -> Arc<HashMap<String, Device>> {
+        self.devices.lock().await.clone()
     }
 
     /// Poll the `EventLoop`, and maybe return a Homie event.
@@ -155,7 +162,13 @@ impl HomieController {
             .topic
             .strip_prefix(&base_topic)
             .ok_or_else(|| format!("Publish with unexpected topic: {:?}", publish))?;
+
+        // If there are no other references to the devices this will give us a mutable reference
+        // directly. If there are other references it will clone the underlying HashMap and update
+        // our Arc to point to that, so that it is now a unique reference.
         let devices = &mut *self.devices.lock().await;
+        let devices = Arc::make_mut(devices);
+
         let parts = subtopic.split("/").collect::<Vec<&str>>();
         match parts.as_slice() {
             [device_id, "$homie"] => {
