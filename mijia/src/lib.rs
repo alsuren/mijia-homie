@@ -65,14 +65,14 @@ impl MijiaSession {
     /// Returns a tuple of (join handle, Self).
     /// If the join handle ever completes then you're in trouble and should
     /// probably restart the process.
-    pub async fn new(
-    ) -> Result<(impl Future<Output = Result<(), anyhow::Error>>, Self), anyhow::Error> {
+    pub async fn new() -> Result<(impl Future<Output = Result<(), eyre::Error>>, Self), eyre::Error>
+    {
         let (handle, bt_session) = BluetoothSession::new().await?;
         Ok((handle, MijiaSession { bt_session }))
     }
 
     /// Get a list of all Mijia sensors which have currently been discovered.
-    pub async fn get_sensors(&self) -> Result<Vec<SensorProps>, anyhow::Error> {
+    pub async fn get_sensors(&self) -> Result<Vec<SensorProps>, eyre::Error> {
         let devices = self.bt_session.get_devices().await?;
 
         let sensors = devices
@@ -96,7 +96,7 @@ impl MijiaSession {
     /// connection interval to save power.
     ///
     /// Notifications will be delivered as events by `MijiaSession::event_stream()`.
-    pub async fn start_notify_sensor(&self, id: &DeviceId) -> Result<(), anyhow::Error> {
+    pub async fn start_notify_sensor(&self, id: &DeviceId) -> Result<(), eyre::Error> {
         let temp_humidity_path = id.object_path.to_string() + SENSOR_READING_CHARACTERISTIC_PATH;
         let temp_humidity = dbus::nonblock::Proxy::new(
             "org.bluez",
@@ -125,11 +125,10 @@ impl MijiaSession {
     /// If the MsgMatch is dropped then the Stream will close.
     pub async fn event_stream(
         &self,
-    ) -> Result<(MsgMatch, impl Stream<Item = MijiaEvent>), anyhow::Error> {
+    ) -> Result<(MsgMatch, impl Stream<Item = MijiaEvent>), eyre::Error> {
         let mut rule = dbus::message::MatchRule::new();
         rule.msg_type = Some(dbus::message::MessageType::Signal);
-        rule.sender =
-            Some(dbus::strings::BusName::new("org.bluez").map_err(|s| anyhow::anyhow!(s))?);
+        rule.sender = Some(dbus::strings::BusName::new("org.bluez").map_err(|s| eyre::eyre!(s))?);
 
         let (msg_match, events) = self
             .bt_session

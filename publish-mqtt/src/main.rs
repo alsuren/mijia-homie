@@ -1,4 +1,3 @@
-use anyhow::Context;
 use backoff::{future::FutureOperation, ExponentialBackoff};
 use futures::stream::StreamExt;
 use futures::{FutureExt, TryFutureExt};
@@ -7,6 +6,8 @@ use itertools::Itertools;
 use mijia::{DeviceId, MacAddress, MijiaEvent, MijiaSession, Readings, SensorProps};
 use rumqttc::MqttOptions;
 use rustls::ClientConfig;
+use stable_eyre::eyre;
+use stable_eyre::eyre::WrapErr;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
@@ -31,8 +32,9 @@ const SENSOR_CONNECT_RETRY_TIMEOUT: Duration = Duration::from_secs(60);
 const SENSOR_NAMES_FILENAME: &str = "sensor_names.conf";
 
 #[tokio::main]
-async fn main() -> Result<(), anyhow::Error> {
-    dotenv::dotenv().context("reading .env")?;
+async fn main() -> Result<(), eyre::Report> {
+    stable_eyre::install()?;
+    dotenv::dotenv().wrap_err("reading .env")?;
     pretty_env_logger::init();
     color_backtrace::install();
 
@@ -81,13 +83,13 @@ async fn main() -> Result<(), anyhow::Error> {
     let sensor_handle = local.run_until(async move { run_sensor_system(homie, &session).await });
 
     // Poll everything to completion, until the first one bombs out.
-    let res: Result<_, anyhow::Error> = try_join! {
+    let res: Result<_, eyre::Error> = try_join! {
         // If this ever finishes, we lost connection to D-Bus.
         dbus_handle,
         // Bluetooth finished first. Convert error and get on with your life.
         sensor_handle.map(|res| Ok(res?)),
         // MQTT event loop finished first.
-        homie_handle.map_err(|err| anyhow::anyhow!(err)),
+        homie_handle.map_err(|err| eyre::eyre!(err)),
     };
     res?;
     Ok(())
@@ -182,7 +184,7 @@ impl Sensor {
         &mut self,
         homie: &HomieDevice,
         readings: &Readings,
-    ) -> Result<(), anyhow::Error> {
+    ) -> Result<(), eyre::Error> {
         println!("{} {} ({})", self.mac_address, readings, self.name);
 
         let node_id = self.node_id();
@@ -193,28 +195,22 @@ impl Sensor {
                 Self::PROPERTY_ID_TEMPERATURE,
                 format!("{:.2}", readings.temperature),
             )
-            .await
-            .with_context(|| std::line!().to_string())?;
+            .await?;
         homie
             .publish_value(&node_id, Self::PROPERTY_ID_HUMIDITY, readings.humidity)
-            .await
-            .with_context(|| std::line!().to_string())?;
+            .await?;
         homie
             .publish_value(
                 &node_id,
                 Self::PROPERTY_ID_BATTERY,
                 readings.battery_percent,
             )
-            .await
-            .with_context(|| std::line!().to_string())?;
+            .await?;
         Ok(())
     }
 
-    async fn mark_connected(&mut self, homie: &mut HomieDevice) -> Result<(), anyhow::Error> {
-        homie
-            .add_node(self.as_node())
-            .await
-            .with_context(|| std::line!().to_string())?;
+    async fn mark_connected(&mut self, homie: &mut HomieDevice) -> Result<(), eyre::Error> {
+        homie.add_node(self.as_node()).await?;
         self.connection_status = ConnectionStatus::Connected;
         Ok(())
     }
@@ -223,14 +219,11 @@ impl Sensor {
 async fn run_sensor_system(
     mut homie: HomieDevice,
     session: &MijiaSession,
-) -> Result<(), anyhow::Error> {
+) -> Result<(), eyre::Error> {
     let sensor_names = hashmap_from_file(SENSOR_NAMES_FILENAME)
-        .context(format!("reading {}", SENSOR_NAMES_FILENAME))?;
+        .wrap_err(format!("reading {}", SENSOR_NAMES_FILENAME))?;
 
-    homie
-        .ready()
-        .await
-        .with_context(|| std::line!().to_string())?;
+    homie.ready().await?;
 
     let state = Arc::new(Mutex::new(SensorState {
         sensors: HashMap::new(),
@@ -244,14 +237,14 @@ async fn run_sensor_system(
 
 /// Read the given file of key-value pairs into a hashmap.
 /// Returns an empty hashmap if the file doesn't exist, or an error if it is malformed.
-pub fn hashmap_from_file(filename: &str) -> Result<HashMap<MacAddress, String>, anyhow::Error> {
+pub fn hashmap_from_file(filename: &str) -> Result<HashMap<MacAddress, String>, eyre::Error> {
     let mut map: HashMap<MacAddress, String> = HashMap::new();
     if let Ok(file) = File::open(filename) {
         for line in BufReader::new(file).lines() {
             let line = line?;
             let parts: Vec<&str> = line.splitn(2, '=').collect();
             if parts.len() != 2 {
-                anyhow::bail!("Invalid line '{}'", line);
+                eyre::bail!("Invalid line '{}'", line);
             }
             map.insert(parts[0].parse()?, parts[1].to_string());
         }
@@ -263,7 +256,7 @@ async fn bluetooth_connection_loop(
     state: Arc<Mutex<SensorState>>,
     session: &MijiaSession,
     sensor_names: &HashMap<MacAddress, String>,
-) -> Result<(), anyhow::Error> {
+) -> Result<(), eyre::Error> {
     let mut next_scan_due = Instant::now();
     loop {
         // Print count and list of sensors in each state.
@@ -284,9 +277,7 @@ async fn bluetooth_connection_loop(
         let now = Instant::now();
         if now > next_scan_due && state.lock().await.sensors.len() < sensor_names.len() {
             next_scan_due = now + SCAN_INTERVAL;
-            check_for_sensors(state.clone(), session, &sensor_names)
-                .await
-                .with_context(|| std::line!().to_string())?;
+            check_for_sensors(state.clone(), session, &sensor_names).await?;
         }
 
         // Check the state of each sensor and act on it if appropriate.
@@ -303,9 +294,7 @@ async fn bluetooth_connection_loop(
                         sensor.connection_status
                     })
                     .expect("sensors cannot be deleted");
-                action_sensor(state.clone(), session, id, connection_status)
-                    .await
-                    .with_context(|| std::line!().to_string())?;
+                action_sensor(state.clone(), session, id, connection_status).await?;
             }
         }
         time::delay_for(CONNECT_INTERVAL).await;
@@ -323,7 +312,7 @@ async fn action_sensor(
     session: &MijiaSession,
     id: DeviceId,
     status: ConnectionStatus,
-) -> Result<(), anyhow::Error> {
+) -> Result<(), eyre::Error> {
     match status {
         ConnectionStatus::Connecting { reserved_until } if reserved_until > Instant::now() => {
             Ok(())
@@ -346,13 +335,10 @@ async fn check_for_sensors(
     state: Arc<Mutex<SensorState>>,
     session: &MijiaSession,
     sensor_names: &HashMap<MacAddress, String>,
-) -> Result<(), anyhow::Error> {
+) -> Result<(), eyre::Error> {
     session.bt_session.start_discovery().await?;
 
-    let sensors = session
-        .get_sensors()
-        .await
-        .with_context(|| std::line!().to_string())?;
+    let sensors = session.get_sensors().await?;
     let state = &mut *state.lock().await;
     for props in sensors {
         if sensor_names.contains_key(&props.mac_address)
@@ -373,7 +359,7 @@ async fn connect_sensor_with_id(
     state: Arc<Mutex<SensorState>>,
     session: &MijiaSession,
     id: DeviceId,
-) -> Result<(), anyhow::Error> {
+) -> Result<(), eyre::Error> {
     // Update the state of the sensor to `Connecting`.
     {
         let mut state = state.lock().await;
@@ -407,12 +393,8 @@ async fn connect_sensor_with_id(
 async fn connect_and_subscribe_sensor_or_disconnect<'a>(
     session: &MijiaSession,
     id: &DeviceId,
-) -> Result<(), anyhow::Error> {
-    session
-        .bt_session
-        .connect(id)
-        .await
-        .with_context(|| std::line!().to_string())?;
+) -> Result<(), eyre::Error> {
+    session.bt_session.connect(id).await?;
 
     let mut backoff = ExponentialBackoff::default();
     backoff.max_elapsed_time = Some(SENSOR_CONNECT_RETRY_TIMEOUT);
@@ -422,11 +404,7 @@ async fn connect_and_subscribe_sensor_or_disconnect<'a>(
         backoff,
     )
     .or_else(|e| async {
-        session
-            .bt_session
-            .disconnect(id)
-            .await
-            .with_context(|| std::line!().to_string())?;
+        session.bt_session.disconnect(id).await?;
         Err(e)
     })
     .await
@@ -437,7 +415,7 @@ async fn check_for_stale_sensor(
     state: Arc<Mutex<SensorState>>,
     session: &MijiaSession,
     id: DeviceId,
-) -> Result<(), anyhow::Error> {
+) -> Result<(), eyre::Error> {
     let state = &mut *state.lock().await;
     let sensor = state.sensors.get_mut(&id).unwrap();
     let now = Instant::now();
@@ -448,19 +426,11 @@ async fn check_for_stale_sensor(
             now - sensor.last_update_timestamp
         );
         sensor.connection_status = ConnectionStatus::Disconnected;
-        state
-            .homie
-            .remove_node(&sensor.node_id())
-            .await
-            .with_context(|| std::line!().to_string())?;
+        state.homie.remove_node(&sensor.node_id()).await?;
         // We could drop our state lock at this point, if it ends up taking
         // too long. As it is, it's quite nice that we can't attempt to connect
         // while we're in the middle of disconnecting.
-        session
-            .bt_session
-            .disconnect(&id)
-            .await
-            .with_context(|| std::line!().to_string())?;
+        session.bt_session.disconnect(&id).await?;
     }
     Ok(())
 }
@@ -468,15 +438,13 @@ async fn check_for_stale_sensor(
 async fn service_bluetooth_event_queue(
     state: Arc<Mutex<SensorState>>,
     session: &MijiaSession,
-) -> Result<(), anyhow::Error> {
+) -> Result<(), eyre::Error> {
     println!("Subscribing to events");
     let (msg_match, mut events) = session.event_stream().await?;
     println!("Processing events");
 
     while let Some(event) = events.next().await {
-        handle_bluetooth_event(state.clone(), event)
-            .await
-            .with_context(|| std::line!().to_string())?
+        handle_bluetooth_event(state.clone(), event).await?
     }
 
     session
@@ -492,7 +460,7 @@ async fn service_bluetooth_event_queue(
 async fn handle_bluetooth_event(
     state: Arc<Mutex<SensorState>>,
     event: MijiaEvent,
-) -> Result<(), anyhow::Error> {
+) -> Result<(), eyre::Error> {
     let state = &mut *state.lock().await;
     let homie = &mut state.homie;
     let sensors = &mut state.sensors;

@@ -7,10 +7,10 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/alsuren/mijia-homie/"
 
 [dependencies]
-anyhow = "1.0.32"
 bluez-generated = { path = "../bluez-generated" }
 dbus = { version = "0.8.4", features = ["futures"] }
 dbus-tokio = "0.5.2"
+eyre = "0.6"
 futures = "0.3.5"
 itertools = "0.9.0"
 tokio = "0.2.22"

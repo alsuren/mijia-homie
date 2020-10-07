@@ -7,9 +7,9 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/alsuren/mijia-homie/"
 
 [dependencies]
-anyhow = "1.0.32"
 backoff = { version = "0.2.1", features = ["tokio"] }
 color-backtrace = "0.4.2"
+eyre = "0.6"
 dotenv = "0.15.0"
 futures = "0.3.5"
 futures-channel = "0.3.5"
@@ -21,4 +21,5 @@ pretty_env_logger = "0.4.0"
 rumqttc = "0.1.1"
 rustls = "0.18.1"
 rustls-native-certs = "0.4.0"
+stable-eyre = "0.2"
 tokio = "0.2.22"
