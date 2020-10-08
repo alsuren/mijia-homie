@@ -6,9 +6,8 @@ use rumqttc::{
 };
 use std::collections::HashMap;
 use std::str;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use thiserror::Error;
-use tokio::sync::Mutex;
 use tokio::task::JoinError;
 
 mod types;
@@ -134,8 +133,8 @@ impl HomieController {
 
     /// Get a snapshot of the set of Homie devices which have been discovered so far, keyed by their
     /// IDs.
-    pub async fn devices(&self) -> Arc<HashMap<String, Device>> {
-        self.devices.lock().await.clone()
+    pub fn devices(&self) -> Arc<HashMap<String, Device>> {
+        self.devices.lock().unwrap().clone()
     }
 
     /// Poll the `EventLoop`, and maybe return a Homie event.
@@ -170,7 +169,29 @@ impl HomieController {
         Ok(None)
     }
 
+    /// Handle a publish event received from the MQTT broker, updating the devices and our
+    /// subscriptions as appropriate and possibly returning an event to send back to the controller
+    /// application.
     async fn handle_publish(&self, publish: Publish) -> Result<Option<Event>, HandleError> {
+        let (event, topics_to_subscribe) = self.handle_publish_sync(publish)?;
+
+        for topic in topics_to_subscribe {
+            log::trace!("Subscribe to {}", topic);
+            self.mqtt_client.subscribe(topic, QoS::AtLeastOnce).await?;
+        }
+
+        Ok(event)
+    }
+
+    /// Handle a publish event, update the devices, and return any event and any new topics which
+    /// should be subscribed to.
+    ///
+    /// This is separate from `handle_publish` because it takes the `devices` lock, to ensure that
+    /// no async operations are awaited while the lock is held.
+    fn handle_publish_sync(
+        &self,
+        publish: Publish,
+    ) -> Result<(Option<Event>, Vec<String>), HandleError> {
         let base_topic = format!("{}/", self.base_topic);
         let payload = str::from_utf8(&publish.payload)
             .map_err(|e| format!("Payload not valid UTF-8: {}", e))?;
@@ -182,35 +203,44 @@ impl HomieController {
         // If there are no other references to the devices this will give us a mutable reference
         // directly. If there are other references it will clone the underlying HashMap and update
         // our Arc to point to that, so that it is now a unique reference.
-        let devices = &mut *self.devices.lock().await;
+        let devices = &mut *self.devices.lock().unwrap();
         let devices = Arc::make_mut(devices);
 
+        // Collect new MQTT topics to which we need to subscribe here, so that the subscription can
+        // happen after the devices lock has been released.
+        let mut topics_to_subscribe: Vec<String> = vec![];
+
         let parts = subtopic.split("/").collect::<Vec<&str>>();
-        match parts.as_slice() {
+        let event = match parts.as_slice() {
             [device_id, "$homie"] => {
                 if !devices.contains_key(*device_id) {
-                    self.new_device(devices, device_id, payload).await?;
-                    return Ok(Some(Event::DeviceUpdated {
-                        device_id: device_id.to_string(),
+                    log::trace!("Homie device '{}' version '{}'", device_id, payload);
+                    devices.insert((*device_id).to_owned(), Device::new(device_id, payload));
+                    let topic = format!("{}/{}/+", self.base_topic, device_id);
+                    topics_to_subscribe.push(topic);
+                    Some(Event::DeviceUpdated {
+                        device_id: (*device_id).to_owned(),
                         has_required_attributes: false,
-                    }));
+                    })
+                } else {
+                    None
                 }
             }
             [device_id, "$name"] => {
                 let device = get_mut_device_for(devices, "Got name for", device_id)?;
                 device.name = Some(payload.to_owned());
-                return Ok(Some(Event::device_updated(device)));
+                Some(Event::device_updated(device))
             }
             [device_id, "$state"] => {
                 let state = payload.parse()?;
                 let device = get_mut_device_for(devices, "Got state for", device_id)?;
                 device.state = state;
-                return Ok(Some(Event::device_updated(device)));
+                Some(Event::device_updated(device))
             }
             [device_id, "$implementation"] => {
                 let device = get_mut_device_for(devices, "Got implementation for", device_id)?;
                 device.implementation = Some(payload.to_owned());
-                return Ok(Some(Event::device_updated(device)));
+                Some(Event::device_updated(device))
             }
             [device_id, "$nodes"] => {
                 let nodes: Vec<_> = payload.split(",").collect();
@@ -222,20 +252,20 @@ impl HomieController {
                     if !device.nodes.contains_key(node_id) {
                         device.nodes.insert(node_id.to_owned(), Node::new(node_id));
                         let topic = format!("{}/{}/{}/+", self.base_topic, device_id, node_id);
-                        self.mqtt_client.subscribe(topic, QoS::AtLeastOnce).await?;
+                        topics_to_subscribe.push(topic);
                     }
                 }
-                return Ok(Some(Event::device_updated(device)));
+                Some(Event::device_updated(device))
             }
             [device_id, node_id, "$name"] => {
                 let node = get_mut_node_for(devices, "Got node name for", device_id, node_id)?;
                 node.name = Some(payload.to_owned());
-                return Ok(Some(Event::node_updated(device_id, node)));
+                Some(Event::node_updated(device_id, node))
             }
             [device_id, node_id, "$type"] => {
                 let node = get_mut_node_for(devices, "Got node type for", device_id, node_id)?;
                 node.node_type = Some(payload.to_owned());
-                return Ok(Some(Event::node_updated(device_id, node)));
+                Some(Event::node_updated(device_id, node))
             }
             [device_id, node_id, "$properties"] => {
                 let properties: Vec<_> = payload.split(",").collect();
@@ -252,10 +282,10 @@ impl HomieController {
                             "{}/{}/{}/{}/+",
                             self.base_topic, device_id, node_id, property_id
                         );
-                        self.mqtt_client.subscribe(topic, QoS::AtLeastOnce).await?;
+                        topics_to_subscribe.push(topic);
                     }
                 }
-                return Ok(Some(Event::node_updated(device_id, node)));
+                Some(Event::node_updated(device_id, node))
             }
             [device_id, node_id, property_id, "$name"] => {
                 let property = get_mut_property_for(
@@ -266,7 +296,7 @@ impl HomieController {
                     property_id,
                 )?;
                 property.name = Some(payload.to_owned());
-                return Ok(Some(Event::property_updated(device_id, node_id, property)));
+                Some(Event::property_updated(device_id, node_id, property))
             }
             [device_id, node_id, property_id, "$datatype"] => {
                 let datatype = payload.parse()?;
@@ -278,7 +308,7 @@ impl HomieController {
                     property_id,
                 )?;
                 property.datatype = Some(datatype);
-                return Ok(Some(Event::property_updated(device_id, node_id, property)));
+                Some(Event::property_updated(device_id, node_id, property))
             }
             [device_id, node_id, property_id, "$unit"] => {
                 let property = get_mut_property_for(
@@ -289,7 +319,7 @@ impl HomieController {
                     property_id,
                 )?;
                 property.unit = Some(payload.to_owned());
-                return Ok(Some(Event::property_updated(device_id, node_id, property)));
+                Some(Event::property_updated(device_id, node_id, property))
             }
             [device_id, node_id, property_id, "$format"] => {
                 let property = get_mut_property_for(
@@ -300,7 +330,7 @@ impl HomieController {
                     property_id,
                 )?;
                 property.format = Some(payload.to_owned());
-                return Ok(Some(Event::property_updated(device_id, node_id, property)));
+                Some(Event::property_updated(device_id, node_id, property))
             }
             [device_id, node_id, property_id, "$settable"] => {
                 let settable = payload
@@ -314,7 +344,7 @@ impl HomieController {
                     property_id,
                 )?;
                 property.settable = settable;
-                return Ok(Some(Event::property_updated(device_id, node_id, property)));
+                Some(Event::property_updated(device_id, node_id, property))
             }
             [device_id, node_id, property_id, "$retained"] => {
                 let retained = payload
@@ -328,7 +358,7 @@ impl HomieController {
                     property_id,
                 )?;
                 property.retained = retained;
-                return Ok(Some(Event::property_updated(device_id, node_id, property)));
+                Some(Event::property_updated(device_id, node_id, property))
             }
             [device_id, node_id, property_id] if !property_id.starts_with("$") => {
                 // TODO: What about values of properties we don't yet know about? They may arrive
@@ -342,24 +372,15 @@ impl HomieController {
                     property_id,
                 )?;
                 property.value = Some(payload.to_owned());
-                return Ok(Some(Event::property_value(device_id, node_id, property)));
+                Some(Event::property_value(device_id, node_id, property))
             }
-            _ => log::warn!("Unexpected subtopic {} = {}", subtopic, payload),
-        }
-        Ok(None)
-    }
+            _ => {
+                log::warn!("Unexpected subtopic {} = {}", subtopic, payload);
+                None
+            }
+        };
 
-    async fn new_device(
-        &self,
-        devices: &mut HashMap<String, Device>,
-        device_id: &str,
-        homie_version: &str,
-    ) -> Result<(), ClientError> {
-        log::trace!("Homie device '{}' version '{}'", device_id, homie_version);
-        devices.insert(device_id.to_owned(), Device::new(device_id, homie_version));
-        let topic = format!("{}/{}/+", self.base_topic, device_id);
-        log::trace!("Subscribe to {}", topic);
-        self.mqtt_client.subscribe(topic, QoS::AtLeastOnce).await
+        Ok((event, topics_to_subscribe))
     }
 
     /// Start discovering Homie devices.
