@@ -29,23 +29,29 @@ pub enum PollError {
     Internal(&'static str),
 }
 
+/// An event from a Homie device, either because of a property change or because something new has
+/// been discovered.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Event {
+    /// A new device has been discovered, or an attribute of the device has been updated.
     DeviceUpdated {
         device_id: String,
         has_required_attributes: bool,
     },
+    /// An attribute of a node on a device has been updated.
     NodeUpdated {
         device_id: String,
         node_id: String,
         has_required_attributes: bool,
     },
+    /// An attribute of a property on a node has been updated.
     PropertyUpdated {
         device_id: String,
         node_id: String,
         property_id: String,
         has_required_attributes: bool,
     },
+    /// The value of a property has changed.
     PropertyValueChanged {
         device_id: String,
         node_id: String,
