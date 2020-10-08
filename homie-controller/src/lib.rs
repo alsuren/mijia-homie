@@ -173,25 +173,30 @@ impl HomieController {
     /// subscriptions as appropriate and possibly returning an event to send back to the controller
     /// application.
     async fn handle_publish(&self, publish: Publish) -> Result<Option<Event>, HandleError> {
-        let (event, topics_to_subscribe) = self.handle_publish_sync(publish)?;
+        let (event, topics_to_subscribe, topics_to_unsubscribe) =
+            self.handle_publish_sync(publish)?;
 
         for topic in topics_to_subscribe {
             log::trace!("Subscribe to {}", topic);
             self.mqtt_client.subscribe(topic, QoS::AtLeastOnce).await?;
+        }
+        for topic in topics_to_unsubscribe {
+            log::trace!("Unsubscribe from {}", topic);
+            self.mqtt_client.unsubscribe(topic).await?;
         }
 
         Ok(event)
     }
 
     /// Handle a publish event, update the devices, and return any event and any new topics which
-    /// should be subscribed to.
+    /// should be subscribed to or unsubscribed from.
     ///
     /// This is separate from `handle_publish` because it takes the `devices` lock, to ensure that
     /// no async operations are awaited while the lock is held.
     fn handle_publish_sync(
         &self,
         publish: Publish,
-    ) -> Result<(Option<Event>, Vec<String>), HandleError> {
+    ) -> Result<(Option<Event>, Vec<String>, Vec<String>), HandleError> {
         let base_topic = format!("{}/", self.base_topic);
         let payload = str::from_utf8(&publish.payload)
             .map_err(|e| format!("Payload not valid UTF-8: {}", e))?;
@@ -206,9 +211,10 @@ impl HomieController {
         let devices = &mut *self.devices.lock().unwrap();
         let devices = Arc::make_mut(devices);
 
-        // Collect new MQTT topics to which we need to subscribe here, so that the subscription can
-        // happen after the devices lock has been released.
+        // Collect MQTT topics to which we need to subscribe or unsubscribe here, so that the
+        // subscription can happen after the devices lock has been released.
         let mut topics_to_subscribe: Vec<String> = vec![];
+        let mut topics_to_unsubscribe: Vec<String> = vec![];
 
         let parts = subtopic.split("/").collect::<Vec<&str>>();
         let event = match parts.as_slice() {
@@ -245,8 +251,25 @@ impl HomieController {
             [device_id, "$nodes"] => {
                 let nodes: Vec<_> = payload.split(",").collect();
                 let device = get_mut_device_for(devices, "Got nodes for", device_id)?;
+
                 // Remove nodes which aren't in the new list.
-                device.nodes.retain(|k, _| nodes.contains(&k.as_ref()));
+                device.nodes.retain(|node_id, node| {
+                    let kept = nodes.contains(&node_id.as_ref());
+                    if !kept {
+                        // The node has been removed, so unsubscribe from its topics and those of its properties
+                        let node_topic = format!("{}/{}/{}/+", self.base_topic, device_id, node_id);
+                        topics_to_unsubscribe.push(node_topic);
+                        for property_id in node.properties.keys() {
+                            let topic = format!(
+                                "{}/{}/{}/{}/+",
+                                self.base_topic, device_id, node_id, property_id
+                            );
+                            topics_to_unsubscribe.push(topic);
+                        }
+                    }
+                    kept
+                });
+
                 // Add new nodes.
                 for node_id in nodes {
                     if !device.nodes.contains_key(node_id) {
@@ -255,6 +278,7 @@ impl HomieController {
                         topics_to_subscribe.push(topic);
                     }
                 }
+
                 Some(Event::device_updated(device))
             }
             [device_id, node_id, "$name"] => {
@@ -270,9 +294,21 @@ impl HomieController {
             [device_id, node_id, "$properties"] => {
                 let properties: Vec<_> = payload.split(",").collect();
                 let node = get_mut_node_for(devices, "Got properties for", device_id, node_id)?;
+
                 // Remove properties which aren't in the new list.
-                node.properties
-                    .retain(|k, _| properties.contains(&k.as_ref()));
+                node.properties.retain(|property_id, _| {
+                    let kept = properties.contains(&property_id.as_ref());
+                    if !kept {
+                        // The property has been removed, so unsubscribe from its topics.
+                        let topic = format!(
+                            "{}/{}/{}/{}/+",
+                            self.base_topic, device_id, node_id, property_id
+                        );
+                        topics_to_unsubscribe.push(topic);
+                    }
+                    kept
+                });
+
                 // Add new properties.
                 for property_id in properties {
                     if !node.properties.contains_key(property_id) {
@@ -285,6 +321,7 @@ impl HomieController {
                         topics_to_subscribe.push(topic);
                     }
                 }
+
                 Some(Event::node_updated(device_id, node))
             }
             [device_id, node_id, property_id, "$name"] => {
@@ -380,7 +417,7 @@ impl HomieController {
             }
         };
 
-        Ok((event, topics_to_subscribe))
+        Ok((event, topics_to_subscribe, topics_to_unsubscribe))
     }
 
     /// Start discovering Homie devices.
