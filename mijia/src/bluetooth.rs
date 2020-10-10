@@ -73,6 +73,7 @@ impl FromStr for MacAddress {
 pub struct DeviceInfo {
     pub id: DeviceId,
     pub mac_address: MacAddress,
+    pub name: Option<String>,
     pub service_data: HashMap<String, Vec<u8>>,
 }
 
@@ -147,6 +148,14 @@ impl BluetoothSession {
                     .filter_map(|addr| addr.as_str())
                     .next()?
                     .to_string();
+                let name = device_properties.get("Name").map(|name| {
+                    name.as_iter()
+                        .unwrap()
+                        .filter_map(|addr| addr.as_str())
+                        .next()
+                        .unwrap()
+                        .to_string()
+                });
                 // UUIDs don't get populated until we connect. Use:
                 //     "ServiceData": Variant(InternalDict { data: [
                 //         ("0000fe95-0000-1000-8000-00805f9b34fb", Variant([48, 88, 91, 5, 1, 23, 33, 215, 56, 193, 164, 40, 1, 0])
@@ -178,6 +187,7 @@ impl BluetoothSession {
                         object_path: path.to_string(),
                     },
                     mac_address: MacAddress(mac_address),
+                    name,
                     service_data,
                 })
             })
