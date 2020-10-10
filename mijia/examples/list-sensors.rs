@@ -2,7 +2,7 @@ use mijia::MijiaSession;
 
 #[tokio::main]
 async fn main() -> Result<(), eyre::Error> {
-    let (dbus_handle, session) = MijiaSession::new().await?;
+    let (_, session) = MijiaSession::new().await?;
 
     session.bt_session.start_discovery().await?;
 
@@ -12,6 +12,5 @@ async fn main() -> Result<(), eyre::Error> {
         println!("{}: {:?}", sensor.mac_address, sensor.id);
     }
 
-    dbus_handle.await?;
     Ok(())
 }
