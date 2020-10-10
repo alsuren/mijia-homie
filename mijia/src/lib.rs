@@ -78,6 +78,12 @@ impl MijiaSession {
         let sensors = devices
             .into_iter()
             .filter_map(|device| {
+                log::trace!(
+                    "{} ({:?}): {:?}",
+                    device.mac_address,
+                    device.name,
+                    device.service_data
+                );
                 if device.service_data.contains_key(MIJIA_SERVICE_DATA_UUID) {
                     Some(SensorProps {
                         id: device.id,
