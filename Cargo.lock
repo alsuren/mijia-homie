@@ -532,6 +532,8 @@ dependencies = [
  "eyre",
  "futures",
  "itertools",
+ "log",
+ "pretty_env_logger",
  "tokio",
 ]
 

@@ -13,4 +13,8 @@ dbus-tokio = "0.5.2"
 eyre = "0.6"
 futures = "0.3.5"
 itertools = "0.9.0"
+log = "0.4.11"
 tokio = "0.2.22"
+
+[dev-dependencies]
+pretty_env_logger = "0.4.0"

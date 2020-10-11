@@ -21,8 +21,10 @@ else
 fi
 
 time cross build $PROFILE_FLAG --target $TARGET --bin publish-mqtt
+time cross build $PROFILE_FLAG --target $TARGET --example list-sensors
 
 time rsync --progress target/$TARGET/$PROFILE/publish-mqtt $TARGET_SSH:publish-mqtt
+time rsync --progress target/$TARGET/$PROFILE/examples/list-sensors $TARGET_SSH:list-sensors
 
 if [ $RUN = 1 ]; then
     if [ $USE_SYSTEMD = 1 ]; then
