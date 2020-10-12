@@ -3,14 +3,13 @@
 //!
 //! See the examples directory for examples of how to use it.
 
-use async_channel::Sender;
 use futures::future::try_join;
 use futures::FutureExt;
 use local_ipaddress;
 use mac_address::get_mac_address;
 use rumqttc::{
-    self, ClientError, ConnectionError, Event, EventLoop, Incoming, LastWill, MqttOptions, Publish,
-    QoS, Request, Subscribe, Unsubscribe,
+    self, AsyncClient, ClientError, ConnectionError, Event, EventLoop, Incoming, LastWill,
+    MqttOptions, QoS,
 };
 use std::fmt::{self, Debug, Display, Formatter};
 use std::future::Future;
@@ -172,9 +171,9 @@ impl HomieDeviceBuilder {
             QoS::AtLeastOnce,
             true,
         ));
-        let event_loop = EventLoop::new(mqtt_options, REQUESTS_CAP);
+        let (client, event_loop) = AsyncClient::new(mqtt_options, REQUESTS_CAP);
 
-        let publisher = DevicePublisher::new(event_loop.handle(), self.device_base);
+        let publisher = DevicePublisher::new(client, self.device_base);
         let homie = HomieDevice::new(publisher.clone(), self.device_name, &EXTENSION_IDS);
 
         let stats = HomieStats::new(publisher.clone());
@@ -452,7 +451,7 @@ impl HomieDevice {
     // 'disconnected'.
     pub async fn disconnect(mut self) -> Result<(), ClientError> {
         self.set_state(State::Disconnected).await?;
-        self.publisher.disconnect().await
+        self.publisher.client.disconnect().await
     }
 
     /// Publish a new value for the given property of the given node of this device. The caller is
@@ -471,14 +470,14 @@ impl HomieDevice {
 
 #[derive(Clone, Debug)]
 struct DevicePublisher {
-    requests_tx: Sender<Request>,
+    pub client: AsyncClient,
     device_base: String,
 }
 
 impl DevicePublisher {
-    fn new(requests_tx: Sender<Request>, device_base: String) -> Self {
+    fn new(client: AsyncClient, device_base: String) -> Self {
         Self {
-            requests_tx,
+            client,
             device_base,
         }
     }
@@ -489,29 +488,19 @@ impl DevicePublisher {
         value: impl Into<Vec<u8>>,
     ) -> Result<(), ClientError> {
         let topic = format!("{}/{}", self.device_base, subtopic);
-        let mut publish = Publish::new(topic, QoS::AtLeastOnce, value);
-        publish.retain = true;
-        self.requests_tx.send(publish.into()).await?;
-        Ok(())
-    }
-
-    async fn disconnect(&self) -> Result<(), ClientError> {
-        self.requests_tx.send(Request::Disconnect).await?;
-        Ok(())
+        self.client
+            .publish(topic, QoS::AtLeastOnce, true, value)
+            .await
     }
 
     async fn subscribe(&self, subtopic: &str) -> Result<(), ClientError> {
         let topic = format!("{}/{}", self.device_base, subtopic);
-        let subscribe = Subscribe::new(topic, QoS::AtLeastOnce);
-        self.requests_tx.send(subscribe.into()).await?;
-        Ok(())
+        self.client.subscribe(topic, QoS::AtLeastOnce).await
     }
 
     async fn unsubscribe(&self, subtopic: &str) -> Result<(), ClientError> {
         let topic = format!("{}/{}", self.device_base, subtopic);
-        let unsubscribe = Unsubscribe::new(topic);
-        self.requests_tx.send(unsubscribe.into()).await?;
-        Ok(())
+        self.client.unsubscribe(topic).await
     }
 }
 
@@ -621,10 +610,13 @@ fn simplify_unit_pair<E>(m: Result<((), ()), E>) -> Result<(), E> {
 mod tests {
     use super::*;
     use async_channel::Receiver;
+    use rumqttc::Request;
 
     fn make_test_device() -> (HomieDevice, Receiver<Request>) {
         let (requests_tx, requests_rx) = async_channel::unbounded();
-        let publisher = DevicePublisher::new(requests_tx, "homie/test-device".to_string());
+        let (cancel_tx, _cancel_rx) = async_channel::unbounded();
+        let client = AsyncClient::from_senders(requests_tx, cancel_tx);
+        let publisher = DevicePublisher::new(client, "homie/test-device".to_string());
         let device = HomieDevice::new(publisher, "Test device".to_string(), &[]);
         (device, requests_rx)
     }
