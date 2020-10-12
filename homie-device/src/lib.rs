@@ -451,7 +451,7 @@ impl HomieDevice {
     // 'disconnected'.
     pub async fn disconnect(mut self) -> Result<(), ClientError> {
         self.set_state(State::Disconnected).await?;
-        self.publisher.disconnect().await
+        self.publisher.client.disconnect().await
     }
 
     /// Publish a new value for the given property of the given node of this device. The caller is
@@ -470,7 +470,7 @@ impl HomieDevice {
 
 #[derive(Clone, Debug)]
 struct DevicePublisher {
-    client: AsyncClient,
+    pub client: AsyncClient,
     device_base: String,
 }
 
@@ -491,10 +491,6 @@ impl DevicePublisher {
         self.client
             .publish(topic, QoS::AtLeastOnce, true, value)
             .await
-    }
-
-    async fn disconnect(&self) -> Result<(), ClientError> {
-        self.client.disconnect().await
     }
 
     async fn subscribe(&self, subtopic: &str) -> Result<(), ClientError> {
