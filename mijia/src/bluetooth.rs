@@ -138,6 +138,7 @@ impl BluetoothSession {
         let sensors = tree
             .into_iter()
             .filter_map(|(path, interfaces)| {
+                log::trace!("Filtering {}", path);
                 // FIXME: can we generate a strongly typed deserialiser for this,
                 // based on the introspection data?
                 let device_properties = interfaces.get("org.bluez.Device1")?;
@@ -148,6 +149,7 @@ impl BluetoothSession {
                     .filter_map(|addr| addr.as_str())
                     .next()?
                     .to_string();
+                log::trace!("MAC address: {}", mac_address);
                 let name = device_properties.get("Name").map(|name| {
                     name.as_iter()
                         .unwrap()
@@ -156,7 +158,9 @@ impl BluetoothSession {
                         .unwrap()
                         .to_string()
                 });
+                log::trace!("Name: {:?}", name);
                 let service_data = get_service_data(device_properties).unwrap_or_default();
+                log::trace!("Service_data: {:?}", service_data);
 
                 Some(DeviceInfo {
                     id: DeviceId {
