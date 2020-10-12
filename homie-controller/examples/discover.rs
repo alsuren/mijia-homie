@@ -23,7 +23,7 @@ async fn main() -> Result<(), PollError> {
                 _ => {
                     println!("Event: {:?}", event);
                     println!("Devices:");
-                    for device in controller.devices().await.values() {
+                    for device in controller.devices().values() {
                         if device.has_required_attributes() {
                             println!(" * {:?}", device);
                         } else {
