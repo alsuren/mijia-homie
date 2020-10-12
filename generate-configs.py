@@ -211,7 +211,7 @@ if __name__ == "__main__":
         mac_to_name = dict(l.strip().replace(":", "").split("=") for l in f)
 
     grafana_input = os.environ.get("GRAFANA_INPUT")
-    grafana_output = os.environ.get("GRAFANA_OUPTUT")
+    grafana_output = os.environ.get("GRAFANA_OUTPUT")
     if grafana_input and grafana_output:
         add_named_sensors_to_grafana(
             mac_to_name, grafana_input, grafana_output,
