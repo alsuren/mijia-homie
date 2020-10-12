@@ -119,7 +119,7 @@ def mutate_smarthome_metadata_model(model, mac_to_name):
 def link_key(mac, title_suffix, homie_suffix):
     return (
         f"MijiaBridge_{mac}_{title_suffix} -> "
-        f"mqtt:homie300:19078e8a:mijia-bridge-raspi{mac}#{homie_suffix}"
+        f"mqtt:homie300:19078e8a:mijia-bridge-raspi:{mac}#{homie_suffix}"
     )
 
 
