@@ -11,7 +11,7 @@ pub mod decode;
 pub use bluetooth::{BluetoothSession, DeviceId, MacAddress};
 pub use decode::Readings;
 
-const MIJIA_SERVICE_DATA_UUID: &str = "0000fe95-0000-1000-8000-00805f9b34fb";
+const MIJIA_NAME: &str = "LYWSD03MMC";
 const SENSOR_READING_CHARACTERISTIC_PATH: &str = "/service0021/char0035";
 const CONNECTION_INTERVAL_CHARACTERISTIC_PATH: &str = "/service0021/char0045";
 /// 500 in little-endian
@@ -84,7 +84,7 @@ impl MijiaSession {
                     device.name,
                     device.service_data
                 );
-                if device.service_data.contains_key(MIJIA_SERVICE_DATA_UUID) {
+                if device.name.as_deref() == Some(MIJIA_NAME) {
                     Some(SensorProps {
                         id: device.id,
                         mac_address: device.mac_address,
