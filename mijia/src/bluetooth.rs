@@ -2,7 +2,7 @@ use crate::DBUS_METHOD_CALL_TIMEOUT;
 use bluez_generated::generated::{OrgBluezAdapter1, OrgBluezDevice1};
 use core::fmt::Debug;
 use core::future::Future;
-use dbus::arg::RefArg;
+use dbus::arg::{RefArg, Variant};
 use dbus::nonblock::stdintf::org_freedesktop_dbus::ObjectManager;
 use dbus::nonblock::SyncConnection;
 use eyre::WrapErr;
@@ -156,31 +156,7 @@ impl BluetoothSession {
                         .unwrap()
                         .to_string()
                 });
-                // UUIDs don't get populated until we connect. Use:
-                //     "ServiceData": Variant(InternalDict { data: [
-                //         ("0000fe95-0000-1000-8000-00805f9b34fb", Variant([48, 88, 91, 5, 1, 23, 33, 215, 56, 193, 164, 40, 1, 0])
-                //     )], outer_sig: Signature("a{sv}") })
-                // instead.
-                let service_data: HashMap<String, Vec<u8>> = device_properties
-                    .get("ServiceData")?
-                    // Variant(...)
-                    .as_iter()?
-                    .next()?
-                    // InternalDict(...)
-                    .as_iter()?
-                    .tuples::<(_, _)>()
-                    .filter_map(|(k, v)| {
-                        let k = k.as_str()?.into();
-                        let v: Option<Vec<u8>> = v
-                            .box_clone()
-                            .as_static_inner(0)?
-                            .as_iter()?
-                            .map(|el| Some(el.as_u64()? as u8))
-                            .collect();
-                        let v = v?;
-                        Some((k, v))
-                    })
-                    .collect();
+                let service_data = get_service_data(device_properties);
 
                 Some(DeviceInfo {
                     id: DeviceId {
@@ -219,4 +195,39 @@ impl BluetoothSession {
             .await
             .wrap_err_with(|| format!("disconnecting from {:?}", id))
     }
+}
+
+fn get_service_data(
+    device_properties: &HashMap<String, Variant<Box<dyn RefArg>>>,
+) -> HashMap<String, Vec<u8>> {
+    // UUIDs don't get populated until we connect. Use:
+    //     "ServiceData": Variant(InternalDict { data: [
+    //         ("0000fe95-0000-1000-8000-00805f9b34fb", Variant([48, 88, 91, 5, 1, 23, 33, 215, 56, 193, 164, 40, 1, 0])
+    //     )], outer_sig: Signature("a{sv}") })
+    // instead.
+    || -> Option<HashMap<_, _>> {
+        Some(
+            device_properties
+                .get("ServiceData")?
+                // Variant(...)
+                .as_iter()?
+                .next()?
+                // InternalDict(...)
+                .as_iter()?
+                .tuples::<(_, _)>()
+                .filter_map(|(k, v)| {
+                    let k = k.as_str()?.into();
+                    let v: Option<Vec<u8>> = v
+                        .box_clone()
+                        .as_static_inner(0)?
+                        .as_iter()?
+                        .map(|el| Some(el.as_u64()? as u8))
+                        .collect();
+                    let v = v?;
+                    Some((k, v))
+                })
+                .collect(),
+        )
+    }()
+    .unwrap_or_default()
 }
