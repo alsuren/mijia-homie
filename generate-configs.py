@@ -116,14 +116,14 @@ def mutate_smarthome_metadata_model(model, mac_to_name):
                 model[key] = new_metadata(title, value)
 
 
-def link_key(mac, title_suffix, homie_suffix):
+def link_key(bridge_id, mac, title_suffix, homie_suffix):
     return (
         f"MijiaBridge_{mac}_{title_suffix} -> "
-        f"mqtt:homie300:19078e8a:mijia-bridge-raspi:{mac}#{homie_suffix}"
+        f"mqtt:homie300:19078e8a:{bridge_id}:{mac}#{homie_suffix}"
     )
 
 
-def new_link(mac, title_suffix, homie_suffix):
+def new_link(bridge_id, mac, title_suffix, homie_suffix):
     return {
         "class": "org.eclipse.smarthome.core.thing.link.ItemChannelLink",
         "value": {
@@ -132,7 +132,7 @@ def new_link(mac, title_suffix, homie_suffix):
                     "mqtt",
                     "homie300",
                     "19078e8a",
-                    "mijia-bridge-raspi",
+                    bridge_id,
                     f"{mac}#{homie_suffix}",
                 ]
             },
@@ -142,16 +142,16 @@ def new_link(mac, title_suffix, homie_suffix):
     }
 
 
-def mutate_smarthome_link_model(model, mac_to_name):
+def mutate_smarthome_link_model(model, mac_to_name, bridge_id):
     for mac, name in mac_to_name.items():
         for title_suffix, homie_suffix in [
             ("Temperature", "temperature"),
             ("Humidity", "humidity"),
             ("BatteryLevel", "battery"),
         ]:
-            key = link_key(mac, title_suffix, homie_suffix)
+            key = link_key(bridge_id, mac, title_suffix, homie_suffix)
             if key not in model:
-                model[key] = new_link(mac, title_suffix, homie_suffix)
+                model[key] = new_link(bridge_id, mac, title_suffix, homie_suffix)
 
 
 def add_named_sensors_to_grafana(mac_to_name, infilename, outfilename):
@@ -187,11 +187,11 @@ def add_named_sensors_to_smarthome_metadata(mac_to_name, infilename, outfilename
         f.write("\n")
 
 
-def add_named_sensors_to_smarthome_link(mac_to_name, infilename, outfilename):
+def add_named_sensors_to_smarthome_link(mac_to_name, infilename, outfilename, bridge_id):
     with open(infilename) as f:
         model = json.load(f)
 
-    mutate_smarthome_link_model(model, mac_to_name)
+    mutate_smarthome_link_model(model, mac_to_name, bridge_id)
 
     with open(outfilename, "w") as f:
         json.dump(model, f, indent=2)
@@ -202,7 +202,7 @@ if __name__ == "__main__":
     namesfilename = os.environ.get("NAMES_INPUT")
     if not namesfilename:
         print(
-            "Please set NAMES_INPUT and either GRAFANA_ or SMARTHOME_JSONDB_ "
+            "Please set NAMES_INPUT and either GRAFANA_ or BRIDGE_ID and SMARTHOME_JSONDB_ "
             "INPUT and OUTPUT."
         )
         exit(1)
@@ -217,9 +217,10 @@ if __name__ == "__main__":
             mac_to_name, grafana_input, grafana_output,
         )
 
+    bridge_id = os.environ.get("BRIDGE_ID")
     smarthome_jsondb_input = os.environ.get("SMARTHOME_JSONDB_INPUT")
     smarthome_jsondb_output = os.environ.get("SMARTHOME_JSONDB_OUTPUT")
-    if smarthome_jsondb_input and smarthome_jsondb_output:
+    if smarthome_jsondb_input and smarthome_jsondb_output and bridge_id:
         if not os.path.exists(smarthome_jsondb_output):
             os.mkdir(smarthome_jsondb_output)
         add_named_sensors_to_smarthome_items(
@@ -240,4 +241,5 @@ if __name__ == "__main__":
             mac_to_name,
             f"{smarthome_jsondb_input}/org.eclipse.smarthome.core.thing.link.ItemChannelLink.json",
             f"{smarthome_jsondb_output}/org.eclipse.smarthome.core.thing.link.ItemChannelLink.json",
+            bridge_id,
         )
