@@ -11,10 +11,8 @@ use thiserror::Error;
 use tokio::task::JoinError;
 
 mod types;
-pub use types::{
-    Datatype, Device, Extension, Node, ParseDatatypeError, ParseExtensionError, ParseStateError,
-    Property, State,
-};
+pub use types::{Datatype, Device, Extension, Node, Property, State};
+use types::{ParseDatatypeError, ParseExtensionError, ParseStateError};
 
 const REQUESTS_CAP: usize = 10;
 
