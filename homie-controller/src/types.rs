@@ -280,6 +280,18 @@ pub struct Device {
 
     /// The Homie extensions implemented by the device.
     pub extensions: Vec<Extension>,
+
+    /// The IP address of the device on the local network.
+    pub local_ip: Option<String>,
+
+    /// The MAC address of the device's network interface.
+    pub mac: Option<String>,
+
+    /// The name of the firmware running on the device.
+    pub firmware_name: Option<String>,
+
+    /// The version of the firware running on the device.
+    pub firmware_version: Option<String>,
 }
 
 impl Device {
@@ -292,6 +304,10 @@ impl Device {
             implementation: None,
             nodes: HashMap::new(),
             extensions: Vec::default(),
+            local_ip: None,
+            mac: None,
+            firmware_name: None,
+            firmware_version: None,
         }
     }
 

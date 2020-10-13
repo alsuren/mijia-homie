@@ -223,8 +223,8 @@ impl HomieController {
                 if !devices.contains_key(*device_id) {
                     log::trace!("Homie device '{}' version '{}'", device_id, payload);
                     devices.insert((*device_id).to_owned(), Device::new(device_id, payload));
-                    let topic = format!("{}/{}/+", self.base_topic, device_id);
-                    topics_to_subscribe.push(topic);
+                    topics_to_subscribe.push(format!("{}/{}/+", self.base_topic, device_id));
+                    topics_to_subscribe.push(format!("{}/{}/$fw/+", self.base_topic, device_id));
                     Some(Event::DeviceUpdated {
                         device_id: (*device_id).to_owned(),
                         has_required_attributes: false,
@@ -255,6 +255,26 @@ impl HomieController {
                     .split(",")
                     .map(|part| part.parse())
                     .collect::<Result<Vec<_>, _>>()?;
+                Some(Event::device_updated(device))
+            }
+            [device_id, "$localip"] => {
+                let device = get_mut_device_for(devices, "Got localip for", device_id)?;
+                device.local_ip = Some(payload.to_owned());
+                Some(Event::device_updated(device))
+            }
+            [device_id, "$mac"] => {
+                let device = get_mut_device_for(devices, "Got mac for", device_id)?;
+                device.mac = Some(payload.to_owned());
+                Some(Event::device_updated(device))
+            }
+            [device_id, "$fw", "name"] => {
+                let device = get_mut_device_for(devices, "Got fw/name for", device_id)?;
+                device.firmware_name = Some(payload.to_owned());
+                Some(Event::device_updated(device))
+            }
+            [device_id, "$fw", "version"] => {
+                let device = get_mut_device_for(devices, "Got fw/version for", device_id)?;
+                device.firmware_version = Some(payload.to_owned());
                 Some(Event::device_updated(device))
             }
             [device_id, "$nodes"] => {
