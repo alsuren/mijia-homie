@@ -506,6 +506,24 @@ impl HomieController {
         log::trace!("Subscribe to {}", topic);
         self.mqtt_client.subscribe(topic, QoS::AtLeastOnce).await
     }
+
+    /// Attempt to set the state of a settable property of a device. If this succeeds the device
+    /// will update the value of the property.
+    pub async fn set(
+        &self,
+        device_id: &str,
+        node_id: &str,
+        property_id: &str,
+        value: impl ToString,
+    ) -> Result<(), ClientError> {
+        let topic = format!(
+            "{}/{}/{}/{}/set",
+            self.base_topic, device_id, node_id, property_id
+        );
+        self.mqtt_client
+            .publish(topic, QoS::AtLeastOnce, false, value.to_string())
+            .await
+    }
 }
 
 fn get_mut_device_for<'a>(
