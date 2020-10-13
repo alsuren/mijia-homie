@@ -16,7 +16,7 @@ mod types;
 pub use types::{Datatype, Device, Extension, Node, Property, State};
 use types::{ParseDatatypeError, ParseExtensionError, ParseStateError};
 
-const REQUESTS_CAP: usize = 10;
+const REQUESTS_CAP: usize = 1000;
 
 /// Error type for futures representing tasks spawned by this crate.
 #[derive(Error, Debug)]
