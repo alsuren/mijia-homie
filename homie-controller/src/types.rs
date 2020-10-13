@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::fmt::{self, Debug, Display, Formatter};
 use std::str::FromStr;
+use std::time::Duration;
 use thiserror::Error;
 
 /// The state of a Homie device according to the Homie
@@ -292,6 +293,30 @@ pub struct Device {
 
     /// The version of the firware running on the device.
     pub firmware_version: Option<String>,
+
+    /// The interval at which the device refreshes its stats.
+    pub stats_interval: Option<Duration>,
+
+    /// The amount of time since the device booted.
+    pub stats_uptime: Option<Duration>,
+
+    /// The device's signal strength in %.
+    pub stats_signal: Option<i64>,
+
+    /// The device's CPU temperature in °C.
+    pub stats_cputemp: Option<f64>,
+
+    /// The device's CPU load in %, averaged across all CPUs over the last `stats_interval`.
+    pub stats_cpuload: Option<i64>,
+
+    /// The device's battery level in %.
+    pub stats_battery: Option<i64>,
+
+    /// The device's free heap space in bytes.
+    pub stats_freeheap: Option<u64>,
+
+    /// The device's power supply voltage in volts.
+    pub stats_supply: Option<f64>,
 }
 
 impl Device {
@@ -308,6 +333,14 @@ impl Device {
             mac: None,
             firmware_name: None,
             firmware_version: None,
+            stats_interval: None,
+            stats_uptime: None,
+            stats_signal: None,
+            stats_cputemp: None,
+            stats_cpuload: None,
+            stats_battery: None,
+            stats_freeheap: None,
+            stats_supply: None,
         }
     }
 
