@@ -11,7 +11,10 @@ use thiserror::Error;
 use tokio::task::JoinError;
 
 mod types;
-pub use types::{Datatype, Device, Node, ParseDatatypeError, ParseStateError, Property, State};
+pub use types::{
+    Datatype, Device, Extension, Node, ParseDatatypeError, ParseExtensionError, ParseStateError,
+    Property, State,
+};
 
 const REQUESTS_CAP: usize = 10;
 
@@ -246,6 +249,14 @@ impl HomieController {
             [device_id, "$implementation"] => {
                 let device = get_mut_device_for(devices, "Got implementation for", device_id)?;
                 device.implementation = Some(payload.to_owned());
+                Some(Event::device_updated(device))
+            }
+            [device_id, "$extensions"] => {
+                let device = get_mut_device_for(devices, "Got extensions for", device_id)?;
+                device.extensions = payload
+                    .split(",")
+                    .map(|part| part.parse())
+                    .collect::<Result<Vec<_>, _>>()?;
                 Some(Event::device_updated(device))
             }
             [device_id, "$nodes"] => {
@@ -489,6 +500,12 @@ impl From<ParseStateError> for HandleError {
 
 impl From<ParseDatatypeError> for HandleError {
     fn from(e: ParseDatatypeError) -> Self {
+        HandleError::Warning(e.to_string())
+    }
+}
+
+impl From<ParseExtensionError> for HandleError {
+    fn from(e: ParseExtensionError) -> Self {
         HandleError::Warning(e.to_string())
     }
 }

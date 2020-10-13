@@ -219,6 +219,38 @@ impl Node {
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct Extension {
+    pub id: String,
+    pub version: String,
+    pub homie_versions: Vec<String>,
+}
+
+/// An error which can be returned when parsing an `Extension` from a string.
+#[derive(Error, Debug)]
+#[error("Invalid extension '{0}'")]
+pub struct ParseExtensionError(String);
+
+impl FromStr for Extension {
+    type Err = ParseExtensionError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let parts: Vec<_> = s.split(":").collect();
+        if let [id, version, homie_versions] = parts.as_slice() {
+            if let Some(homie_versions) = homie_versions.strip_prefix("[") {
+                if let Some(homie_versions) = homie_versions.strip_suffix("]") {
+                    return Ok(Extension {
+                        id: (*id).to_owned(),
+                        version: (*version).to_owned(),
+                        homie_versions: homie_versions.split(";").map(|p| p.to_owned()).collect(),
+                    });
+                }
+            }
+        }
+        Err(ParseExtensionError(s.to_owned()))
+    }
+}
+
 /// A Homie [device](https://homieiot.github.io/specification/#devices) which has been discovered.
 ///
 /// The `id`, `homie_version`, `name` and `state` are required, but might not be available
@@ -245,6 +277,9 @@ pub struct Device {
 
     /// The nodes of the device, keyed by their IDs.
     pub nodes: HashMap<String, Node>,
+
+    /// The Homie extensions implemented by the device.
+    pub extensions: Vec<Extension>,
 }
 
 impl Device {
@@ -256,6 +291,7 @@ impl Device {
             state: State::Unknown,
             implementation: None,
             nodes: HashMap::new(),
+            extensions: Vec::default(),
         }
     }
 
