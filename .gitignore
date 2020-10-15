@@ -1,3 +1,4 @@
 /target
 .env
 sensor_names.conf
+.DS_Store
