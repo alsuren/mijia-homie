@@ -1,24 +1,24 @@
 # Monitoring Temperature with Too Many Bluetooth Thermometers
 
-Binary Solo 2020/10/16
+- Binary Solo - 15th October 2020
 
-Red Badger
+- David Laban
 
 ---
 
 # Outline
 
-- Inception
+- Introduction
 
 - System Overview
 
 - Bluetooth Libraries
 
-- State Management
+- Concurrency
 
-- Future Work
+- Software Engineering
 
-- Spin-off crates
+- Links and Questions
 
 ---
 
@@ -134,23 +134,48 @@ Red Badger
 
 # Concurrency
 
-- `Arc<Mutex<ALL THE THINGS>` and/or use channels. Clone is your friend.
-- Only hold the mutex when you _need_ it, to avoid blocking other threads.
-- (bonus hack): private `std::Mutex<Arc<Devices>>` and `get_devices() -> Arc<Devices>` for a copy-on-write snapshot.
+- `Arc<Mutex<ALL THE THINGS>`
+
+  - Fine as long as you're careful.
+
+  - Only hold the mutex when you _need_ it.
+
+- `Stream<Item = Event>`
+
+  - Kinda fine.
+
+  - Not something that I use much in web-land.
+
+- Unbounded Channels
+
+  - Fine if you control the sender.
 
 ---
 
-# Future Work
+# Software Engineering
 
-- https://github.com/alsuren/mijia-homie/projects/1?fullscreen=true
+- Andrew is good at separating layers:
+
+  - App -> Sensor (mijia) -> Bluetooth (bluez-generated) -> D-Bus.
+
+  - App -> Homie (homie-device) -> MQTT.
+
+  - [MQTT -> Homie (homie-controller) -> InfluxDB soon]
+
+- Test coverage is not excellent. Sue me. 🤠
+
+- Cross-compiling with `cross` is okay to set up, but a bit slow.
+
+- Desktop Linux tech stack (D-Bus) is still a shitshow.
 
 ---
 
-# Spin-off crates
+# Links and Questions
 
-- homie-device
-- homie-controller - eventually replace openHab in the above picture.
+- Homie helper library https://crates.io/crates/homie-device
 
-```
+- GitHub: https://github.com/alsuren/mijia-homie/
 
-```
+- Demo?
+
+- Questions?
