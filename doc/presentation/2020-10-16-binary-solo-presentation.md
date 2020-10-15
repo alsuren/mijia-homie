@@ -66,12 +66,16 @@ Red Badger
 
 # System Overview
 
+<!--
 - Sensors
 - Raspberry Pi
-- Mosqutitto (MQTT broker)
+- Mosquitto (MQTT broker)
 - openHAB
 - InfluxDB
 - Grafana
+-->
+
+![](./system-overview.svg)
 
 ---
 
