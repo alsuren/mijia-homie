@@ -24,7 +24,7 @@
     <script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
     
   <script>
-    fetch("./2020-10-16-binary-solo-presentation.md").then((response) => {
+    fetch("./slides.md").then((response) => {
       response.text().then((value) => {
         document.getElementById("source").innerHTML = value
         window.slideshow = remark.create({

@@ -81,9 +81,23 @@ Red Badger
 
 # Bluetooth Libraries
 
-- blurz - blocking connect() calls; !Send; unmaintained (diagram)
-- btleplug - promising but needs privs; crashy
-- bluez-generated - in-house (literally); uses dbus-rs + dbus-codegen-rust; async; !Send in places
+- `blurz`
+
+  - Started with this.
+  - Blocking `device.connect()` calls.
+  - Not multithreadded (because of how it uses D-Bus).
+  - Unmaintained (for 2 years)
+
+- `btleplug`
+
+  - Mostly Async.
+  - Talks directly to bluetooth stack over a socket.
+  - Tried switching to this but gave up.
+
+- `dbus-rs`
+  - Async or Blocking (depending on which interface you use)
+  - Generates code from introspection on the Raspberry Pi
+  - Single-threaded in places (but that's okay).
 
 ---
 
