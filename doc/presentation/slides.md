@@ -110,8 +110,25 @@ Red Badger
 
 # Concurrency
 
-- Problem with single-threaded blocking bluetooth library:
+- Switch to async library:
   ![](./single-threaded-async.svg)
+- But you all know javascript, so I don't have to tell you this.
+
+---
+
+# Concurrency
+
+- NOT SO FAST!
+  ![](./single-threaded-mutex.svg)
+- What if all of your sensors live in a big `Arc<Mutex<SensorState>>`?
+
+---
+
+# Concurrency
+
+- Hold the Mutex for as little time as possible.
+  ![](./single-threaded-mutex-final.svg)
+- Much better.
 
 ---
 
@@ -133,3 +150,7 @@ Red Badger
 
 - homie-device
 - homie-controller - eventually replace openHab in the above picture.
+
+```
+
+```
