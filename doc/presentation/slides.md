@@ -4,25 +4,27 @@
 
 - David Laban
 
+ <!-- TODO: make this page look less shit -->
+
 ---
 
 # Outline
 
-- Introduction
+- Backstory.
 
-- System Overview
+- System Overview.
 
-- Bluetooth Libraries
+- How it's built.
 
-- Concurrency
+- Concurrency pitfalls.
 
-- Software Engineering
+- Observations about the project.
 
-- Links and Questions
+- Links and Questions.
 
 ---
 
-# Introduction
+# Backstory
 
 - Housemate has a bunch of ESP32 sensors like this one
 
@@ -30,35 +32,35 @@
 
 ---
 
-# Introduction
+# Backstory
 
-- Wouldn't it be nice to have a hundred of these?
+- "Wouldn't it be nice to have a hundred of these?"
 
-- Just imagine what you could do.
+- "Just imagine what you could do."
 
-- What's the cheapest way to do this?
+- "What's the cheapest way to do this?"
 
 ---
 
-# Introduction
+# Backstory
 
-- Let's start with 20.
+- So we bought some of these at `$3` each.
 
 ![](./inception-order.png)
 
 ---
 
-# Introduction
+# Backstory
 
-- Obligatory Screenshot
+- And now we have graphs like this:
 
 ![](./grafana-temperature.png)
 
 ---
 
-# Introduction
+# Backstory
 
-- See also: fridge.
+- And this:
 
 ![](./grafana-fridge.png)
 
@@ -73,13 +75,47 @@
 - openHAB
 - InfluxDB
 - Grafana
--->
+  -->
 
-![](./system-overview.svg)
+<!-- TODO: raspberry pi talks over bluetooth and mqtt -->
+<!-- TODO: explain that Mosquitto is an MQTT server, and that MQTT is pubsub with persistence and tombstones -->
+<!-- TODO: theoretical openHAB replacement -->
+
+- This is what it looks like:
+  ![](./system-overview.svg)
+- Bluetooth for talking to sensors.
+- MQTT for pubsub.
+- Influxdb for storage.
 
 ---
 
-# Bluetooth Libraries
+# MQTT
+
+- MQTT is the pubsub of choice for low-powered gadgets.
+
+- Has `retain`ed messages:
+
+  - Lets you get the current status from the broker.
+
+  - Avoids a round-trip to a power/network-constrained device.
+
+- Has `LastWill` messages:
+
+  - Lets the server clean up after you when you drop off the network.
+
+- `rumqttc` library is pretty good:
+
+  - Works using channels, which is nice.
+
+  - You are responsible for polling its event loop.
+
+  - Maintainers are pretty responsive.
+
+---
+
+# Bluetooth
+
+The library landscape for bluetooth is a bit sad.
 
 - `blurz`
 
@@ -92,11 +128,11 @@
 
   - Mostly Async.
   - Talks directly to bluetooth stack over a socket.
-  - Tried switching to this but gave up.
+  - Tried switching to this (but gave up after a bunch of thread-panics).
 
 - `dbus-rs`
-  - Async or Blocking (depending on which interface you use)
-  - Generates code from introspection on the Raspberry Pi
+  - Async or Blocking (depending on which interface you use).
+  - Generates code from introspection on the Raspberry Pi.
   - Single-threaded in places (but that's okay).
 
 ---
@@ -132,7 +168,7 @@
 
 ---
 
-# Concurrency
+# Concurrency (tools that we use)
 
 - `Arc<Mutex<ALL THE THINGS>`
 
@@ -144,17 +180,19 @@
 
   - Kinda fine.
 
+  - Just the async version of Iter, but with less syntax support.
+
   - Not something that I use much in web-land.
 
 - Unbounded Channels
 
-  - Fine if you control the sender.
+  - Fine if you know it's not going to back up.
 
 ---
 
-# Software Engineering
+# Observations about the project
 
-- Andrew is good at separating layers:
+- Andrew is good at separating things into modules (and crates):
 
   - App -> Sensor (mijia) -> Bluetooth (bluez-generated) -> D-Bus.
 
@@ -162,20 +200,34 @@
 
   - [MQTT -> Homie (homie-controller) -> InfluxDB soon]
 
-- Test coverage is not excellent. Sue me. 🤠
+- Deployment
 
-- Cross-compiling with `cross` is okay to set up, but a bit slow.
+  - Cross-compiling with `cross` is okay to set up, but a bit slow.
 
-- Desktop Linux tech stack (D-Bus) is still a shitshow.
+  - Everything is supervised by systemd.
+
+  - All managed by our `run.sh` script.
+
+  - Test coverage is a bit thin. Sue me. 🤠
+
+- Desktop Linux tech stack (D-Bus, Bluez) is still a shitshow.
+
+- Raspberry Pi only supports 10 connected sensors (10 << 100).
 
 ---
 
-# Links and Questions
-
-- Homie helper library https://crates.io/crates/homie-device
+# Links
 
 - GitHub: https://github.com/alsuren/mijia-homie/
 
-- Demo?
+- Homie helper library https://crates.io/crates/homie-device
 
-- Questions?
+# Questions
+
+- ?
+
+--
+
+# Question from me
+
+- Does anyone have ideas about which graphs we should draw?
