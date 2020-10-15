@@ -121,7 +121,7 @@ The library landscape for bluetooth is a bit sad.
 
   - Started with this.
   - Blocking `device.connect()` calls.
-  - Not multithreadded (because of how it uses D-Bus).
+  - Not multithreaded (because of how it uses D-Bus).
   - Unmaintained (for 2 years)
 
 - `btleplug`
