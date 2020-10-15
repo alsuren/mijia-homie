@@ -68,24 +68,21 @@
 
 # System Overview
 
-<!--
-- Sensors
-- Raspberry Pi
-- Mosquitto (MQTT broker)
-- openHAB
-- InfluxDB
-- Grafana
-  -->
-
-<!-- TODO: raspberry pi talks over bluetooth and mqtt -->
-<!-- TODO: explain that Mosquitto is an MQTT server, and that MQTT is pubsub with persistence and tombstones -->
-<!-- TODO: theoretical openHAB replacement -->
-
 - This is what it looks like:
+
   ![](./system-overview.svg)
-- Bluetooth for talking to sensors.
-- MQTT for pubsub.
-- Influxdb for storage.
+
+---
+
+# System Overview
+
+- This is what it will like:
+
+  ![](./system-overview-future.svg)
+
+--
+
+- Let's dig into the different pieces.
 
 ---
 
@@ -103,6 +100,8 @@
 
   - Lets the server clean up after you when you drop off the network.
 
+- Homie is an auto-discovery convention built on MQTT.
+
 - `rumqttc` library is pretty good:
 
   - Works using channels, which is nice.
@@ -117,23 +116,25 @@
 
 The library landscape for bluetooth is a bit sad.
 
-- `blurz`
+- `blurz` - "bluetooth from before there was tokio"
 
   - Started with this.
   - Blocking `device.connect()` calls.
   - Not multithreaded (because of how it uses D-Bus).
-  - Unmaintained (for 2 years)
+  - Unmaintained (for 2 years).
 
-- `btleplug`
+- `btleplug` - "is that really how it's pronounced?"
 
   - Mostly Async.
-  - Talks directly to bluetooth stack over a socket.
-  - Tried switching to this (but gave up after a bunch of thread-panics).
+  - Theoretically cross platform.
+  - Tried switching to this (but gave up after too many panics).
 
-- `dbus-rs`
-  - Async or Blocking (depending on which interface you use).
-  - Generates code from introspection on the Raspberry Pi.
+- `dbus-rs` - "roll your own bluetooth library"
+  - Generates code from introspection data.
+  - Async or Blocking (up to you).
   - Single-threaded in places (but that's okay).
+  - Non-generated types are a bit **too** dynamic.
+  - Maintainer is really nice.
 
 ---
 
