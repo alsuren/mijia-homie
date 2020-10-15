@@ -223,6 +223,8 @@ The library landscape for bluetooth is a bit sad.
 
 - Homie helper library https://crates.io/crates/homie-device
 
+- Hacktoberfest https://hacktoberfest.digitalocean.com/
+
 # Questions
 
 - ?
