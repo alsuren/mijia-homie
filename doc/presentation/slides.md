@@ -101,7 +101,14 @@ Red Badger
 
 ---
 
-# State Management
+# Concurrency
+
+- Problem with single-threaded blocking bluetooth library:
+  ![](./single-threaded-blocking.svg)
+
+---
+
+# Concurrency
 
 - `Arc<Mutex<ALL THE THINGS>` and/or use channels. Clone is your friend.
 - Only hold the mutex when you _need_ it, to avoid blocking other threads.
