@@ -110,6 +110,13 @@ Red Badger
 
 # Concurrency
 
+- Problem with single-threaded blocking bluetooth library:
+  ![](./single-threaded-async.svg)
+
+---
+
+# Concurrency
+
 - `Arc<Mutex<ALL THE THINGS>` and/or use channels. Clone is your friend.
 - Only hold the mutex when you _need_ it, to avoid blocking other threads.
 - (bonus hack): private `std::Mutex<Arc<Devices>>` and `get_devices() -> Arc<Devices>` for a copy-on-write snapshot.
