@@ -529,6 +529,11 @@ impl HomieController {
             .publish(topic, QoS::AtLeastOnce, false, value.to_string())
             .await
     }
+
+    /// Disconnect from the MQTT broker.
+    pub async fn disconnect(&self) -> Result<(), ClientError> {
+        self.mqtt_client.disconnect().await
+    }
 }
 
 fn get_mut_device_for<'a>(

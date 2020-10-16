@@ -63,6 +63,8 @@ async fn main() -> Result<(), PollError> {
         }
     }
 
+    controller.disconnect().await?;
+
     try_join!(handle.map(|res| Ok::<_, PollError>(res??)))?;
 
     Ok(())
