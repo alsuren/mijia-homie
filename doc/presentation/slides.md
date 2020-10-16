@@ -1,10 +1,12 @@
-# Monitoring Temperature with Too Many Bluetooth Thermometers
+# Monitoring Temperature
 
-- Binary Solo - 15th October 2020
+<pre>(with too many bluetooth thermometers)</pre>
 
-- David Laban
+![](./title.jpg)
 
- <!-- TODO: make this page look less shit -->
+<pre>David Laban</pre>
+
+<pre>Binary Solo - 15th October 2020</pre>
 
 ---
 
@@ -72,17 +74,45 @@
 
   ![](./system-overview.svg)
 
+- Orange is our code.
+
 ---
 
 # System Overview
 
-- This is what it will like:
+- This is the grand plan:
 
   ![](./system-overview-future.svg)
+
+- Orange is our code.
 
 --
 
 - Let's dig into the different pieces.
+
+---
+
+# Rust
+
+- Picked because of a [blog post](https://dev.to/lcsfelix/using-rust-blurz-to-read-from-a-ble-device-gmb) that I found.
+
+- Rust is probably not the **best** language for this.
+
+  - Bluetooth stack on linux is quite dynamic in places.
+
+  - Cross-compiling with `cross` is okay to set up, but a bit slow.
+
+  - We found a [Python project](https://github.com/JsBergbau/MiTemperature2) halfway through, doing the same.
+
+- It was fun anyway:
+
+  - Good chance to work on something together during lockdown.
+
+  - We're both starting to use Rust for work, so good for learning.
+
+        - Andrew is working on [crosvm](https://chromium.googlesource.com/chromiumos/platform/crosvm/) at the moment.
+
+        - [FutureNHS](https://github.com/FutureNHS/futurenhs-platform/) is using Rust on the backend.
 
 ---
 
@@ -108,33 +138,32 @@
 
   - You are responsible for polling its event loop.
 
-  - Maintainers are pretty responsive.
+  - Andrew has submitted patches, and they were well received.
 
 ---
 
 # Bluetooth
 
-The library landscape for bluetooth is a bit sad.
+The Rust Bluetooth story is a bit sad (all wrappers around BlueZ).
 
 - `blurz` - "bluetooth from before there was tokio"
 
   - Started with this.
-  - Blocking `device.connect()` calls.
-  - Not multithreaded (because of how it uses D-Bus).
+  - Talks to BlueZ over D-Bus (single-threaded).
+  - Blocking `device.connect()` calls. 😧
   - Unmaintained (for 2 years).
 
 - `btleplug` - "is that really how it's pronounced?"
 
-  - Mostly Async.
+  - Mostly Async and threadsafe (talks over raw sockets).
   - Theoretically cross platform.
-  - Tried switching to this (but gave up after too many panics).
+  - Tried switching to this (but gave up after too many panicking threads).
 
 - `dbus-rs` - "roll your own bluetooth library"
-  - Generates code from introspection data.
+  - Generates code from D-Bus introspection.
+  - Single-threaded because return types are !Send (but that's okay).
   - Async or Blocking (up to you).
-  - Single-threaded in places (but that's okay).
   - Non-generated types are a bit **too** dynamic.
-  - Maintainer is really nice.
 
 ---
 
@@ -202,8 +231,6 @@ The library landscape for bluetooth is a bit sad.
   - [MQTT -> Homie (homie-controller) -> InfluxDB soon]
 
 - Deployment
-
-  - Cross-compiling with `cross` is okay to set up, but a bit slow.
 
   - Everything is supervised by systemd.
 
