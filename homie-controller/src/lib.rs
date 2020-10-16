@@ -5,15 +5,18 @@ use rumqttc::{
     AsyncClient, ClientError, ConnectionError, EventLoop, Incoming, MqttOptions, Publish, QoS,
 };
 use std::collections::HashMap;
+use std::num::{ParseFloatError, ParseIntError};
 use std::str;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 use thiserror::Error;
 use tokio::task::JoinError;
 
 mod types;
-pub use types::{Datatype, Device, Node, ParseDatatypeError, ParseStateError, Property, State};
+pub use types::{Datatype, Device, Extension, Node, Property, State};
+use types::{ParseDatatypeError, ParseExtensionError, ParseStateError};
 
-const REQUESTS_CAP: usize = 10;
+const REQUESTS_CAP: usize = 1000;
 
 /// Error type for futures representing tasks spawned by this crate.
 #[derive(Error, Debug)]
@@ -222,8 +225,9 @@ impl HomieController {
                 if !devices.contains_key(*device_id) {
                     log::trace!("Homie device '{}' version '{}'", device_id, payload);
                     devices.insert((*device_id).to_owned(), Device::new(device_id, payload));
-                    let topic = format!("{}/{}/+", self.base_topic, device_id);
-                    topics_to_subscribe.push(topic);
+                    topics_to_subscribe.push(format!("{}/{}/+", self.base_topic, device_id));
+                    topics_to_subscribe.push(format!("{}/{}/$fw/+", self.base_topic, device_id));
+                    topics_to_subscribe.push(format!("{}/{}/$stats/+", self.base_topic, device_id));
                     Some(Event::DeviceUpdated {
                         device_id: (*device_id).to_owned(),
                         has_required_attributes: false,
@@ -246,6 +250,82 @@ impl HomieController {
             [device_id, "$implementation"] => {
                 let device = get_mut_device_for(devices, "Got implementation for", device_id)?;
                 device.implementation = Some(payload.to_owned());
+                Some(Event::device_updated(device))
+            }
+            [device_id, "$extensions"] => {
+                let device = get_mut_device_for(devices, "Got extensions for", device_id)?;
+                device.extensions = payload
+                    .split(",")
+                    .map(|part| part.parse())
+                    .collect::<Result<Vec<_>, _>>()?;
+                Some(Event::device_updated(device))
+            }
+            [device_id, "$localip"] => {
+                let device = get_mut_device_for(devices, "Got localip for", device_id)?;
+                device.local_ip = Some(payload.to_owned());
+                Some(Event::device_updated(device))
+            }
+            [device_id, "$mac"] => {
+                let device = get_mut_device_for(devices, "Got mac for", device_id)?;
+                device.mac = Some(payload.to_owned());
+                Some(Event::device_updated(device))
+            }
+            [device_id, "$fw", "name"] => {
+                let device = get_mut_device_for(devices, "Got fw/name for", device_id)?;
+                device.firmware_name = Some(payload.to_owned());
+                Some(Event::device_updated(device))
+            }
+            [device_id, "$fw", "version"] => {
+                let device = get_mut_device_for(devices, "Got fw/version for", device_id)?;
+                device.firmware_version = Some(payload.to_owned());
+                Some(Event::device_updated(device))
+            }
+            [device_id, "$stats", "interval"] => {
+                let interval = payload.parse()?;
+                let device = get_mut_device_for(devices, "Got stats/interval for", device_id)?;
+                device.stats_interval = Some(Duration::from_secs(interval));
+                Some(Event::device_updated(device))
+            }
+            [device_id, "$stats", "uptime"] => {
+                let uptime = payload.parse()?;
+                let device = get_mut_device_for(devices, "Got stats/uptime for", device_id)?;
+                device.stats_uptime = Some(Duration::from_secs(uptime));
+                Some(Event::device_updated(device))
+            }
+            [device_id, "$stats", "signal"] => {
+                let signal = payload.parse()?;
+                let device = get_mut_device_for(devices, "Got stats/signal for", device_id)?;
+                device.stats_signal = Some(signal);
+                Some(Event::device_updated(device))
+            }
+            [device_id, "$stats", "cputemp"] => {
+                let cputemp = payload.parse()?;
+                let device = get_mut_device_for(devices, "Got stats/cputemp for", device_id)?;
+                device.stats_cputemp = Some(cputemp);
+                Some(Event::device_updated(device))
+            }
+            [device_id, "$stats", "cpuload"] => {
+                let cpuload = payload.parse()?;
+                let device = get_mut_device_for(devices, "Got stats/cpuload for", device_id)?;
+                device.stats_cpuload = Some(cpuload);
+                Some(Event::device_updated(device))
+            }
+            [device_id, "$stats", "battery"] => {
+                let battery = payload.parse()?;
+                let device = get_mut_device_for(devices, "Got stats/battery for", device_id)?;
+                device.stats_battery = Some(battery);
+                Some(Event::device_updated(device))
+            }
+            [device_id, "$stats", "freeheap"] => {
+                let freeheap = payload.parse()?;
+                let device = get_mut_device_for(devices, "Got stats/freeheap for", device_id)?;
+                device.stats_freeheap = Some(freeheap);
+                Some(Event::device_updated(device))
+            }
+            [device_id, "$stats", "supply"] => {
+                let supply = payload.parse()?;
+                let device = get_mut_device_for(devices, "Got stats/supply for", device_id)?;
+                device.stats_supply = Some(supply);
                 Some(Event::device_updated(device))
             }
             [device_id, "$nodes"] => {
@@ -490,5 +570,23 @@ impl From<ParseStateError> for HandleError {
 impl From<ParseDatatypeError> for HandleError {
     fn from(e: ParseDatatypeError) -> Self {
         HandleError::Warning(e.to_string())
+    }
+}
+
+impl From<ParseExtensionError> for HandleError {
+    fn from(e: ParseExtensionError) -> Self {
+        HandleError::Warning(e.to_string())
+    }
+}
+
+impl From<ParseIntError> for HandleError {
+    fn from(e: ParseIntError) -> Self {
+        HandleError::Warning(format!("Invalid integer: {}", e))
+    }
+}
+
+impl From<ParseFloatError> for HandleError {
+    fn from(e: ParseFloatError) -> Self {
+        HandleError::Warning(format!("Invalid float: {}", e))
     }
 }

@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::fmt::{self, Debug, Display, Formatter};
 use std::str::FromStr;
+use std::time::Duration;
 use thiserror::Error;
 
 /// The state of a Homie device according to the Homie
@@ -43,7 +44,7 @@ impl State {
 /// An error which can be returned when parsing a `State` from a string, if the string does not
 /// match a valid Homie
 /// [device lifecycle](https://homieiot.github.io/specification/#device-lifecycle) state.
-#[derive(Error, Debug)]
+#[derive(Clone, Debug, Error, Eq, PartialEq)]
 #[error("Invalid state '{0}'")]
 pub struct ParseStateError(String);
 
@@ -82,7 +83,7 @@ pub enum Datatype {
 
 /// An error which can be returned when parsing a `Datatype` from a string, if the string does not
 /// match a valid Homie `$datatype` attribute.
-#[derive(Error, Debug)]
+#[derive(Clone, Debug, Error, Eq, PartialEq)]
 #[error("Invalid datatype '{0}'")]
 pub struct ParseDatatypeError(String);
 
@@ -219,6 +220,38 @@ impl Node {
     }
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Extension {
+    pub id: String,
+    pub version: String,
+    pub homie_versions: Vec<String>,
+}
+
+/// An error which can be returned when parsing an `Extension` from a string.
+#[derive(Clone, Debug, Error, Eq, PartialEq)]
+#[error("Invalid extension '{0}'")]
+pub struct ParseExtensionError(String);
+
+impl FromStr for Extension {
+    type Err = ParseExtensionError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let parts: Vec<_> = s.split(":").collect();
+        if let [id, version, homie_versions] = parts.as_slice() {
+            if let Some(homie_versions) = homie_versions.strip_prefix("[") {
+                if let Some(homie_versions) = homie_versions.strip_suffix("]") {
+                    return Ok(Extension {
+                        id: (*id).to_owned(),
+                        version: (*version).to_owned(),
+                        homie_versions: homie_versions.split(";").map(|p| p.to_owned()).collect(),
+                    });
+                }
+            }
+        }
+        Err(ParseExtensionError(s.to_owned()))
+    }
+}
+
 /// A Homie [device](https://homieiot.github.io/specification/#devices) which has been discovered.
 ///
 /// The `id`, `homie_version`, `name` and `state` are required, but might not be available
@@ -245,6 +278,45 @@ pub struct Device {
 
     /// The nodes of the device, keyed by their IDs.
     pub nodes: HashMap<String, Node>,
+
+    /// The Homie extensions implemented by the device.
+    pub extensions: Vec<Extension>,
+
+    /// The IP address of the device on the local network.
+    pub local_ip: Option<String>,
+
+    /// The MAC address of the device's network interface.
+    pub mac: Option<String>,
+
+    /// The name of the firmware running on the device.
+    pub firmware_name: Option<String>,
+
+    /// The version of the firware running on the device.
+    pub firmware_version: Option<String>,
+
+    /// The interval at which the device refreshes its stats.
+    pub stats_interval: Option<Duration>,
+
+    /// The amount of time since the device booted.
+    pub stats_uptime: Option<Duration>,
+
+    /// The device's signal strength in %.
+    pub stats_signal: Option<i64>,
+
+    /// The device's CPU temperature in °C.
+    pub stats_cputemp: Option<f64>,
+
+    /// The device's CPU load in %, averaged across all CPUs over the last `stats_interval`.
+    pub stats_cpuload: Option<i64>,
+
+    /// The device's battery level in %.
+    pub stats_battery: Option<i64>,
+
+    /// The device's free heap space in bytes.
+    pub stats_freeheap: Option<u64>,
+
+    /// The device's power supply voltage in volts.
+    pub stats_supply: Option<f64>,
 }
 
 impl Device {
@@ -256,6 +328,19 @@ impl Device {
             state: State::Unknown,
             implementation: None,
             nodes: HashMap::new(),
+            extensions: Vec::default(),
+            local_ip: None,
+            mac: None,
+            firmware_name: None,
+            firmware_version: None,
+            stats_interval: None,
+            stats_uptime: None,
+            stats_signal: None,
+            stats_cputemp: None,
+            stats_cpuload: None,
+            stats_battery: None,
+            stats_freeheap: None,
+            stats_supply: None,
         }
     }
 
@@ -269,5 +354,44 @@ impl Device {
                 .nodes
                 .values()
                 .all(|node| node.has_required_attributes())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn extension_parse_succeeds() {
+        let legacy_stats: Extension = "org.homie.legacy-stats:0.1.1:[4.x]".parse().unwrap();
+        assert_eq!(legacy_stats.id, "org.homie.legacy-stats");
+        assert_eq!(legacy_stats.version, "0.1.1");
+        assert_eq!(legacy_stats.homie_versions, &["4.x"]);
+
+        let meta: Extension = "eu.epnw.meta:1.1.0:[3.0.1;4.x]".parse().unwrap();
+        assert_eq!(meta.id, "eu.epnw.meta");
+        assert_eq!(meta.version, "1.1.0");
+        assert_eq!(meta.homie_versions, &["3.0.1", "4.x"]);
+
+        let minimal: Extension = "a:0:[]".parse().unwrap();
+        assert_eq!(minimal.id, "a");
+        assert_eq!(minimal.version, "0");
+        assert_eq!(minimal.homie_versions, &[""]);
+    }
+
+    #[test]
+    fn extension_parse_fails() {
+        assert_eq!(
+            "".parse::<Extension>(),
+            Err(ParseExtensionError("".to_owned()))
+        );
+        assert_eq!(
+            "test.blah:1.2.3".parse::<Extension>(),
+            Err(ParseExtensionError("test.blah:1.2.3".to_owned()))
+        );
+        assert_eq!(
+            "test.blah:1.2.3:4.x".parse::<Extension>(),
+            Err(ParseExtensionError("test.blah:1.2.3:4.x".to_owned()))
+        );
     }
 }
