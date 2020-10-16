@@ -491,6 +491,11 @@ impl HomieController {
                 property.value = Some(payload.to_owned());
                 Some(Event::property_value(device_id, node_id, property))
             }
+            [_device_id, _node_id, _property_id, "set"] => {
+                // Value set message may have been sent by us or another controller. Either way,
+                // ignore it, it is only for the device.
+                None
+            }
             _ => {
                 log::warn!("Unexpected subtopic {} = {}", subtopic, payload);
                 None
