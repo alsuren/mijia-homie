@@ -44,7 +44,7 @@ impl State {
 /// An error which can be returned when parsing a `State` from a string, if the string does not
 /// match a valid Homie
 /// [device lifecycle](https://homieiot.github.io/specification/#device-lifecycle) state.
-#[derive(Error, Debug)]
+#[derive(Clone, Debug, Error, Eq, PartialEq)]
 #[error("Invalid state '{0}'")]
 pub struct ParseStateError(String);
 
@@ -83,7 +83,7 @@ pub enum Datatype {
 
 /// An error which can be returned when parsing a `Datatype` from a string, if the string does not
 /// match a valid Homie `$datatype` attribute.
-#[derive(Error, Debug)]
+#[derive(Clone, Debug, Error, Eq, PartialEq)]
 #[error("Invalid datatype '{0}'")]
 pub struct ParseDatatypeError(String);
 
@@ -220,7 +220,7 @@ impl Node {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Extension {
     pub id: String,
     pub version: String,
@@ -228,7 +228,7 @@ pub struct Extension {
 }
 
 /// An error which can be returned when parsing an `Extension` from a string.
-#[derive(Error, Debug)]
+#[derive(Clone, Debug, Error, Eq, PartialEq)]
 #[error("Invalid extension '{0}'")]
 pub struct ParseExtensionError(String);
 
@@ -354,5 +354,44 @@ impl Device {
                 .nodes
                 .values()
                 .all(|node| node.has_required_attributes())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn extension_parse_succeeds() {
+        let legacy_stats: Extension = "org.homie.legacy-stats:0.1.1:[4.x]".parse().unwrap();
+        assert_eq!(legacy_stats.id, "org.homie.legacy-stats");
+        assert_eq!(legacy_stats.version, "0.1.1");
+        assert_eq!(legacy_stats.homie_versions, &["4.x"]);
+
+        let meta: Extension = "eu.epnw.meta:1.1.0:[3.0.1;4.x]".parse().unwrap();
+        assert_eq!(meta.id, "eu.epnw.meta");
+        assert_eq!(meta.version, "1.1.0");
+        assert_eq!(meta.homie_versions, &["3.0.1", "4.x"]);
+
+        let minimal: Extension = "a:0:[]".parse().unwrap();
+        assert_eq!(minimal.id, "a");
+        assert_eq!(minimal.version, "0");
+        assert_eq!(minimal.homie_versions, &[""]);
+    }
+
+    #[test]
+    fn extension_parse_fails() {
+        assert_eq!(
+            "".parse::<Extension>(),
+            Err(ParseExtensionError("".to_owned()))
+        );
+        assert_eq!(
+            "test.blah:1.2.3".parse::<Extension>(),
+            Err(ParseExtensionError("test.blah:1.2.3".to_owned()))
+        );
+        assert_eq!(
+            "test.blah:1.2.3:4.x".parse::<Extension>(),
+            Err(ParseExtensionError("test.blah:1.2.3:4.x".to_owned()))
+        );
     }
 }
