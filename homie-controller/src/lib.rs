@@ -16,6 +16,9 @@ mod types;
 pub use types::{Datatype, Device, Extension, Node, Property, State};
 use types::{ParseDatatypeError, ParseExtensionError, ParseStateError};
 
+mod values;
+pub use values::{ColorFormat, ColorHSV, ColorRGB, Value};
+
 const REQUESTS_CAP: usize = 1000;
 
 /// Error type for futures representing tasks spawned by this crate.
@@ -516,7 +519,7 @@ impl HomieController {
         device_id: &str,
         node_id: &str,
         property_id: &str,
-        value: impl ToString,
+        value: impl Value,
     ) -> Result<(), ClientError> {
         let topic = format!(
             "{}/{}/{}/{}/set",

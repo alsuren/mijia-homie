@@ -1,3 +1,4 @@
+use crate::values::{ColorFormat, Value, ValueError};
 use std::collections::HashMap;
 use std::fmt::{self, Debug, Display, Formatter};
 use std::str::FromStr;
@@ -79,6 +80,25 @@ pub enum Datatype {
     String,
     Enum,
     Color,
+}
+
+impl Datatype {
+    fn as_str(&self) -> &'static str {
+        match self {
+            Self::Integer => "integer",
+            Self::Float => "float",
+            Self::Boolean => "boolean",
+            Self::String => "string",
+            Self::Enum => "enum",
+            Self::Color => "color",
+        }
+    }
+}
+
+impl Display for Datatype {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
 }
 
 /// An error which can be returned when parsing a `Datatype` from a string, if the string does not
@@ -166,6 +186,48 @@ impl Property {
     /// are filled in.
     pub fn has_required_attributes(&self) -> bool {
         self.name.is_some() && self.datatype.is_some()
+    }
+
+    pub fn value<T: Value>(&self) -> Result<T, ValueError> {
+        let expected = T::datatype();
+        // If the datatype is known and it doesn't match what is being asked for, that's an error.
+        // If it's not known, maybe parsing will succeed.
+        if let Some(actual) = self.datatype {
+            if actual != expected {
+                return Err(ValueError::WrongDatatype { expected, actual });
+            }
+        }
+
+        if let Some(ref format) = self.format {
+            T::valid_for(format)?;
+        }
+
+        match self.value {
+            None => Err(ValueError::Unknown),
+            Some(ref value) => value.parse().map_err(|_| ValueError::ParseFailed {
+                value: value.to_owned(),
+                datatype: expected,
+            }),
+        }
+    }
+
+    /// If the datatype of the property is `Color`, returns the color format.
+    pub fn color_format(&self) -> Result<ColorFormat, ValueError> {
+        // If the datatype is known and it isn't color, that's an error. If it's not known, maybe
+        // parsing the format will succeed, so try anyway.
+        if let Some(actual) = self.datatype {
+            if actual != Datatype::Color {
+                return Err(ValueError::WrongDatatype {
+                    expected: Datatype::Color,
+                    actual,
+                });
+            }
+        }
+
+        match self.format {
+            None => Err(ValueError::Unknown),
+            Some(ref format) => format.parse(),
+        }
     }
 }
 
@@ -360,6 +422,7 @@ impl Device {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::values::{ColorHSV, ColorRGB};
 
     #[test]
     fn extension_parse_succeeds() {
@@ -393,5 +456,209 @@ mod tests {
             "test.blah:1.2.3:4.x".parse::<Extension>(),
             Err(ParseExtensionError("test.blah:1.2.3:4.x".to_owned()))
         );
+    }
+
+    #[test]
+    fn property_integer_parse() {
+        let mut property = Property::new("property_id");
+
+        // With no known value, parsing fails.
+        assert_eq!(property.value::<i64>(), Err(ValueError::Unknown));
+
+        // With an invalid value, parsing also fails.
+        property.value = Some("-".to_owned());
+        assert_eq!(
+            property.value::<i64>(),
+            Err(ValueError::ParseFailed {
+                value: "-".to_owned(),
+                datatype: Datatype::Integer,
+            })
+        );
+
+        // With a valid value but unknown datatype, parsing succeeds.
+        property.value = Some("42".to_owned());
+        assert_eq!(property.value(), Ok(42));
+
+        // With the correct datatype, parsing still succeeds.
+        property.datatype = Some(Datatype::Integer);
+        assert_eq!(property.value(), Ok(42));
+
+        // Negative values can be parsed.
+        property.value = Some("-66".to_owned());
+        assert_eq!(property.value(), Ok(-66));
+
+        // With the wrong datatype, parsing fails.
+        property.datatype = Some(Datatype::Float);
+        assert_eq!(
+            property.value::<i64>(),
+            Err(ValueError::WrongDatatype {
+                actual: Datatype::Float,
+                expected: Datatype::Integer,
+            })
+        );
+    }
+
+    #[test]
+    fn property_float_parse() {
+        let mut property = Property::new("property_id");
+
+        // With no known value, parsing fails.
+        assert_eq!(property.value::<f64>(), Err(ValueError::Unknown));
+
+        // With an invalid value, parsing also fails.
+        property.value = Some("-".to_owned());
+        assert_eq!(
+            property.value::<f64>(),
+            Err(ValueError::ParseFailed {
+                value: "-".to_owned(),
+                datatype: Datatype::Float,
+            })
+        );
+
+        // With a valid value but unknown datatype, parsing succeeds.
+        property.value = Some("42.36".to_owned());
+        assert_eq!(property.value(), Ok(42.36));
+
+        // With the correct datatype, parsing still succeeds.
+        property.datatype = Some(Datatype::Float);
+        assert_eq!(property.value(), Ok(42.36));
+
+        // With the wrong datatype, parsing fails.
+        property.datatype = Some(Datatype::Integer);
+        assert_eq!(
+            property.value::<f64>(),
+            Err(ValueError::WrongDatatype {
+                actual: Datatype::Integer,
+                expected: Datatype::Float,
+            })
+        );
+    }
+
+    #[test]
+    fn property_color_parse() {
+        let mut property = Property::new("property_id");
+
+        // With no known value, parsing fails.
+        assert_eq!(property.value::<ColorRGB>(), Err(ValueError::Unknown));
+        assert_eq!(property.value::<ColorHSV>(), Err(ValueError::Unknown));
+
+        // With an invalid value, parsing also fails.
+        property.value = Some("".to_owned());
+        assert_eq!(
+            property.value::<ColorRGB>(),
+            Err(ValueError::ParseFailed {
+                value: "".to_owned(),
+                datatype: Datatype::Color,
+            })
+        );
+
+        // With a valid value but unknown datatype, parsing succeeds as either kind of colour.
+        property.value = Some("12,34,56".to_owned());
+        assert_eq!(
+            property.value(),
+            Ok(ColorRGB {
+                r: 12,
+                g: 34,
+                b: 56
+            })
+        );
+        assert_eq!(
+            property.value(),
+            Ok(ColorHSV {
+                h: 12,
+                s: 34,
+                v: 56
+            })
+        );
+
+        // With the correct datatype and no format, parsing succeeds as either kind of colour.
+        property.datatype = Some(Datatype::Color);
+        assert_eq!(
+            property.value(),
+            Ok(ColorRGB {
+                r: 12,
+                g: 34,
+                b: 56
+            })
+        );
+        assert_eq!(
+            property.value(),
+            Ok(ColorHSV {
+                h: 12,
+                s: 34,
+                v: 56
+            })
+        );
+
+        // With a format set, parsing succeeds only as the correct kind of colour.
+        property.format = Some("rgb".to_owned());
+        assert_eq!(
+            property.value(),
+            Ok(ColorRGB {
+                r: 12,
+                g: 34,
+                b: 56
+            })
+        );
+        assert_eq!(
+            property.value::<ColorHSV>(),
+            Err(ValueError::WrongFormat {
+                format: "rgb".to_owned()
+            })
+        );
+
+        // With the wrong datatype, parsing fails.
+        property.datatype = Some(Datatype::Integer);
+        assert_eq!(
+            property.value::<ColorRGB>(),
+            Err(ValueError::WrongDatatype {
+                actual: Datatype::Integer,
+                expected: Datatype::Color,
+            })
+        );
+        assert_eq!(
+            property.value::<ColorHSV>(),
+            Err(ValueError::WrongDatatype {
+                actual: Datatype::Integer,
+                expected: Datatype::Color,
+            })
+        );
+    }
+
+    #[test]
+    fn property_color_format() {
+        let mut property = Property::new("property_id");
+
+        // With no known format or datatype, format parsing fails.
+        assert_eq!(property.color_format(), Err(ValueError::Unknown));
+
+        // Parsing an invalid format fails.
+        property.format = Some("".to_owned());
+        assert_eq!(
+            property.color_format(),
+            Err(ValueError::WrongFormat {
+                format: "".to_owned()
+            })
+        );
+
+        // Parsing valid formats works even if datatype is unnkown.
+        property.format = Some("rgb".to_owned());
+        assert_eq!(property.color_format(), Ok(ColorFormat::RGB));
+        property.format = Some("hsv".to_owned());
+        assert_eq!(property.color_format(), Ok(ColorFormat::HSV));
+
+        // With the wrong datatype, parsing fails.
+        property.datatype = Some(Datatype::Integer);
+        assert_eq!(
+            property.color_format(),
+            Err(ValueError::WrongDatatype {
+                actual: Datatype::Integer,
+                expected: Datatype::Color
+            })
+        );
+
+        // With the correct datatype, parsing works.
+        property.datatype = Some(Datatype::Color);
+        assert_eq!(property.color_format(), Ok(ColorFormat::HSV));
     }
 }
