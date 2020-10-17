@@ -218,6 +218,25 @@ impl Property {
             Some(ref format) => format.parse(),
         }
     }
+
+    /// If the datatype of the property is `Enum`, gets the possible values of the enum.
+    pub fn enum_values(&self) -> Result<Vec<&str>, ValueError> {
+        // If the datatype is known and it isn't enum, that's an error. If it's not known, try
+        // anyway.
+        if let Some(actual) = self.datatype {
+            if actual != Datatype::Enum {
+                return Err(ValueError::WrongDatatype {
+                    expected: Datatype::Enum,
+                    actual,
+                });
+            }
+        }
+
+        match self.format {
+            None => Err(ValueError::Unknown),
+            Some(ref format) => Ok(format.split(',').collect()),
+        }
+    }
 }
 
 /// A [node](https://homieiot.github.io/specification/#nodes) of a Homie device.
@@ -649,5 +668,39 @@ mod tests {
         // With the correct datatype, parsing works.
         property.datatype = Some(Datatype::Color);
         assert_eq!(property.color_format(), Ok(ColorFormat::HSV));
+    }
+
+    #[test]
+    fn property_enum_format() {
+        let mut property = Property::new("property_id");
+
+        // With no known format or datatype, format parsing fails.
+        assert_eq!(property.enum_values(), Err(ValueError::Unknown));
+
+        // An empty string is possible.
+        property.format = Some("".to_owned());
+        assert_eq!(property.enum_values(), Ok(vec![]));
+
+        // A single value is valid.
+        property.format = Some("one".to_owned());
+        assert_eq!(property.enum_values(), Ok(vec!["one"]));
+
+        // Several values are parsed correctly.
+        property.format = Some("one,two,three".to_owned());
+        assert_eq!(property.enum_values(), Ok(vec!["one", "two", "three"]));
+
+        // With the correct datatype, parsing works.
+        property.datatype = Some(Datatype::Enum);
+        assert_eq!(property.enum_values(), Ok(vec!["one", "two", "three"]));
+
+        // With the wrong datatype, parsing fails.
+        property.datatype = Some(Datatype::Color);
+        assert_eq!(
+            property.enum_values(),
+            Err(ValueError::WrongDatatype {
+                actual: Datatype::Color,
+                expected: Datatype::Enum
+            })
+        );
     }
 }
