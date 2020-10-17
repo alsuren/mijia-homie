@@ -67,7 +67,7 @@ impl State {
 }
 
 impl Display for State {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         f.write_str(self.as_str())
     }
 }
@@ -95,7 +95,7 @@ pub struct HomieDeviceBuilder {
 }
 
 impl Debug for HomieDeviceBuilder {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         f.debug_struct("HomieDeviceBuilder")
             .field("device_base", &self.device_base)
             .field("device_name", &self.device_name)

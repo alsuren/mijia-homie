@@ -65,7 +65,7 @@ impl FromStr for State {
 }
 
 impl Display for State {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         f.write_str(self.as_str())
     }
 }

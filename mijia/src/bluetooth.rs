@@ -33,7 +33,7 @@ impl DeviceId {
 pub struct MacAddress(String);
 
 impl Display for MacAddress {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         f.write_str(&self.0)
     }
 }
@@ -42,7 +42,7 @@ impl Display for MacAddress {
 pub struct ParseMacAddressError();
 
 impl Display for ParseMacAddressError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write!(f, "Invalid MAC address")
     }
 }
@@ -83,7 +83,7 @@ pub struct BluetoothSession {
 }
 
 impl Debug for BluetoothSession {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write!(f, "BluetoothSession")
     }
 }
