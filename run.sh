@@ -1,10 +1,5 @@
 set -euxo pipefail
 
-# This relies on a version of cross that can read `context` and `dockerfile`
-# from Cross.toml. You can install it with:
-#
-#     cargo install --git=https://github.com/alsuren/cross --branch=docker-build-context
-#
 TARGET=${TARGET:-armv7-unknown-linux-gnueabihf}
 TARGET_SSH=${TARGET_SSH:-pi@raspberrypi.local}
 PROFILE=${PROFILE:-debug}
@@ -20,6 +15,8 @@ else
     echo "Invalid profile '$PROFILE'"
     exit 1
 fi
+
+cargo install cross
 
 if [ "${EXAMPLE}" != "" ]; then
     time cross build $PROFILE_FLAG --target $TARGET --example $EXAMPLE
