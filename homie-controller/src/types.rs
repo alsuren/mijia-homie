@@ -189,24 +189,13 @@ impl Property {
     }
 
     pub fn value<T: Value>(&self) -> Result<T, ValueError> {
-        let expected = T::datatype();
-        // If the datatype is known and it doesn't match what is being asked for, that's an error.
-        // If it's not known, maybe parsing will succeed.
-        if let Some(actual) = self.datatype {
-            if actual != expected {
-                return Err(ValueError::WrongDatatype { expected, actual });
-            }
-        }
-
-        if let Some(ref format) = self.format {
-            T::valid_for(format)?;
-        }
+        T::valid_for(self.datatype, &self.format)?;
 
         match self.value {
             None => Err(ValueError::Unknown),
             Some(ref value) => value.parse().map_err(|_| ValueError::ParseFailed {
                 value: value.to_owned(),
-                datatype: expected,
+                datatype: T::datatype(),
             }),
         }
     }

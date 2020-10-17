@@ -19,13 +19,38 @@ pub enum ValueError {
     ParseFailed { value: String, datatype: Datatype },
 }
 
+/// The value of a Homie property. This has implementations corresponding to the possible property datatypes.
 pub trait Value: ToString + FromStr {
+    /// The Homie datatype corresponding to this type.
     fn datatype() -> Datatype;
+
+    /// Check whether this value type is valid for the given property datatype and format string.
+    ///
+    /// Returns `Ok(())` if so, or `Err(WrongFormat(...))` or `Err(WrongDatatype(...))` if not.
+    ///
+    /// The default implementation checks the datatype, and delegates to `valid_for_format` to check
+    /// the format.
+    fn valid_for(datatype: Option<Datatype>, format: &Option<String>) -> Result<(), ValueError> {
+        // If the datatype is known and it doesn't match what is being asked for, that's an error.
+        // If it's not known, maybe parsing will succeed.
+        if let Some(actual) = datatype {
+            let expected = Self::datatype();
+            if actual != expected {
+                return Err(ValueError::WrongDatatype { expected, actual });
+            }
+        }
+
+        if let Some(ref format) = format {
+            Self::valid_for_format(format)
+        } else {
+            Ok(())
+        }
+    }
 
     /// Check whether this value type is valid for the given property format string.
     ///
-    /// Retuns `Ok(())` if so, or `Err(WrongFormat(...))` if not.
-    fn valid_for(_format: &str) -> Result<(), ValueError> {
+    /// Returns `Ok(())` if so, or `Err(WrongFormat(...))` if not.
+    fn valid_for_format(_format: &str) -> Result<(), ValueError> {
         Ok(())
     }
 }
@@ -103,7 +128,7 @@ impl<T: Color> Value for T {
         Datatype::Color
     }
 
-    fn valid_for(format: &str) -> Result<(), ValueError> {
+    fn valid_for_format(format: &str) -> Result<(), ValueError> {
         if format == Self::format().as_str() {
             Ok(())
         } else {
