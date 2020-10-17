@@ -154,20 +154,17 @@ impl HomieController {
 
     async fn handle_event(&self, incoming: Incoming) -> Result<Option<Event>, PollError> {
         log::trace!("Incoming: {:?}", incoming);
-        match incoming {
-            Incoming::Publish(publish) => {
-                match self.handle_publish(publish).await {
-                    Err(HandleError::Warning(err)) => {
-                        // These error strings indicate some issue with parsing the publish
-                        // event from the network, perhaps due to a malfunctioning device,
-                        // so should just be logged and ignored.
-                        log::warn!("{}", err)
-                    }
-                    Err(HandleError::Fatal(e)) => Err(e)?,
-                    Ok(event) => return Ok(event),
+        if let Incoming::Publish(publish) = incoming {
+            match self.handle_publish(publish).await {
+                Err(HandleError::Warning(err)) => {
+                    // These error strings indicate some issue with parsing the publish
+                    // event from the network, perhaps due to a malfunctioning device,
+                    // so should just be logged and ignored.
+                    log::warn!("{}", err)
                 }
+                Err(HandleError::Fatal(e)) => return Err(e.into()),
+                Ok(event) => return Ok(event),
             }
-            _ => {}
         }
         Ok(None)
     }
@@ -219,7 +216,7 @@ impl HomieController {
         let mut topics_to_subscribe: Vec<String> = vec![];
         let mut topics_to_unsubscribe: Vec<String> = vec![];
 
-        let parts = subtopic.split("/").collect::<Vec<&str>>();
+        let parts = subtopic.split('/').collect::<Vec<&str>>();
         let event = match parts.as_slice() {
             [device_id, "$homie"] => {
                 if !devices.contains_key(*device_id) {
@@ -255,7 +252,7 @@ impl HomieController {
             [device_id, "$extensions"] => {
                 let device = get_mut_device_for(devices, "Got extensions for", device_id)?;
                 device.extensions = payload
-                    .split(",")
+                    .split(',')
                     .map(|part| part.parse())
                     .collect::<Result<Vec<_>, _>>()?;
                 Some(Event::device_updated(device))
@@ -329,7 +326,7 @@ impl HomieController {
                 Some(Event::device_updated(device))
             }
             [device_id, "$nodes"] => {
-                let nodes: Vec<_> = payload.split(",").collect();
+                let nodes: Vec<_> = payload.split(',').collect();
                 let device = get_mut_device_for(devices, "Got nodes for", device_id)?;
 
                 // Remove nodes which aren't in the new list.
@@ -372,7 +369,7 @@ impl HomieController {
                 Some(Event::node_updated(device_id, node))
             }
             [device_id, node_id, "$properties"] => {
-                let properties: Vec<_> = payload.split(",").collect();
+                let properties: Vec<_> = payload.split(',').collect();
                 let node = get_mut_node_for(devices, "Got properties for", device_id, node_id)?;
 
                 // Remove properties which aren't in the new list.
@@ -477,7 +474,7 @@ impl HomieController {
                 property.retained = retained;
                 Some(Event::property_updated(device_id, node_id, property))
             }
-            [device_id, node_id, property_id] if !property_id.starts_with("$") => {
+            [device_id, node_id, property_id] if !property_id.starts_with('$') => {
                 // TODO: What about values of properties we don't yet know about? They may arrive
                 // before the $properties of the node, because the "homie/node_id/+" subscription
                 // matches both.
