@@ -1,4 +1,6 @@
-set -euxo pipefail
+#!/bin/bash
+
+set -euo pipefail
 
 TARGET=${TARGET:-armv7-unknown-linux-gnueabihf}
 TARGET_SSH=${TARGET_SSH:-pi@raspberrypi.local}
@@ -6,6 +8,14 @@ PROFILE=${PROFILE:-debug}
 RUN=${RUN:-1}
 USE_SYSTEMD=${USE_SYSTEMD:-1}
 EXAMPLE=${EXAMPLE:-}
+
+if [ $# != 0 ]; then
+    echo "ERROR: $0 should be configured via the following environment variables:"
+    echo
+    cat $0 |  grep --only-matching '^[A-Z_]\+'
+    echo
+    exit 1
+fi
 
 if [ $PROFILE = release ]; then
     PROFILE_FLAG=--release
