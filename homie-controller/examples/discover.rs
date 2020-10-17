@@ -1,7 +1,9 @@
+//! Example to discover all Homie devices, and log whenever a property value changes.
+
 use homie_controller::{Event, HomieController, PollError};
 use rumqttc::MqttOptions;
 
-#[tokio::main(core_threads = 2)]
+#[tokio::main]
 async fn main() -> Result<(), PollError> {
     pretty_env_logger::init();
 

@@ -1,7 +1,7 @@
 use homie_device::{Datatype, HomieDevice, Node, Property, SpawnError};
 use rumqttc::MqttOptions;
 
-#[tokio::main(core_threads = 2)]
+#[tokio::main]
 async fn main() -> Result<(), SpawnError> {
     pretty_env_logger::init();
 
