@@ -247,7 +247,44 @@ impl Color for ColorHSV {
     }
 }
 
+/// The value of a Homie [enum](https://homieiot.github.io/specification/#enum) property.
+///
+/// This must be a non-empty string.
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct EnumValue(String);
 
-// TODO: enum, color
+impl EnumValue {
+    pub fn new(s: &str) -> Self {
+        assert!(!s.is_empty());
+        EnumValue(s.to_owned())
+    }
+}
+
+/// An error while attempting to parse an `EnumValue` from a string, because the string is empty.
+#[derive(Clone, Debug, Error, Eq, PartialEq)]
+#[error("Empty string is not a valid enum value.")]
+pub struct ParseEnumError();
+
+impl FromStr for EnumValue {
+    type Err = ParseEnumError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.is_empty() {
+            Err(ParseEnumError())
+        } else {
+            Ok(EnumValue::new(s))
+        }
+    }
+}
+
+impl ToString for EnumValue {
+    fn to_string(&self) -> String {
+        self.0.to_string()
+    }
+}
+
+impl Value for EnumValue {
+    fn datatype() -> Datatype {
+        Datatype::Enum
+    }
+}

@@ -438,7 +438,7 @@ impl Device {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::values::{ColorHSV, ColorRGB};
+    use crate::values::{ColorHSV, ColorRGB, EnumValue};
 
     #[test]
     fn extension_parse_succeeds() {
@@ -637,6 +637,42 @@ mod tests {
             Err(ValueError::WrongDatatype {
                 actual: Datatype::Integer,
                 expected: Datatype::Color,
+            })
+        );
+    }
+
+    #[test]
+    fn property_enum_parse() {
+        let mut property = Property::new("property_id");
+
+        // With no known value, parsing fails.
+        assert_eq!(property.value::<EnumValue>(), Err(ValueError::Unknown));
+
+        // With an invalid value, parsing also fails.
+        property.value = Some("".to_owned());
+        assert_eq!(
+            property.value::<EnumValue>(),
+            Err(ValueError::ParseFailed {
+                value: "".to_owned(),
+                datatype: Datatype::Enum,
+            })
+        );
+
+        // With a valid value but unknown datatype, parsing succeeds.
+        property.value = Some("anything".to_owned());
+        assert_eq!(property.value(), Ok(EnumValue::new("anything")));
+
+        // With the correct datatype, parsing still succeeds.
+        property.datatype = Some(Datatype::Enum);
+        assert_eq!(property.value(), Ok(EnumValue::new("anything")));
+
+        // With the wrong datatype, parsing fails.
+        property.datatype = Some(Datatype::String);
+        assert_eq!(
+            property.value::<EnumValue>(),
+            Err(ValueError::WrongDatatype {
+                actual: Datatype::String,
+                expected: Datatype::Enum,
             })
         );
     }

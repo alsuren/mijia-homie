@@ -17,7 +17,9 @@ pub use types::{Datatype, Device, Extension, Node, Property, State};
 use types::{ParseDatatypeError, ParseExtensionError, ParseStateError};
 
 mod values;
-pub use values::{ColorFormat, ColorHSV, ColorRGB, Value};
+pub use values::{
+    ColorFormat, ColorHSV, ColorRGB, EnumValue, ParseColorError, ParseEnumError, Value,
+};
 
 const REQUESTS_CAP: usize = 1000;
 
