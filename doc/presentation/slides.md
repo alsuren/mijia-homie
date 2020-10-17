@@ -104,15 +104,25 @@
 
   - We found a [Python project](https://github.com/JsBergbau/MiTemperature2) halfway through, doing the same.
 
+<!-- prettier-ignore-start -->
+<!--
+  Indentation is bigger here because that's how much indentation remark needs
+  to render a third-level bullet point.
+  Ideally I would set tab width to 4 everywhere in prettier, but that makes
+  prettier do strange things (https://github.com/prettier/prettier/issues/5019).
+-->
+
 - It was fun anyway:
 
-  - Good chance to work on something together during lockdown.
+    - Good chance to work on something together during lockdown.
 
-  - We're both starting to use Rust for work, so good for learning.
+    - We're both starting to use Rust for work, so good for learning.
 
         - Andrew is working on [crosvm](https://chromium.googlesource.com/chromiumos/platform/crosvm/) at the moment.
 
         - [FutureNHS](https://github.com/FutureNHS/futurenhs-platform/) is using Rust on the backend.
+
+<!-- prettier-ignore-end -->
 
 ---
 
