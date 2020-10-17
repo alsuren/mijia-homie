@@ -234,7 +234,15 @@ impl Property {
 
         match self.format {
             None => Err(ValueError::Unknown),
-            Some(ref format) => Ok(format.split(',').collect()),
+            Some(ref format) => {
+                if format.is_empty() {
+                    Err(ValueError::WrongFormat {
+                        format: "".to_owned(),
+                    })
+                } else {
+                    Ok(format.split(',').collect())
+                }
+            }
         }
     }
 }
@@ -677,9 +685,14 @@ mod tests {
         // With no known format or datatype, format parsing fails.
         assert_eq!(property.enum_values(), Err(ValueError::Unknown));
 
-        // An empty string is possible.
+        // An empty format string is invalid.
         property.format = Some("".to_owned());
-        assert_eq!(property.enum_values(), Ok(vec![]));
+        assert_eq!(
+            property.enum_values(),
+            Err(ValueError::WrongFormat {
+                format: "".to_owned()
+            })
+        );
 
         // A single value is valid.
         property.format = Some("one".to_owned());
