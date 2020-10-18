@@ -1,6 +1,7 @@
 use crate::types::Datatype;
 use std::fmt::{self, Debug, Display, Formatter};
 use std::num::ParseIntError;
+use std::ops::RangeInclusive;
 use std::str::FromStr;
 use thiserror::Error;
 
@@ -21,6 +22,8 @@ pub enum ValueError {
 
 /// The value of a Homie property. This has implementations corresponding to the possible property datatypes.
 pub trait Value: ToString + FromStr {
+    type Format;
+
     /// The Homie datatype corresponding to this type.
     fn datatype() -> Datatype;
 
@@ -53,30 +56,78 @@ pub trait Value: ToString + FromStr {
     fn valid_for_format(_format: &str) -> Result<(), ValueError> {
         Ok(())
     }
+
+    fn parse_format(format: &str) -> Result<Self::Format, ValueError>;
 }
 
 impl Value for i64 {
+    type Format = RangeInclusive<Self>;
+
     fn datatype() -> Datatype {
         Datatype::Integer
+    }
+
+    fn parse_format(format: &str) -> Result<Self::Format, ValueError> {
+        if let [Ok(start), Ok(end)] = format
+            .splitn(2, ':')
+            .map(|part| part.parse())
+            .collect::<Vec<_>>()
+            .as_slice()
+        {
+            Ok(RangeInclusive::new(*start, *end))
+        } else {
+            Err(ValueError::WrongFormat {
+                format: format.to_owned(),
+            })
+        }
     }
 }
 
 impl Value for f64 {
+    type Format = RangeInclusive<Self>;
+
     fn datatype() -> Datatype {
         Datatype::Float
+    }
+
+    fn parse_format(format: &str) -> Result<Self::Format, ValueError> {
+        if let [Ok(start), Ok(end)] = format
+            .splitn(2, ':')
+            .map(|part| part.parse())
+            .collect::<Vec<_>>()
+            .as_slice()
+        {
+            Ok(RangeInclusive::new(*start, *end))
+        } else {
+            Err(ValueError::WrongFormat {
+                format: format.to_owned(),
+            })
+        }
     }
 }
 
 impl Value for bool {
+    type Format = ();
+
     fn datatype() -> Datatype {
         Datatype::Boolean
+    }
+
+    fn parse_format(_format: &str) -> Result<Self::Format, ValueError> {
+        Ok(())
     }
 }
 
 // TODO: What about &str?
 impl Value for String {
+    type Format = ();
+
     fn datatype() -> Datatype {
         Datatype::String
+    }
+
+    fn parse_format(_format: &str) -> Result<Self::Format, ValueError> {
+        Ok(())
     }
 }
 
@@ -124,6 +175,8 @@ pub trait Color: Value {
 }
 
 impl<T: Color> Value for T {
+    type Format = ColorFormat;
+
     fn datatype() -> Datatype {
         Datatype::Color
     }
@@ -136,6 +189,10 @@ impl<T: Color> Value for T {
                 format: format.to_owned(),
             })
         }
+    }
+
+    fn parse_format(format: &str) -> Result<Self::Format, ValueError> {
+        ColorFormat::from_str(format)
     }
 }
 
@@ -284,7 +341,19 @@ impl ToString for EnumValue {
 }
 
 impl Value for EnumValue {
+    type Format = Vec<String>;
+
     fn datatype() -> Datatype {
         Datatype::Enum
+    }
+
+    fn parse_format(format: &str) -> Result<Self::Format, ValueError> {
+        if format.is_empty() {
+            Err(ValueError::WrongFormat {
+                format: "".to_owned(),
+            })
+        } else {
+            Ok(format.split(',').map(|part| part.to_owned()).collect())
+        }
     }
 }
