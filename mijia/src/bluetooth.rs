@@ -1,5 +1,5 @@
 use crate::DBUS_METHOD_CALL_TIMEOUT;
-use bluez_generated::generated::{OrgBluezAdapter1, OrgBluezDevice1};
+use bluez_generated::{OrgBluezAdapter1, OrgBluezDevice1};
 use core::fmt::Debug;
 use core::future::Future;
 use dbus::arg::{RefArg, Variant};

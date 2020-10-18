@@ -1,4 +1,4 @@
-use bluez_generated::generated::OrgBluezGattCharacteristic1;
+use bluez_generated::OrgBluezGattCharacteristic1;
 use core::future::Future;
 use dbus::nonblock::MsgMatch;
 use dbus::Message;
