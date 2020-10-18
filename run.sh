@@ -2,17 +2,26 @@
 
 set -euo pipefail
 
-TARGET=${TARGET:-armv7-unknown-linux-gnueabihf}
+## Set TARGET_SSH=user@host.local to decide which machine to run on.
 TARGET_SSH=${TARGET_SSH:-pi@raspberrypi.local}
+## Set PROFILE=release for a release build.
 PROFILE=${PROFILE:-debug}
+## Set RUN=0 to push a new binary without running it.
 RUN=${RUN:-1}
+## Set USE_SYSTEMD=0 to run without process supervision (EXAMPLEs never use process supervision).
 USE_SYSTEMD=${USE_SYSTEMD:-1}
+## Set EXAMPLE=list-sensors to run the list-sensors example rather than publish-mqtt.
 EXAMPLE=${EXAMPLE:-}
+
+# Target architecture for raspbian on a raspberry pi.
+# Changing this requires changes to Cross.toml. Send a patch if you want this
+# to be made configurable again.
+TARGET=armv7-unknown-linux-gnueabihf
 
 if [ $# != 0 ]; then
     echo "ERROR: $0 should be configured via the following environment variables:"
     echo
-    cat $0 |  grep --only-matching '^[A-Z_]\+'
+    grep '^## ' "$0" | sed 's/^## /  /'
     echo
     exit 1
 fi
