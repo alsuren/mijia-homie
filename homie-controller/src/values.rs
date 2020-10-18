@@ -230,14 +230,14 @@ impl FromStr for ColorHSV {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let parts: Vec<_> = s.split(',').collect();
         if let [h, s, v] = parts.as_slice() {
-            Ok(ColorHSV {
-                h: h.parse()?,
-                s: s.parse()?,
-                v: v.parse()?,
-            })
-        } else {
-            Err(ParseColorError())
+            let h = h.parse()?;
+            let s = s.parse()?;
+            let v = v.parse()?;
+            if h <= 360 && s <= 100 && v <= 100 {
+                return Ok(ColorHSV { h, s, v });
+            }
         }
+        Err(ParseColorError())
     }
 }
 
