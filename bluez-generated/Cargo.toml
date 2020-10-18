@@ -7,7 +7,8 @@ license = "MIT OR Apache-2.0"
 description = "Generated bindings for talking to BlueZ on Linux."
 repository = "https://github.com/alsuren/mijia-homie/"
 keywords = ["bluetooth", "ble", "bluez", "dbus"]
-categories = ["api-bindings", "os::linux-apis", ""]
+categories = ["api-bindings", "os::linux-apis"]
+maintenance = { status = "experimental" }
 
 [dependencies]
 dbus = { version = "0.8.4", features = ["futures"] }
