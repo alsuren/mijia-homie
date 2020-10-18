@@ -13,7 +13,7 @@ USE_SYSTEMD=${USE_SYSTEMD:-1}
 ## Set EXAMPLE=list-sensors to run the list-sensors example rather than publish-mqtt.
 EXAMPLE=${EXAMPLE:-}
 
-# Target architecture for raspbian on a raspberry pi.
+# Target architecture for Raspbian on a Raspberry Pi.
 # Changing this requires changes to Cross.toml. Send a patch if you want this
 # to be made configurable again.
 TARGET=armv7-unknown-linux-gnueabihf
