@@ -1,4 +1,4 @@
-use crate::values::{ColorFormat, Value, ValueError};
+use crate::values::{ColorFormat, EnumValue, Value, ValueError};
 use std::collections::HashMap;
 use std::fmt::{self, Debug, Display, Formatter};
 use std::ops::RangeInclusive;
@@ -222,16 +222,7 @@ impl Property {
 
     /// If the datatype of the property is `Enum`, gets the possible values of the enum.
     pub fn enum_values(&self) -> Result<Vec<&str>, ValueError> {
-        // If the datatype is known and it isn't enum, that's an error. If it's not known, try
-        // anyway.
-        if let Some(actual) = self.datatype {
-            if actual != Datatype::Enum {
-                return Err(ValueError::WrongDatatype {
-                    expected: Datatype::Enum,
-                    actual,
-                });
-            }
-        }
+        EnumValue::valid_for(self.datatype, &self.format)?;
 
         match self.format {
             None => Err(ValueError::Unknown),
