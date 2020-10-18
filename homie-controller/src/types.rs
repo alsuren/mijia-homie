@@ -298,10 +298,15 @@ impl Node {
     }
 }
 
+/// A Homie [extension](https://homieiot.github.io/extensions/) supported by a device.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Extension {
+    /// The identifier of the extension. This should be a reverse domain name followed by some
+    /// suffix.
     pub id: String,
+    /// The version of the extension.
     pub version: String,
+    /// The versions of the Homie spec which the extension supports.
     pub homie_versions: Vec<String>,
 }
 
