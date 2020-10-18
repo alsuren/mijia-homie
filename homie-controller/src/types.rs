@@ -1,6 +1,7 @@
 use crate::values::{ColorFormat, Value, ValueError};
 use std::collections::HashMap;
 use std::fmt::{self, Debug, Display, Formatter};
+use std::ops::RangeInclusive;
 use std::str::FromStr;
 use std::time::Duration;
 use thiserror::Error;
@@ -241,6 +242,28 @@ impl Property {
                     })
                 } else {
                     Ok(format.split(',').collect())
+                }
+            }
+        }
+    }
+
+    pub fn range<T: Value + Copy>(&self) -> Result<RangeInclusive<T>, ValueError> {
+        T::valid_for(self.datatype, &self.format)?;
+
+        match self.format {
+            None => Err(ValueError::Unknown),
+            Some(ref format) => {
+                if let [Ok(start), Ok(end)] = format
+                    .splitn(2, ':')
+                    .map(|part| part.parse())
+                    .collect::<Vec<_>>()
+                    .as_slice()
+                {
+                    Ok(RangeInclusive::new(*start, *end))
+                } else {
+                    Err(ValueError::WrongFormat {
+                        format: format.to_owned(),
+                    })
                 }
             }
         }
@@ -754,6 +777,59 @@ mod tests {
             Err(ValueError::WrongDatatype {
                 actual: Datatype::Color,
                 expected: Datatype::Enum
+            })
+        );
+    }
+
+    #[test]
+    fn property_numeric_format() {
+        let mut property = Property::new("property_id");
+
+        // With no known format or datatype, format parsing fails.
+        assert_eq!(property.range::<i64>(), Err(ValueError::Unknown));
+        assert_eq!(property.range::<f64>(), Err(ValueError::Unknown));
+
+        // An empty format string is invalid.
+        property.format = Some("".to_owned());
+        assert_eq!(
+            property.range::<i64>(),
+            Err(ValueError::WrongFormat {
+                format: "".to_owned()
+            })
+        );
+        assert_eq!(
+            property.range::<f64>(),
+            Err(ValueError::WrongFormat {
+                format: "".to_owned()
+            })
+        );
+
+        // A valid range is parsed correctly.
+        property.format = Some("1:10".to_owned());
+        assert_eq!(property.range(), Ok(1..=10));
+        assert_eq!(property.range(), Ok(1.0..=10.0));
+
+        // A range with a decimal point must be a float.
+        property.format = Some("3.6:4.2".to_owned());
+        assert_eq!(property.range(), Ok(3.6..=4.2));
+        assert_eq!(
+            property.range::<i64>(),
+            Err(ValueError::WrongFormat {
+                format: "3.6:4.2".to_owned()
+            })
+        );
+
+        // With the correct datatype, parsing works.
+        property.datatype = Some(Datatype::Integer);
+        property.format = Some("1:10".to_owned());
+        assert_eq!(property.range(), Ok(1..=10));
+
+        // For the wrong datatype, parsing fails.
+        assert_eq!(
+            property.range::<f64>(),
+            Err(ValueError::WrongDatatype {
+                actual: Datatype::Integer,
+                expected: Datatype::Float
             })
         );
     }
