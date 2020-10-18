@@ -3,11 +3,11 @@
 This is a project for capturing BLE data from a Xiaomi Mijia 2
 hygrometer-thermometer and publishing it. The repository includes:
 
-- A tool to publish readings to an MQTT broker following the [Homie convention](https://homieiot.github.io/).
-- A library for implementing Homie devices.
-- A library for implementing Homie controllers.
-- A library for reading Mijia sensors.
-- Generated bindings for talking to BlueZ on Linux.
+- [A tool](./publish-mqtt) to publish readings to an MQTT broker following the [Homie convention](https://homieiot.github.io/).
+- [A library](./homie-device) for implementing Homie devices.
+- [A library](./homie-controller) for implementing Homie controllers.
+- [A library](./mijia) for reading Mijia sensors.
+- [Generated bindings](./bluez-generated) for talking to BlueZ on Linux.
 
 The project originated from a
 [blog post](https://dev.to/lcsfelix/using-rust-blurz-to-capture-bluetooth-messages-9f-temp-slug-3838740?preview=259783675da772c58dae7c7ec5e06fd3e9746205826a13f6c39fcdefba2e37713113f2b21f1aeade314f556d37c2bc59e2c0b128499dd616d3622327),
@@ -38,11 +38,11 @@ dual licensed as above, without any additional terms or conditions.
 
 ## Setup
 
-To run this code on your raspberry pi, you will need:
+To run this code on your Raspberry Pi, you will need:
 
-- Some Mijia sensors
-- A working rust toolchain and Docker on your laptop.
-- An MQTT server to connect to (test.mosquitto.org works okay for testing, but you will want to deploy your own if you're monitoring your house)
+- Some Xiaomi Mijia version 2 bluetooth temperature and humidity sensors.
+- A working Rust toolchain and Docker on your laptop.
+- An MQTT broker to connect to (test.mosquitto.org works okay for testing, but you will want to deploy your own if you're monitoring your house).
 - Something to read the measurements from MQTT. [Homie Device Discovery](https://rroemhild.github.io/hodd/) is probably easiest for debugging.
 
 After following these steps, you should end up with something that looks like this:
@@ -53,7 +53,7 @@ After following these steps, you should end up with something that looks like th
 
       TARGET_SSH=pi@raspberrypi.local EXAMPLE=list-sensors ./run.sh
 
-- Add each of the sensors to `/home/pi/sensor_names.conf` on the raspberry pi. Each line should be of the form:
+- Add each of the sensors to `/home/pi/sensor_names.conf` on the Raspberry Pi. Each line should be of the form:
 
       A4:C1:38:D7:21:17=Landing
 
@@ -67,6 +67,6 @@ After following these steps, you should end up with something that looks like th
 
   This will start the publisher under systemd and show you the logs.
 
-- It takes a while to connect to all of the sensors and start getting readings. Once everything is running, you can hodd to see your readings.
+- It takes a while to connect to all of the sensors and start getting readings. Once everything is running, you can HoDD to see your readings.
 
-- If everything is visible in hodd then you can add other integrations. Anything that understands Homie should be able to read your sensors. OpenHAB is what we're using, but take a look at the [Homie Implementations page](https://homieiot.github.io/implementations/) and see if anything inspires you.
+- If everything is visible in HoDD then you can add other integrations. Anything that understands Homie should be able to read your sensors. OpenHAB is what we're using, but take a look at the [Homie Implementations page](https://homieiot.github.io/implementations/) and see if anything inspires you.
