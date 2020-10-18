@@ -1,4 +1,3 @@
-use bluez_generated::bluetooth_event::BluetoothEvent;
 use bluez_generated::generated::OrgBluezGattCharacteristic1;
 use core::future::Future;
 use dbus::nonblock::MsgMatch;
@@ -7,8 +6,10 @@ use futures::{Stream, StreamExt};
 use std::time::Duration;
 
 pub mod bluetooth;
+mod bluetooth_event;
 pub mod decode;
 pub use bluetooth::{BluetoothSession, DeviceId, MacAddress};
+use bluetooth_event::BluetoothEvent;
 pub use decode::Readings;
 
 const MIJIA_NAME: &str = "LYWSD03MMC";
