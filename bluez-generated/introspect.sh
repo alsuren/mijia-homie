@@ -9,8 +9,8 @@
 # Set GDBUS='ssh pi@raspberrypi.local gdbus' to use remote gdbus.
 # Set INTROSPECT=0 to skip introspection.
 #
-# Code generation requires dbus-codegen-rust from master.
-# Run `cargo install --git=https://github.com/diwic/dbus-rs` to install.
+# Code generation requires dbus-codegen-rust.
+# Install with `cargo install dbus-codegen`.
 # Set GENERATE=0 to skip code generation.
 
 set -euo pipefail
