@@ -1,16 +1,30 @@
-set -euxo pipefail
+#!/bin/bash
 
-# This relies on a version of cross that can read `context` and `dockerfile`
-# from Cross.toml. You can install it with:
-#
-#     cargo install --git=https://github.com/alsuren/cross --branch=docker-build-context
-#
-TARGET=${TARGET:-armv7-unknown-linux-gnueabihf}
+set -euo pipefail
+
+## Set TARGET_SSH=user@host.local to decide which machine to run on.
 TARGET_SSH=${TARGET_SSH:-pi@raspberrypi.local}
+## Set PROFILE=release for a release build.
 PROFILE=${PROFILE:-debug}
+## Set RUN=0 to push a new binary without running it.
 RUN=${RUN:-1}
+## Set USE_SYSTEMD=0 to run without process supervision (EXAMPLEs never use process supervision).
 USE_SYSTEMD=${USE_SYSTEMD:-1}
+## Set EXAMPLE=list-sensors to run the list-sensors example rather than publish-mqtt.
 EXAMPLE=${EXAMPLE:-}
+
+# Target architecture for Raspbian on a Raspberry Pi.
+# Changing this requires changes to Cross.toml. Send a patch if you want this
+# to be made configurable again.
+TARGET=armv7-unknown-linux-gnueabihf
+
+if [ $# != 0 ]; then
+    echo "ERROR: $0 should be configured via the following environment variables:"
+    echo
+    grep '^## ' "$0" | sed 's/^## /  /'
+    echo
+    exit 1
+fi
 
 if [ $PROFILE = release ]; then
     PROFILE_FLAG=--release
@@ -20,6 +34,8 @@ else
     echo "Invalid profile '$PROFILE'"
     exit 1
 fi
+
+cargo install cross
 
 if [ "${EXAMPLE}" != "" ]; then
     time cross build $PROFILE_FLAG --target $TARGET --example $EXAMPLE
