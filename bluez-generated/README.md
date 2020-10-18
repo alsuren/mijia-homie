@@ -1,5 +1,8 @@
 # Generated bindings for BlueZ
 
+[![crates.io page](https://img.shields.io/crates/v/bluez-generated.svg)](https://crates.io/crates/bluez-generated)
+[![docs.rs page](https://docs.rs/bluez-generated/badge.svg)](https://docs.rs/bluez-generated)
+
 This crate contains async bindings for Bluez.
 
 Bindings are generated from introspection data, using `dbus-codegen`.
