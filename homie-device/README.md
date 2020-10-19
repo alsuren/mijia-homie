@@ -1,5 +1,8 @@
 # Homie device library
 
+[![crates.io page](https://img.shields.io/crates/v/homie-device.svg)](https://crates.io/crates/homie-device)
+[![docs.rs page](https://docs.rs/homie-device/badge.svg)](https://docs.rs/homie-device)
+
 `homie-device` is a library for creating devices implementing the
 [Homie convention](https://homieiot.github.io/) for IoT devices connecting to an MQTT broker.
 
