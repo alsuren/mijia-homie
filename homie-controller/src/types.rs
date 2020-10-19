@@ -128,7 +128,7 @@ impl FromStr for Datatype {
 ///
 /// The `id`, `name` and `datatype` are required, but might not be available immediately when the
 /// property is first discovered. The other attributes are optional.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Property {
     /// The subtopic ID of the property. This is unique per node, and should follow the Homie
     /// [ID format](https://homieiot.github.io/specification/#topic-ids).
@@ -265,7 +265,7 @@ impl Property {
 ///
 /// All attributes are required, but might not be available immediately when the node is first
 /// discovered.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Node {
     /// The subtopic ID of the node. This is unique per device, and should follow the Homie
     /// [ID format](https://homieiot.github.io/specification/#topic-ids).
@@ -353,7 +353,7 @@ impl FromStr for Extension {
 ///
 /// The `id`, `homie_version`, `name` and `state` are required, but might not be available
 /// immediately when the device is first discovered. The `implementation` is optional.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Device {
     /// The subtopic ID of the device. This is unique per Homie base topic, and should follow the
     /// Homie [ID format](https://homieiot.github.io/specification/#topic-ids).
