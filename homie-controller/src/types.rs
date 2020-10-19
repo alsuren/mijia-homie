@@ -298,6 +298,11 @@ impl Node {
         }
     }
 
+    /// Add the given property to the node's set of properties.
+    pub(crate) fn add_property(&mut self, property: Property) {
+        self.properties.insert(property.id.clone(), property);
+    }
+
     /// Returns whether all the required
     /// [attributes](https://homieiot.github.io/specification/#node-attributes) of the node and its
     /// properties are filled in.
@@ -417,6 +422,12 @@ pub struct Device {
 }
 
 impl Device {
+    /// Create a new device with the given ID.
+    ///
+    /// # Arguments
+    /// * `id`: The subtopic ID for the device. This must be unique per Homie base topic, and follow
+    ///   the Homie [ID format](https://homieiot.github.io/specification/#topic-ids).
+    /// * `homie_version`: The version of the Homie convention which the device implements.
     pub(crate) fn new(id: &str, homie_version: &str) -> Device {
         Device {
             id: id.to_owned(),
@@ -439,6 +450,11 @@ impl Device {
             stats_freeheap: None,
             stats_supply: None,
         }
+    }
+
+    /// Add the given node to the devices's set of nodes.
+    pub(crate) fn add_node(&mut self, node: Node) {
+        self.nodes.insert(node.id.clone(), node);
     }
 
     /// Returns whether all the required

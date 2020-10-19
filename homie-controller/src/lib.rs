@@ -352,7 +352,7 @@ impl HomieController {
                 // Add new nodes.
                 for node_id in nodes {
                     if !device.nodes.contains_key(node_id) {
-                        device.nodes.insert(node_id.to_owned(), Node::new(node_id));
+                        device.add_node(Node::new(node_id));
                         let topic = format!("{}/{}/{}/+", self.base_topic, device_id, node_id);
                         topics_to_subscribe.push(topic);
                     }
@@ -391,8 +391,7 @@ impl HomieController {
                 // Add new properties.
                 for property_id in properties {
                     if !node.properties.contains_key(property_id) {
-                        node.properties
-                            .insert(property_id.to_owned(), Property::new(property_id));
+                        node.add_property(Property::new(property_id));
                         let topic = format!(
                             "{}/{}/{}/{}/+",
                             self.base_topic, device_id, node_id, property_id
@@ -752,9 +751,7 @@ mod tests {
         let mut expected_node = Node::new("node_id");
         expected_node.name = Some("Node name".to_owned());
         expected_node.node_type = Some("Node type".to_owned());
-        expected_device
-            .nodes
-            .insert("node_id".to_owned(), expected_node.clone());
+        expected_device.add_node(expected_node.clone());
         assert_eq!(
             controller.devices().get("device_id").unwrap().to_owned(),
             expected_device
@@ -812,12 +809,8 @@ mod tests {
         let mut expected_property = Property::new("property_id");
         expected_property.name = Some("Property name".to_owned());
         expected_property.datatype = Some(Datatype::Integer);
-        expected_node
-            .properties
-            .insert("property_id".to_owned(), expected_property);
-        expected_device
-            .nodes
-            .insert("node_id".to_owned(), expected_node);
+        expected_node.add_property(expected_property);
+        expected_device.add_node(expected_node);
         assert_eq!(
             controller.devices().get("device_id").unwrap().to_owned(),
             expected_device
