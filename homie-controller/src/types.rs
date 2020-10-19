@@ -840,4 +840,63 @@ mod tests {
             })
         );
     }
+
+    #[test]
+    fn property_has_required_attributes() {
+        let mut property = Property::new("property_id");
+        assert_eq!(property.has_required_attributes(), false);
+
+        property.name = Some("Property name".to_owned());
+        assert_eq!(property.has_required_attributes(), false);
+
+        property.datatype = Some(Datatype::Integer);
+        assert_eq!(property.has_required_attributes(), true);
+    }
+
+    /// Construct a minimal `Property` with all the required attributes.
+    fn property_with_required_attributes() -> Property {
+        let mut property = Property::new("property_id");
+        property.name = Some("Property name".to_owned());
+        property.datatype = Some(Datatype::Integer);
+        property
+    }
+
+    #[test]
+    fn node_has_required_attributes() {
+        let mut node = Node::new("node_id");
+        assert_eq!(node.has_required_attributes(), false);
+
+        node.name = Some("Node name".to_owned());
+        assert_eq!(node.has_required_attributes(), false);
+
+        node.node_type = Some("Node type".to_owned());
+        assert_eq!(node.has_required_attributes(), false);
+
+        node.add_property(property_with_required_attributes());
+        assert_eq!(node.has_required_attributes(), true);
+    }
+
+    /// Construct a minimal `Node` with all the required attributes.
+    fn node_with_required_attributes() -> Node {
+        let mut node = Node::new("node_id");
+        node.name = Some("Node name".to_owned());
+        node.node_type = Some("Node type".to_owned());
+        node.add_property(property_with_required_attributes());
+        node
+    }
+
+    #[test]
+    fn device_has_required_attributes() {
+        let mut device = Device::new("device_id", "123");
+        assert_eq!(device.has_required_attributes(), false);
+
+        device.name = Some("Device name".to_owned());
+        assert_eq!(device.has_required_attributes(), false);
+
+        device.state = State::Init;
+        assert_eq!(device.has_required_attributes(), true);
+
+        device.add_node(node_with_required_attributes());
+        assert_eq!(device.has_required_attributes(), true);
+    }
 }
