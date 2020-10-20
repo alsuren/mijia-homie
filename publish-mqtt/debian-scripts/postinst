@@ -1,0 +1,10 @@
+#!/bin/sh
+
+set -e
+
+if [ "$1" = "configure" ] ; then
+  touch /etc/publish-mqtt/sensor_names.conf
+  adduser --system --home /etc/publish-mqtt publish-mqtt
+fi
+
+#DEBHELPER#
