@@ -668,12 +668,73 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn controller_start() -> Result<(), Box<dyn std::error::Error>> {
+    async fn subscribes_to_things() -> Result<(), Box<dyn std::error::Error>> {
         let (controller, requests_rx) = make_test_controller();
 
         // Start discovering.
         controller.start().await?;
         expect_subscriptions(&requests_rx, &["base_topic/+/$homie"]);
+
+        // Discover a new device.
+        publish(&controller, "base_topic/device_id/$homie", "4.0").await?;
+        expect_subscriptions(
+            &requests_rx,
+            &[
+                "base_topic/device_id/+",
+                "base_topic/device_id/$fw/+",
+                "base_topic/device_id/$stats/+",
+            ],
+        );
+        publish(&controller, "base_topic/device_id/$name", "Device name").await?;
+        publish(&controller, "base_topic/device_id/$state", "ready").await?;
+        // A node on the device.
+        publish(&controller, "base_topic/device_id/$nodes", "node_id").await?;
+        expect_subscriptions(&requests_rx, &["base_topic/device_id/node_id/+"]);
+        publish(
+            &controller,
+            "base_topic/device_id/node_id/$name",
+            "Node name",
+        )
+        .await?;
+        publish(
+            &controller,
+            "base_topic/device_id/node_id/$type",
+            "Node type",
+        )
+        .await?;
+        publish(
+            &controller,
+            "base_topic/device_id/node_id/$properties",
+            "property_id",
+        )
+        .await?;
+        expect_subscriptions(
+            &requests_rx,
+            &["base_topic/device_id/node_id/property_id/+"],
+        );
+        publish(
+            &controller,
+            "base_topic/device_id/node_id/property_id/$name",
+            "Property name",
+        )
+        .await?;
+        publish(
+            &controller,
+            "base_topic/device_id/node_id/property_id/$datatype",
+            "integer",
+        )
+        .await?;
+
+        // Assert no more subscriptions
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn emits_appropriate_events() -> Result<(), Box<dyn std::error::Error>> {
+        let (controller, _requests_rx) = make_test_controller();
+
+        // Start discovering.
+        controller.start().await?;
 
         // Discover a new device.
         assert_eq!(
@@ -682,14 +743,6 @@ mod tests {
                 device_id: "device_id".to_owned(),
                 has_required_attributes: false
             })
-        );
-        expect_subscriptions(
-            &requests_rx,
-            &[
-                "base_topic/device_id/+",
-                "base_topic/device_id/$fw/+",
-                "base_topic/device_id/$stats/+",
-            ],
         );
         assert_eq!(
             publish(&controller, "base_topic/device_id/$name", "Device name").await?,
@@ -721,7 +774,6 @@ mod tests {
                 has_required_attributes: false
             })
         );
-        expect_subscriptions(&requests_rx, &["base_topic/device_id/node_id/+"]);
         assert_eq!(
             publish(
                 &controller,
@@ -748,15 +800,6 @@ mod tests {
                 has_required_attributes: false
             })
         );
-        let mut expected_node = Node::new("node_id");
-        expected_node.name = Some("Node name".to_owned());
-        expected_node.node_type = Some("Node type".to_owned());
-        expected_device.add_node(expected_node.clone());
-        assert_eq!(
-            controller.devices().get("device_id").unwrap().to_owned(),
-            expected_device
-        );
-
         // A property on the node.
         assert_eq!(
             publish(
@@ -770,10 +813,6 @@ mod tests {
                 node_id: "node_id".to_owned(),
                 has_required_attributes: false
             })
-        );
-        expect_subscriptions(
-            &requests_rx,
-            &["base_topic/device_id/node_id/property_id/+"],
         );
         assert_eq!(
             publish(
@@ -802,15 +841,6 @@ mod tests {
                 property_id: "property_id".to_owned(),
                 has_required_attributes: true
             })
-        );
-        let mut expected_property = Property::new("property_id");
-        expected_property.name = Some("Property name".to_owned());
-        expected_property.datatype = Some(Datatype::Integer);
-        expected_node.add_property(expected_property);
-        expected_device.add_node(expected_node);
-        assert_eq!(
-            controller.devices().get("device_id").unwrap().to_owned(),
-            expected_device
         );
 
         Ok(())
