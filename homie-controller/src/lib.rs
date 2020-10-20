@@ -10,7 +10,6 @@ use std::str;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use thiserror::Error;
-use tokio::task::JoinError;
 
 mod types;
 pub use types::{Datatype, Device, Extension, Node, Property, State};
@@ -30,8 +29,6 @@ pub enum PollError {
     Client(#[from] ClientError),
     #[error("{0}")]
     Connection(#[from] ConnectionError),
-    #[error("Task failed: {0}")]
-    Join(#[from] JoinError),
     #[error("Internal error: {0}")]
     Internal(&'static str),
 }

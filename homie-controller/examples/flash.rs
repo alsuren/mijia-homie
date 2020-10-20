@@ -3,6 +3,7 @@
 use futures::FutureExt;
 use homie_controller::{Datatype, Event, HomieController, HomieEventLoop, PollError};
 use rumqttc::MqttOptions;
+use std::error::Error;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::task::{self, JoinHandle};
@@ -34,7 +35,7 @@ fn spawn_poll_loop(
 }
 
 #[tokio::main]
-async fn main() -> Result<(), PollError> {
+async fn main() -> Result<(), Box<dyn Error>> {
     pretty_env_logger::init();
 
     let mqttoptions = MqttOptions::new("homie_controller", "test.mosquitto.org", 1883);
@@ -65,7 +66,7 @@ async fn main() -> Result<(), PollError> {
 
     controller.disconnect().await?;
 
-    try_join!(handle.map(|res| Ok::<_, PollError>(res??)))?;
+    try_join!(handle.map(|res| Ok::<_, Box<dyn Error>>(res??)))?;
 
     Ok(())
 }
