@@ -874,6 +874,9 @@ mod tests {
 
         node.add_property(property_with_required_attributes());
         assert_eq!(node.has_required_attributes(), true);
+
+        node.add_property(Property::new("property_without_required_attributes"));
+        assert_eq!(node.has_required_attributes(), false);
     }
 
     /// Construct a minimal `Node` with all the required attributes.
@@ -898,5 +901,8 @@ mod tests {
 
         device.add_node(node_with_required_attributes());
         assert_eq!(device.has_required_attributes(), true);
+
+        device.add_node(Node::new("node_without_required_attributes"));
+        assert_eq!(device.has_required_attributes(), false);
     }
 }
