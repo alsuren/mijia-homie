@@ -635,11 +635,21 @@ mod tests {
         (controller, requests_rx)
     }
 
-    fn expect_subscribe(request: Request, expected: Subscribe) {
-        if let Request::Subscribe(actual) = request {
-            assert_eq!(actual, expected);
-        } else {
-            panic!("Expected subscribe but got {:?}", request);
+    fn expect_subscriptions(requests_rx: &Receiver<Request>, subscription_topics: &[&str]) {
+        let requests: Vec<_> = (0..subscription_topics.len())
+            .map(|_| {
+                let request = requests_rx.try_recv().unwrap();
+                if let Request::Subscribe(subscribe) = request {
+                    subscribe
+                } else {
+                    panic!("Expected subscribe but got {:?}", request);
+                }
+            })
+            .collect();
+
+        for topic in subscription_topics {
+            let expected = Subscribe::new(*topic, QoS::AtLeastOnce);
+            assert!(requests.contains(&expected));
         }
     }
 
@@ -663,10 +673,7 @@ mod tests {
 
         // Start discovering.
         controller.start().await?;
-        expect_subscribe(
-            requests_rx.recv().await?,
-            Subscribe::new("base_topic/+/$homie", QoS::AtLeastOnce),
-        );
+        expect_subscriptions(&requests_rx, &["base_topic/+/$homie"]);
 
         // Discover a new device.
         assert_eq!(
@@ -676,17 +683,13 @@ mod tests {
                 has_required_attributes: false
             })
         );
-        expect_subscribe(
-            requests_rx.recv().await?,
-            Subscribe::new("base_topic/device_id/+", QoS::AtLeastOnce),
-        );
-        expect_subscribe(
-            requests_rx.recv().await?,
-            Subscribe::new("base_topic/device_id/$fw/+", QoS::AtLeastOnce),
-        );
-        expect_subscribe(
-            requests_rx.recv().await?,
-            Subscribe::new("base_topic/device_id/$stats/+", QoS::AtLeastOnce),
+        expect_subscriptions(
+            &requests_rx,
+            &[
+                "base_topic/device_id/+",
+                "base_topic/device_id/$fw/+",
+                "base_topic/device_id/$stats/+",
+            ],
         );
         assert_eq!(
             publish(&controller, "base_topic/device_id/$name", "Device name").await?,
@@ -718,10 +721,7 @@ mod tests {
                 has_required_attributes: false
             })
         );
-        expect_subscribe(
-            requests_rx.recv().await?,
-            Subscribe::new("base_topic/device_id/node_id/+", QoS::AtLeastOnce),
-        );
+        expect_subscriptions(&requests_rx, &["base_topic/device_id/node_id/+"]);
         assert_eq!(
             publish(
                 &controller,
@@ -771,12 +771,9 @@ mod tests {
                 has_required_attributes: false
             })
         );
-        expect_subscribe(
-            requests_rx.recv().await?,
-            Subscribe::new(
-                "base_topic/device_id/node_id/property_id/+",
-                QoS::AtLeastOnce,
-            ),
+        expect_subscriptions(
+            &requests_rx,
+            &["base_topic/device_id/node_id/property_id/+"],
         );
         assert_eq!(
             publish(
