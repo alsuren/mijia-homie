@@ -815,4 +815,82 @@ mod tests {
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn constructs_device_tree() -> Result<(), Box<dyn std::error::Error>> {
+        let (controller, _requests_rx) = make_test_controller();
+
+        // Discover a new device with property with nodes.
+
+        controller.start().await?;
+        publish(&controller, "base_topic/device_id/$homie", "4.0").await?;
+        publish(&controller, "base_topic/device_id/$name", "Device name").await?;
+        publish(&controller, "base_topic/device_id/$state", "ready").await?;
+
+        publish(&controller, "base_topic/device_id/$nodes", "node_id").await?;
+        publish(
+            &controller,
+            "base_topic/device_id/node_id/$name",
+            "Node name",
+        )
+        .await?;
+        publish(
+            &controller,
+            "base_topic/device_id/node_id/$type",
+            "Node type",
+        )
+        .await?;
+        publish(
+            &controller,
+            "base_topic/device_id/node_id/$properties",
+            "property_id",
+        )
+        .await?;
+        publish(
+            &controller,
+            "base_topic/device_id/node_id/property_id/$name",
+            "Property name",
+        )
+        .await?;
+        publish(
+            &controller,
+            "base_topic/device_id/node_id/property_id/$datatype",
+            "integer",
+        )
+        .await?;
+
+        // Construct the fixture
+
+        let expected_property = Property {
+            name: Some("Property name".to_owned()),
+            datatype: Some(Datatype::Integer),
+            ..Property::new("property_id")
+        };
+
+        // We could do something like this here?
+        //     ..Node::with_property("node_id", expected_property)
+        let mut expected_node = Node {
+            name: Some("Node name".to_owned()),
+            node_type: Some("Node type".to_owned()),
+            ..Node::new("node_id")
+        };
+        expected_node.add_property(expected_property);
+
+        // Similarly, ..Device::with_node("device_id", "4.0", expected_node)
+        let mut expected_device = Device {
+            name: Some("Device name".to_owned()),
+            state: State::Ready,
+            ..Device::new("device_id", "4.0")
+        };
+        // Maybe we don't need two nodes?
+        expected_device.add_node(expected_node.clone());
+        expected_device.add_node(expected_node);
+
+        assert_eq!(
+            controller.devices().get("device_id").unwrap().to_owned(),
+            expected_device
+        );
+
+        Ok(())
+    }
 }
