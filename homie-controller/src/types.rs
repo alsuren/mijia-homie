@@ -75,11 +75,19 @@ impl Display for State {
 /// The data type of a Homie property.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Datatype {
+    /// A [64-bit signed integer](https://homieiot.github.io/specification/#integer).
     Integer,
+    /// A [64-bit floating-point number](https://homieiot.github.io/specification/#float).
     Float,
+    /// A [boolean value](https://homieiot.github.io/specification/#boolean).
     Boolean,
+    /// A [UTF-8 encoded string](https://homieiot.github.io/specification/#string).
     String,
+    /// An [enum value](https://homieiot.github.io/specification/#enum) from a set of possible
+    /// values specified by the property format.
     Enum,
+    /// An RGB or HSV [color](https://homieiot.github.io/specification/#color), depending on the
+    /// property format.
     Color,
 }
 
@@ -157,9 +165,16 @@ pub struct Property {
 
     /// The format of the property, if any. This should be specified if the datatype is `Enum` or
     /// `Color`, and may be specified if the datatype is `Integer` or `Float`.
+    ///
+    /// This field holds the raw string received from the device; use
+    /// [color_format](#method.color_format), [enum_values](#method.enum_values) or
+    /// [range](#method.range) to parse it according to the datatype of the property.
     pub format: Option<String>,
 
     /// The current value of the property, if known. This may change frequently.
+    ///
+    /// This field holds the raw string received from the device; use [value](#method.value) to
+    /// parse it according to the datatype of the property.
     pub value: Option<String>,
 }
 
@@ -189,6 +204,9 @@ impl Property {
         self.name.is_some() && self.datatype.is_some()
     }
 
+    /// The value of the property, parsed as the appropriate Homie `Value` type. This will return
+    /// `WrongDatatype` if you try to parse it as a type which doesn't match the datatype declared
+    /// by the property.
     pub fn value<T: Value>(&self) -> Result<T, ValueError> {
         T::valid_for(self.datatype, &self.format)?;
 
@@ -238,6 +256,8 @@ impl Property {
         }
     }
 
+    /// If the dataype of the property is `Integer` or `Float`, gets the allowed range of values (if
+    /// any is declared by the device).
     pub fn range<T: Value + Copy>(&self) -> Result<RangeInclusive<T>, ValueError> {
         T::valid_for(self.datatype, &self.format)?;
 

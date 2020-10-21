@@ -4,19 +4,36 @@ use std::num::ParseIntError;
 use std::str::FromStr;
 use thiserror::Error;
 
+/// An error encountered while parsing the value or format of a property.
 #[derive(Clone, Debug, Error, Eq, PartialEq)]
 pub enum ValueError {
+    /// The value of the property or attribute is not yet known, or not set by the device.
     #[error("Value not yet known.")]
     Unknown,
+    /// The method call expected the property to have a particular datatype, but the datatype sent
+    /// by the device was something different.
     #[error("Expected value of type {expected} but was {actual}.")]
     WrongDatatype {
+        /// The datatype expected by the method call.
         expected: Datatype,
+        /// The actual datatype of the property, as sent by the device.
         actual: Datatype,
     },
+    /// The format of the property couldn't be parsed or didn't match what was expected by the
+    /// method call.
     #[error("Invalid or unexpected format {format}.")]
-    WrongFormat { format: String },
+    WrongFormat {
+        /// The format string of the property.
+        format: String,
+    },
+    /// The value of the property couldn't be parsed as the expected type.
     #[error("Parsing {value} as datatype {datatype} failed.")]
-    ParseFailed { value: String, datatype: Datatype },
+    ParseFailed {
+        /// The string value of the property.
+        value: String,
+        /// The datatype as which the value was attempted to be parsed.
+        datatype: Datatype,
+    },
 }
 
 /// The value of a Homie property. This has implementations corresponding to the possible property datatypes.

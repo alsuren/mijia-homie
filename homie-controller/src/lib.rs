@@ -17,16 +17,18 @@ use types::{ParseDatatypeError, ParseExtensionError, ParseStateError};
 
 mod values;
 pub use values::{
-    ColorFormat, ColorHSV, ColorRGB, EnumValue, ParseColorError, ParseEnumError, Value,
+    ColorFormat, ColorHSV, ColorRGB, EnumValue, ParseColorError, ParseEnumError, Value, ValueError,
 };
 
 const REQUESTS_CAP: usize = 1000;
 
-/// Error type for futures representing tasks spawned by this crate.
+/// An error encountered while polling a `HomieController`.
 #[derive(Error, Debug)]
 pub enum PollError {
+    /// Error sending to the MQTT broker.
     #[error("{0}")]
     Client(#[from] ClientError),
+    /// Error connecting to or communicating with the MQTT broker.
     #[error("{0}")]
     Connection(#[from] ConnectionError),
 }
