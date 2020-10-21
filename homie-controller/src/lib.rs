@@ -667,6 +667,20 @@ mod tests {
             .await
     }
 
+    fn property_set(properties: Vec<Property>) -> HashMap<String, Property> {
+        properties
+            .into_iter()
+            .map(|property| (property.id.clone(), property))
+            .collect()
+    }
+
+    fn node_set(nodes: Vec<Node>) -> HashMap<String, Node> {
+        nodes
+            .into_iter()
+            .map(|node| (node.id.clone(), node))
+            .collect()
+    }
+
     #[tokio::test]
     async fn subscribes_to_things() -> Result<(), Box<dyn std::error::Error>> {
         let (controller, requests_rx) = make_test_controller();
@@ -830,14 +844,14 @@ mod tests {
     async fn constructs_device_tree() -> Result<(), Box<dyn std::error::Error>> {
         let (controller, _requests_rx) = make_test_controller();
 
-        // Discover a new device with property with nodes.
+        // Discover a new device with a node with a property.
 
         controller.start().await?;
         publish(&controller, "base_topic/device_id/$homie", "4.0").await?;
         publish(&controller, "base_topic/device_id/$name", "Device name").await?;
         publish(&controller, "base_topic/device_id/$state", "ready").await?;
-
         publish(&controller, "base_topic/device_id/$nodes", "node_id").await?;
+
         publish(
             &controller,
             "base_topic/device_id/node_id/$name",
@@ -856,6 +870,7 @@ mod tests {
             "property_id",
         )
         .await?;
+
         publish(
             &controller,
             "base_topic/device_id/node_id/property_id/$name",
@@ -869,32 +884,23 @@ mod tests {
         )
         .await?;
 
-        // Construct the fixture
-
         let expected_property = Property {
             name: Some("Property name".to_owned()),
             datatype: Some(Datatype::Integer),
             ..Property::new("property_id")
         };
-
-        // We could do something like this here?
-        //     ..Node::with_property("node_id", expected_property)
-        let mut expected_node = Node {
+        let expected_node = Node {
             name: Some("Node name".to_owned()),
             node_type: Some("Node type".to_owned()),
+            properties: property_set(vec![expected_property]),
             ..Node::new("node_id")
         };
-        expected_node.add_property(expected_property);
-
-        // Similarly, ..Device::with_node("device_id", "4.0", expected_node)
-        let mut expected_device = Device {
+        let expected_device = Device {
             name: Some("Device name".to_owned()),
             state: State::Ready,
+            nodes: node_set(vec![expected_node]),
             ..Device::new("device_id", "4.0")
         };
-        // Maybe we don't need two nodes?
-        expected_device.add_node(expected_node.clone());
-        expected_device.add_node(expected_node);
 
         assert_eq!(
             controller.devices().get("device_id").unwrap().to_owned(),
