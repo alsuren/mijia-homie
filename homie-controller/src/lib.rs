@@ -352,7 +352,7 @@ impl HomieController {
                 // Add new nodes.
                 for node_id in nodes {
                     if !device.nodes.contains_key(node_id) {
-                        device.nodes.insert(node_id.to_owned(), Node::new(node_id));
+                        device.add_node(Node::new(node_id));
                         let topic = format!("{}/{}/{}/+", self.base_topic, device_id, node_id);
                         topics_to_subscribe.push(topic);
                     }
@@ -391,8 +391,7 @@ impl HomieController {
                 // Add new properties.
                 for property_id in properties {
                     if !node.properties.contains_key(property_id) {
-                        node.properties
-                            .insert(property_id.to_owned(), Property::new(property_id));
+                        node.add_property(Property::new(property_id));
                         let topic = format!(
                             "{}/{}/{}/{}/+",
                             self.base_topic, device_id, node_id, property_id
@@ -615,5 +614,205 @@ impl From<ParseIntError> for HandleError {
 impl From<ParseFloatError> for HandleError {
     fn from(e: ParseFloatError) -> Self {
         HandleError::Warning(format!("Invalid float: {}", e))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use async_channel::Receiver;
+    use rumqttc::{Packet, Request, Subscribe};
+
+    fn make_test_controller() -> (HomieController, Receiver<Request>) {
+        let (requests_tx, requests_rx) = async_channel::unbounded();
+        let (cancel_tx, _cancel_rx) = async_channel::unbounded();
+        let mqtt_client = AsyncClient::from_senders(requests_tx, cancel_tx);
+        let controller = HomieController {
+            base_topic: "base_topic".to_owned(),
+            mqtt_client,
+            devices: Mutex::new(Arc::new(HashMap::new())),
+        };
+        (controller, requests_rx)
+    }
+
+    fn expect_subscriptions(requests_rx: &Receiver<Request>, subscription_topics: &[&str]) {
+        let requests: Vec<_> = (0..subscription_topics.len())
+            .map(|_| {
+                let request = requests_rx.try_recv().unwrap();
+                if let Request::Subscribe(subscribe) = request {
+                    subscribe
+                } else {
+                    panic!("Expected subscribe but got {:?}", request);
+                }
+            })
+            .collect();
+
+        for topic in subscription_topics {
+            let expected = Subscribe::new(*topic, QoS::AtLeastOnce);
+            assert!(requests.contains(&expected));
+        }
+    }
+
+    async fn publish(
+        controller: &HomieController,
+        topic: &str,
+        payload: &str,
+    ) -> Result<Option<Event>, PollError> {
+        controller
+            .handle_event(Packet::Publish(Publish::new(
+                topic,
+                QoS::AtLeastOnce,
+                payload,
+            )))
+            .await
+    }
+
+    #[tokio::test]
+    async fn controller_start() -> Result<(), Box<dyn std::error::Error>> {
+        let (controller, requests_rx) = make_test_controller();
+
+        // Start discovering.
+        controller.start().await?;
+        expect_subscriptions(&requests_rx, &["base_topic/+/$homie"]);
+
+        // Discover a new device.
+        assert_eq!(
+            publish(&controller, "base_topic/device_id/$homie", "4.0").await?,
+            Some(Event::DeviceUpdated {
+                device_id: "device_id".to_owned(),
+                has_required_attributes: false
+            })
+        );
+        expect_subscriptions(
+            &requests_rx,
+            &[
+                "base_topic/device_id/+",
+                "base_topic/device_id/$fw/+",
+                "base_topic/device_id/$stats/+",
+            ],
+        );
+        assert_eq!(
+            publish(&controller, "base_topic/device_id/$name", "Device name").await?,
+            Some(Event::DeviceUpdated {
+                device_id: "device_id".to_owned(),
+                has_required_attributes: false
+            })
+        );
+        assert_eq!(
+            publish(&controller, "base_topic/device_id/$state", "ready").await?,
+            Some(Event::DeviceUpdated {
+                device_id: "device_id".to_owned(),
+                has_required_attributes: true
+            })
+        );
+        let mut expected_device = Device::new("device_id", "4.0");
+        expected_device.state = State::Ready;
+        expected_device.name = Some("Device name".to_owned());
+        assert_eq!(
+            controller.devices().get("device_id").unwrap().to_owned(),
+            expected_device
+        );
+
+        // A node on the device.
+        assert_eq!(
+            publish(&controller, "base_topic/device_id/$nodes", "node_id").await?,
+            Some(Event::DeviceUpdated {
+                device_id: "device_id".to_owned(),
+                has_required_attributes: false
+            })
+        );
+        expect_subscriptions(&requests_rx, &["base_topic/device_id/node_id/+"]);
+        assert_eq!(
+            publish(
+                &controller,
+                "base_topic/device_id/node_id/$name",
+                "Node name"
+            )
+            .await?,
+            Some(Event::NodeUpdated {
+                device_id: "device_id".to_owned(),
+                node_id: "node_id".to_owned(),
+                has_required_attributes: false
+            })
+        );
+        assert_eq!(
+            publish(
+                &controller,
+                "base_topic/device_id/node_id/$type",
+                "Node type"
+            )
+            .await?,
+            Some(Event::NodeUpdated {
+                device_id: "device_id".to_owned(),
+                node_id: "node_id".to_owned(),
+                has_required_attributes: false
+            })
+        );
+        let mut expected_node = Node::new("node_id");
+        expected_node.name = Some("Node name".to_owned());
+        expected_node.node_type = Some("Node type".to_owned());
+        expected_device.add_node(expected_node.clone());
+        assert_eq!(
+            controller.devices().get("device_id").unwrap().to_owned(),
+            expected_device
+        );
+
+        // A property on the node.
+        assert_eq!(
+            publish(
+                &controller,
+                "base_topic/device_id/node_id/$properties",
+                "property_id"
+            )
+            .await?,
+            Some(Event::NodeUpdated {
+                device_id: "device_id".to_owned(),
+                node_id: "node_id".to_owned(),
+                has_required_attributes: false
+            })
+        );
+        expect_subscriptions(
+            &requests_rx,
+            &["base_topic/device_id/node_id/property_id/+"],
+        );
+        assert_eq!(
+            publish(
+                &controller,
+                "base_topic/device_id/node_id/property_id/$name",
+                "Property name"
+            )
+            .await?,
+            Some(Event::PropertyUpdated {
+                device_id: "device_id".to_owned(),
+                node_id: "node_id".to_owned(),
+                property_id: "property_id".to_owned(),
+                has_required_attributes: false
+            })
+        );
+        assert_eq!(
+            publish(
+                &controller,
+                "base_topic/device_id/node_id/property_id/$datatype",
+                "integer"
+            )
+            .await?,
+            Some(Event::PropertyUpdated {
+                device_id: "device_id".to_owned(),
+                node_id: "node_id".to_owned(),
+                property_id: "property_id".to_owned(),
+                has_required_attributes: true
+            })
+        );
+        let mut expected_property = Property::new("property_id");
+        expected_property.name = Some("Property name".to_owned());
+        expected_property.datatype = Some(Datatype::Integer);
+        expected_node.add_property(expected_property);
+        expected_device.add_node(expected_node);
+        assert_eq!(
+            controller.devices().get("device_id").unwrap().to_owned(),
+            expected_device
+        );
+
+        Ok(())
     }
 }

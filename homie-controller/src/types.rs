@@ -128,7 +128,7 @@ impl FromStr for Datatype {
 ///
 /// The `id`, `name` and `datatype` are required, but might not be available immediately when the
 /// property is first discovered. The other attributes are optional.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Property {
     /// The subtopic ID of the property. This is unique per node, and should follow the Homie
     /// [ID format](https://homieiot.github.io/specification/#topic-ids).
@@ -265,7 +265,7 @@ impl Property {
 ///
 /// All attributes are required, but might not be available immediately when the node is first
 /// discovered.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Node {
     /// The subtopic ID of the node. This is unique per device, and should follow the Homie
     /// [ID format](https://homieiot.github.io/specification/#topic-ids).
@@ -296,6 +296,11 @@ impl Node {
             node_type: None,
             properties: HashMap::new(),
         }
+    }
+
+    /// Add the given property to the node's set of properties.
+    pub(crate) fn add_property(&mut self, property: Property) {
+        self.properties.insert(property.id.clone(), property);
     }
 
     /// Returns whether all the required
@@ -353,7 +358,7 @@ impl FromStr for Extension {
 ///
 /// The `id`, `homie_version`, `name` and `state` are required, but might not be available
 /// immediately when the device is first discovered. The `implementation` is optional.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Device {
     /// The subtopic ID of the device. This is unique per Homie base topic, and should follow the
     /// Homie [ID format](https://homieiot.github.io/specification/#topic-ids).
@@ -417,6 +422,12 @@ pub struct Device {
 }
 
 impl Device {
+    /// Create a new device with the given ID.
+    ///
+    /// # Arguments
+    /// * `id`: The subtopic ID for the device. This must be unique per Homie base topic, and follow
+    ///   the Homie [ID format](https://homieiot.github.io/specification/#topic-ids).
+    /// * `homie_version`: The version of the Homie convention which the device implements.
     pub(crate) fn new(id: &str, homie_version: &str) -> Device {
         Device {
             id: id.to_owned(),
@@ -439,6 +450,11 @@ impl Device {
             stats_freeheap: None,
             stats_supply: None,
         }
+    }
+
+    /// Add the given node to the devices's set of nodes.
+    pub(crate) fn add_node(&mut self, node: Node) {
+        self.nodes.insert(node.id.clone(), node);
     }
 
     /// Returns whether all the required
@@ -823,5 +839,70 @@ mod tests {
                 expected: Datatype::Float
             })
         );
+    }
+
+    #[test]
+    fn property_has_required_attributes() {
+        let mut property = Property::new("property_id");
+        assert_eq!(property.has_required_attributes(), false);
+
+        property.name = Some("Property name".to_owned());
+        assert_eq!(property.has_required_attributes(), false);
+
+        property.datatype = Some(Datatype::Integer);
+        assert_eq!(property.has_required_attributes(), true);
+    }
+
+    /// Construct a minimal `Property` with all the required attributes.
+    fn property_with_required_attributes() -> Property {
+        let mut property = Property::new("property_id");
+        property.name = Some("Property name".to_owned());
+        property.datatype = Some(Datatype::Integer);
+        property
+    }
+
+    #[test]
+    fn node_has_required_attributes() {
+        let mut node = Node::new("node_id");
+        assert_eq!(node.has_required_attributes(), false);
+
+        node.name = Some("Node name".to_owned());
+        assert_eq!(node.has_required_attributes(), false);
+
+        node.node_type = Some("Node type".to_owned());
+        assert_eq!(node.has_required_attributes(), false);
+
+        node.add_property(property_with_required_attributes());
+        assert_eq!(node.has_required_attributes(), true);
+
+        node.add_property(Property::new("property_without_required_attributes"));
+        assert_eq!(node.has_required_attributes(), false);
+    }
+
+    /// Construct a minimal `Node` with all the required attributes.
+    fn node_with_required_attributes() -> Node {
+        let mut node = Node::new("node_id");
+        node.name = Some("Node name".to_owned());
+        node.node_type = Some("Node type".to_owned());
+        node.add_property(property_with_required_attributes());
+        node
+    }
+
+    #[test]
+    fn device_has_required_attributes() {
+        let mut device = Device::new("device_id", "123");
+        assert_eq!(device.has_required_attributes(), false);
+
+        device.name = Some("Device name".to_owned());
+        assert_eq!(device.has_required_attributes(), false);
+
+        device.state = State::Init;
+        assert_eq!(device.has_required_attributes(), true);
+
+        device.add_node(node_with_required_attributes());
+        assert_eq!(device.has_required_attributes(), true);
+
+        device.add_node(Node::new("node_without_required_attributes"));
+        assert_eq!(device.has_required_attributes(), false);
     }
 }
