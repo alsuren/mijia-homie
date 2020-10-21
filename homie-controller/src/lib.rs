@@ -685,23 +685,12 @@ mod tests {
                 "base_topic/device_id/$stats/+",
             ],
         );
-        publish(&controller, "base_topic/device_id/$name", "Device name").await?;
-        publish(&controller, "base_topic/device_id/$state", "ready").await?;
-        // A node on the device.
+
+        // Discover a node on the device.
         publish(&controller, "base_topic/device_id/$nodes", "node_id").await?;
         expect_subscriptions(&requests_rx, &["base_topic/device_id/node_id/+"]);
-        publish(
-            &controller,
-            "base_topic/device_id/node_id/$name",
-            "Node name",
-        )
-        .await?;
-        publish(
-            &controller,
-            "base_topic/device_id/node_id/$type",
-            "Node type",
-        )
-        .await?;
+
+        // Discover a property on the node.
         publish(
             &controller,
             "base_topic/device_id/node_id/$properties",
@@ -712,20 +701,10 @@ mod tests {
             &requests_rx,
             &["base_topic/device_id/node_id/property_id/+"],
         );
-        publish(
-            &controller,
-            "base_topic/device_id/node_id/property_id/$name",
-            "Property name",
-        )
-        .await?;
-        publish(
-            &controller,
-            "base_topic/device_id/node_id/property_id/$datatype",
-            "integer",
-        )
-        .await?;
 
-        // Assert no more subscriptions
+        // No more subscriptions.
+        assert!(requests_rx.is_empty());
+
         Ok(())
     }
 
@@ -800,6 +779,7 @@ mod tests {
                 has_required_attributes: false
             })
         );
+
         // A property on the node.
         assert_eq!(
             publish(
