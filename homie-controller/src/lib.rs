@@ -29,8 +29,6 @@ pub enum PollError {
     Client(#[from] ClientError),
     #[error("{0}")]
     Connection(#[from] ConnectionError),
-    #[error("Internal error: {0}")]
-    Internal(&'static str),
 }
 
 /// An event from a Homie device, either because of a property change or because something new has
