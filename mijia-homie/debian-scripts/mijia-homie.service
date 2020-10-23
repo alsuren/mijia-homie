@@ -1,14 +1,14 @@
 [Unit]
-Description=publish-mqtt - send temperature readings to mqtt
+Description=Bluetooth temperature sensor to MQTT publisher
 After=network.target
 
 [Service]
 Type=simple
-User=pi
-WorkingDirectory=/home/pi
+User=mijia-homie
+WorkingDirectory=/etc/mijia-homie
 Environment=RUST_BACKTRACE=1
 Environment=RUST_LIB_BACKTRACE=1
-ExecStart=/home/pi/publish-mqtt
+ExecStart=/usr/bin/mijia-homie
 Restart=always
 
 [Install]

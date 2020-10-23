@@ -1,5 +1,5 @@
 [package]
-name = "publish-mqtt"
+name = "mijia-homie"
 version = "0.1.0"
 authors = ["David Laban <alsuren@gmail.com>", "Andrew Walbran <qwandor@google.com>"]
 edition = "2018"
@@ -31,10 +31,10 @@ tokio = "0.2.22"
 depends = "$auto, adduser, bluez"
 section = "net"
 maintainer-scripts = "debian-scripts"
-conf-files = ["/etc/publish-mqtt/.env"]
+conf-files = ["/etc/mijia-homie/.env"]
 assets = [
-	["target/release/publish-mqtt", "usr/bin/", "755"],
-	[".env.example", "/etc/publish-mqtt/.env", "644"],
+	["target/release/mijia-homie", "usr/bin/", "755"],
+	[".env.example", "/etc/mijia-homie/.env", "644"],
 ]
 
 # This section needs to be here even if it's empty, for the systemd integration to work.

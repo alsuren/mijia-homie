@@ -1,0 +1,10 @@
+#!/bin/sh
+
+set -e
+
+if [ "$1" = "configure" ] ; then
+  touch /etc/mijia-homie/sensor_names.conf
+  adduser --system --home /etc/mijia-homie mijia-homie
+fi
+
+#DEBHELPER#

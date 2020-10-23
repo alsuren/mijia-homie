@@ -5,5 +5,5 @@ members = [
     "homie-controller",
     "homie-device",
     "mijia",
-    "publish-mqtt",
+    "mijia-homie",
 ]
