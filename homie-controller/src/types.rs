@@ -86,8 +86,9 @@ pub enum Datatype {
     /// An [enum value](https://homieiot.github.io/specification/#enum) from a set of possible
     /// values specified by the property format.
     Enum,
-    /// An RGB or HSV [color](https://homieiot.github.io/specification/#color), depending on the
-    /// property format.
+    /// An [RGB](enum.ColorFormat.html#variant.RGB) or [HSV](enum.ColorFormat.html#variant.HSV)
+    /// [color](https://homieiot.github.io/specification/#color), depending on the property
+    /// [format](struct.Property.html#method.color_format).
     Color,
 }
 
@@ -166,14 +167,14 @@ pub struct Property {
     /// The format of the property, if any. This should be specified if the datatype is `Enum` or
     /// `Color`, and may be specified if the datatype is `Integer` or `Float`.
     ///
-    /// This field holds the raw string received from the device; use
+    /// This field holds the raw string received from the device. Use
     /// [color_format](#method.color_format), [enum_values](#method.enum_values) or
     /// [range](#method.range) to parse it according to the datatype of the property.
     pub format: Option<String>,
 
     /// The current value of the property, if known. This may change frequently.
     ///
-    /// This field holds the raw string received from the device; use [value](#method.value) to
+    /// This field holds the raw string received from the device. Use [value](#method.value) to
     /// parse it according to the datatype of the property.
     pub value: Option<String>,
 }
