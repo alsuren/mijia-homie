@@ -667,13 +667,67 @@ mod tests {
             .await
     }
 
+    fn property_set(properties: Vec<Property>) -> HashMap<String, Property> {
+        properties
+            .into_iter()
+            .map(|property| (property.id.clone(), property))
+            .collect()
+    }
+
+    fn node_set(nodes: Vec<Node>) -> HashMap<String, Node> {
+        nodes
+            .into_iter()
+            .map(|node| (node.id.clone(), node))
+            .collect()
+    }
+
     #[tokio::test]
-    async fn controller_start() -> Result<(), Box<dyn std::error::Error>> {
+    async fn subscribes_to_things() -> Result<(), Box<dyn std::error::Error>> {
         let (controller, requests_rx) = make_test_controller();
 
         // Start discovering.
         controller.start().await?;
         expect_subscriptions(&requests_rx, &["base_topic/+/$homie"]);
+
+        // Discover a new device.
+        publish(&controller, "base_topic/device_id/$homie", "4.0").await?;
+        expect_subscriptions(
+            &requests_rx,
+            &[
+                "base_topic/device_id/+",
+                "base_topic/device_id/$fw/+",
+                "base_topic/device_id/$stats/+",
+            ],
+        );
+
+        // Discover a node on the device.
+        publish(&controller, "base_topic/device_id/$nodes", "node_id").await?;
+        expect_subscriptions(&requests_rx, &["base_topic/device_id/node_id/+"]);
+
+        // Discover a property on the node.
+        publish(
+            &controller,
+            "base_topic/device_id/node_id/$properties",
+            "property_id",
+        )
+        .await?;
+        expect_subscriptions(
+            &requests_rx,
+            &["base_topic/device_id/node_id/property_id/+"],
+        );
+
+        // No more subscriptions.
+        assert!(requests_rx.is_empty());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn emits_appropriate_events() -> Result<(), Box<dyn std::error::Error>> {
+        let (controller, _requests_rx) = make_test_controller();
+
+        // Start discovering.
+        controller.start().await?;
 
         // Discover a new device.
         assert_eq!(
@@ -682,14 +736,6 @@ mod tests {
                 device_id: "device_id".to_owned(),
                 has_required_attributes: false
             })
-        );
-        expect_subscriptions(
-            &requests_rx,
-            &[
-                "base_topic/device_id/+",
-                "base_topic/device_id/$fw/+",
-                "base_topic/device_id/$stats/+",
-            ],
         );
         assert_eq!(
             publish(&controller, "base_topic/device_id/$name", "Device name").await?,
@@ -721,7 +767,6 @@ mod tests {
                 has_required_attributes: false
             })
         );
-        expect_subscriptions(&requests_rx, &["base_topic/device_id/node_id/+"]);
         assert_eq!(
             publish(
                 &controller,
@@ -748,14 +793,6 @@ mod tests {
                 has_required_attributes: false
             })
         );
-        let mut expected_node = Node::new("node_id");
-        expected_node.name = Some("Node name".to_owned());
-        expected_node.node_type = Some("Node type".to_owned());
-        expected_device.add_node(expected_node.clone());
-        assert_eq!(
-            controller.devices().get("device_id").unwrap().to_owned(),
-            expected_device
-        );
 
         // A property on the node.
         assert_eq!(
@@ -770,10 +807,6 @@ mod tests {
                 node_id: "node_id".to_owned(),
                 has_required_attributes: false
             })
-        );
-        expect_subscriptions(
-            &requests_rx,
-            &["base_topic/device_id/node_id/property_id/+"],
         );
         assert_eq!(
             publish(
@@ -803,11 +836,72 @@ mod tests {
                 has_required_attributes: true
             })
         );
-        let mut expected_property = Property::new("property_id");
-        expected_property.name = Some("Property name".to_owned());
-        expected_property.datatype = Some(Datatype::Integer);
-        expected_node.add_property(expected_property);
-        expected_device.add_node(expected_node);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn constructs_device_tree() -> Result<(), Box<dyn std::error::Error>> {
+        let (controller, _requests_rx) = make_test_controller();
+
+        // Discover a new device with a node with a property.
+
+        controller.start().await?;
+        publish(&controller, "base_topic/device_id/$homie", "4.0").await?;
+        publish(&controller, "base_topic/device_id/$name", "Device name").await?;
+        publish(&controller, "base_topic/device_id/$state", "ready").await?;
+        publish(&controller, "base_topic/device_id/$nodes", "node_id").await?;
+
+        publish(
+            &controller,
+            "base_topic/device_id/node_id/$name",
+            "Node name",
+        )
+        .await?;
+        publish(
+            &controller,
+            "base_topic/device_id/node_id/$type",
+            "Node type",
+        )
+        .await?;
+        publish(
+            &controller,
+            "base_topic/device_id/node_id/$properties",
+            "property_id",
+        )
+        .await?;
+
+        publish(
+            &controller,
+            "base_topic/device_id/node_id/property_id/$name",
+            "Property name",
+        )
+        .await?;
+        publish(
+            &controller,
+            "base_topic/device_id/node_id/property_id/$datatype",
+            "integer",
+        )
+        .await?;
+
+        let expected_property = Property {
+            name: Some("Property name".to_owned()),
+            datatype: Some(Datatype::Integer),
+            ..Property::new("property_id")
+        };
+        let expected_node = Node {
+            name: Some("Node name".to_owned()),
+            node_type: Some("Node type".to_owned()),
+            properties: property_set(vec![expected_property]),
+            ..Node::new("node_id")
+        };
+        let expected_device = Device {
+            name: Some("Device name".to_owned()),
+            state: State::Ready,
+            nodes: node_set(vec![expected_node]),
+            ..Device::new("device_id", "4.0")
+        };
+
         assert_eq!(
             controller.devices().get("device_id").unwrap().to_owned(),
             expected_device
