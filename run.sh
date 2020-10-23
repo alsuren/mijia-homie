@@ -45,10 +45,10 @@ else
     time rsync --progress target/$TARGET/$PROFILE/mijia-homie $TARGET_SSH:mijia-homie
 fi
 
-if [ $RUN = 1 ]; then
-    if [  $EXAMPLE != "" ]; then
+if [ "$RUN" = 1 ]; then
+    if [ "$EXAMPLE" != "" ]; then
         ssh $TARGET_SSH ./$EXAMPLE
-    elif [ $USE_SYSTEMD = 1 ]; then
+    elif [ "$USE_SYSTEMD" = 1 ]; then
         scp mijia-homie.service $TARGET_SSH:mijia-homie.service
         ssh $TARGET_SSH sudo mv mijia-homie.service /etc/systemd/system/mijia-homie.service
         ssh $TARGET_SSH sudo systemctl daemon-reload
