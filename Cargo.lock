@@ -542,6 +542,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "mijia-homie"
+version = "0.1.0"
+dependencies = [
+ "backoff",
+ "color-backtrace",
+ "dotenv",
+ "eyre",
+ "futures",
+ "futures-channel",
+ "homie-device",
+ "itertools",
+ "log",
+ "mijia",
+ "pretty_env_logger",
+ "rumqttc",
+ "rustls",
+ "rustls-native-certs",
+ "stable-eyre",
+ "tokio",
+]
+
+[[package]]
 name = "miniz_oxide"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -754,28 +776,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1e0704ee1a7e00d7bb417d0770ea303c1bccbabf0ef1667dae92b5967f5f8a71"
 dependencies = [
  "unicode-xid",
-]
-
-[[package]]
-name = "publish-mqtt"
-version = "0.1.0"
-dependencies = [
- "backoff",
- "color-backtrace",
- "dotenv",
- "eyre",
- "futures",
- "futures-channel",
- "homie-device",
- "itertools",
- "log",
- "mijia",
- "pretty_env_logger",
- "rumqttc",
- "rustls",
- "rustls-native-certs",
- "stable-eyre",
- "tokio",
 ]
 
 [[package]]

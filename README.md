@@ -3,7 +3,7 @@
 This is a project for capturing BLE data from a Xiaomi Mijia 2
 hygrometer-thermometer and publishing it. The repository includes:
 
-- [A tool](./publish-mqtt) to publish readings to an MQTT broker following the [Homie convention](https://homieiot.github.io/).
+- [A tool](./mijia-homie) to publish readings to an MQTT broker following the [Homie convention](https://homieiot.github.io/).
 - [A library](./homie-device) for implementing Homie devices.
 - [A library](./homie-controller) for implementing Homie controllers.
 - [A library](./mijia) for reading Mijia sensors.
@@ -59,7 +59,7 @@ After following these steps, you should end up with something that looks like th
 
   If you don't know the sensor names yet, just make some names up for now.
 
-- You will also want to copy `publish-mqtt/.env.example` to `/home/pi/.env` and edit it to suit your needs.
+- You will also want to copy `mijia-homie/.env.example` to `/home/pi/.env` and edit it to suit your needs.
 
 - You should then be able to run the publisher using `run.sh` with default arguments:
 

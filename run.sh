@@ -10,7 +10,7 @@ PROFILE=${PROFILE:-debug}
 RUN=${RUN:-1}
 ## Set USE_SYSTEMD=0 to run without process supervision (EXAMPLEs never use process supervision).
 USE_SYSTEMD=${USE_SYSTEMD:-1}
-## Set EXAMPLE=list-sensors to run the list-sensors example rather than publish-mqtt.
+## Set EXAMPLE=list-sensors to run the list-sensors example rather than mijia-homie.
 EXAMPLE=${EXAMPLE:-}
 
 # Target architecture for Raspbian on a Raspberry Pi.
@@ -41,20 +41,20 @@ if [ "${EXAMPLE}" != "" ]; then
     time cross build $PROFILE_FLAG --target $TARGET --example $EXAMPLE
     time rsync --progress target/$TARGET/$PROFILE/examples/$EXAMPLE $TARGET_SSH:$EXAMPLE
 else
-    time cross build $PROFILE_FLAG --target $TARGET --bin publish-mqtt
-    time rsync --progress target/$TARGET/$PROFILE/publish-mqtt $TARGET_SSH:publish-mqtt
+    time cross build $PROFILE_FLAG --target $TARGET --bin mijia-homie
+    time rsync --progress target/$TARGET/$PROFILE/mijia-homie $TARGET_SSH:mijia-homie
 fi
 
 if [ $RUN = 1 ]; then
     if [  $EXAMPLE != "" ]; then
         ssh $TARGET_SSH ./$EXAMPLE
     elif [ $USE_SYSTEMD = 1 ]; then
-        scp publish-mqtt.service $TARGET_SSH:publish-mqtt.service
-        ssh $TARGET_SSH sudo mv publish-mqtt.service /etc/systemd/system/publish-mqtt.service
+        scp mijia-homie.service $TARGET_SSH:mijia-homie.service
+        ssh $TARGET_SSH sudo mv mijia-homie.service /etc/systemd/system/mijia-homie.service
         ssh $TARGET_SSH sudo systemctl daemon-reload
-        ssh $TARGET_SSH sudo systemctl restart publish-mqtt.service
-        ssh $TARGET_SSH sudo journalctl -u publish-mqtt.service --output=cat --follow
+        ssh $TARGET_SSH sudo systemctl restart mijia-homie.service
+        ssh $TARGET_SSH sudo journalctl -u mijia-homie.service --output=cat --follow
     else
-        ssh $TARGET_SSH ./publish-mqtt
+        ssh $TARGET_SSH ./mijia-homie
     fi
 fi
