@@ -4,7 +4,10 @@ version = "0.1.0"
 authors = ["David Laban <alsuren@gmail.com>", "Andrew Walbran <qwandor@google.com>"]
 edition = "2018"
 license = "MIT OR Apache-2.0"
+description = "Service to connect to Xiaomi Mijia 2 temperature/humidity sensors over bluetooth and report their readings to an MQTT broker following the Homie convention."
 repository = "https://github.com/alsuren/mijia-homie/"
+keywords = ["ble", "bluetooth", "homie", "mqtt"]
+categories = ["network-programming"]
 
 [dependencies]
 backoff = { version = "0.2.1", features = ["tokio"] }
@@ -23,3 +26,16 @@ rustls = "0.18.1"
 rustls-native-certs = "0.4.0"
 stable-eyre = "0.2.1"
 tokio = "0.2.22"
+
+[package.metadata.deb]
+depends = "$auto, adduser, bluez"
+section = "net"
+maintainer-scripts = "debian-scripts"
+conf-files = ["/etc/publish-mqtt/.env"]
+assets = [
+	["target/release/publish-mqtt", "usr/bin/", "755"],
+	[".env.example", "/etc/publish-mqtt/.env", "644"],
+]
+
+# This section needs to be here even if it's empty, for the systemd integration to work.
+[package.metadata.deb.systemd-units]
