@@ -11,6 +11,9 @@ RUN /cmake.sh
 COPY  --from=context xargo.sh /
 RUN /xargo.sh
 
+COPY cargo-deb.sh /
+RUN /cargo-deb.sh
+
 RUN apt-get install --assume-yes --no-install-recommends \
     g++-arm-linux-gnueabihf \
     libc6-dev-armhf-cross
