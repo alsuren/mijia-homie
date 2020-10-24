@@ -58,7 +58,7 @@ jobs:
 
       - name: Make a "nightly" package version
         id: version
-        run: echo "::set-output name=date::$(cargo read-manifest --manifest-path mijia-homie/Cargo.toml  | jq -r .version)-$(date +'%Y-%m-%d')"
+        run: echo "::set-output name=version::$(cargo read-manifest --manifest-path mijia-homie/Cargo.toml  | jq -r .version)-$(date +'%Y-%m-%d')"
 
       - name: Package
         run: cd mijia-homie && cargo deb --target ${{ env.target }} --no-build  --deb-version=${{ steps.version.outputs.version }}
