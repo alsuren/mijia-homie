@@ -26,9 +26,9 @@ if [ $# != 0 ]; then
     exit 1
 fi
 
-if [ $PROFILE = release ]; then
+if [ "$PROFILE" = release ]; then
     PROFILE_FLAG=--release
-elif [ $PROFILE = debug ]; then
+elif [ "$PROFILE" = debug ]; then
     PROFILE_FLAG=''
 else
     echo "Invalid profile '$PROFILE'"
@@ -38,23 +38,24 @@ fi
 cargo install cross
 
 if [ "${EXAMPLE}" != "" ]; then
-    time cross build $PROFILE_FLAG --target $TARGET --example $EXAMPLE
-    time rsync --progress target/$TARGET/$PROFILE/examples/$EXAMPLE $TARGET_SSH:$EXAMPLE
+    time cross build "$PROFILE_FLAG" --target $TARGET --example "$EXAMPLE"
+    time rsync --progress "target/$TARGET/$PROFILE/examples/$EXAMPLE" "$TARGET_SSH:$EXAMPLE"
 else
-    time cross build $PROFILE_FLAG --target $TARGET --bin mijia-homie
-    time rsync --progress target/$TARGET/$PROFILE/mijia-homie $TARGET_SSH:mijia-homie
+    time cross build "$PROFILE_FLAG" --target $TARGET --bin mijia-homie
+    time rsync --progress "target/$TARGET/$PROFILE/mijia-homie" "$TARGET_SSH:mijia-homie"
 fi
 
 if [ "$RUN" = 1 ]; then
     if [ "$EXAMPLE" != "" ]; then
-        ssh $TARGET_SSH ./$EXAMPLE
+        # shellcheck disable=SC2029
+        ssh "$TARGET_SSH" "./$EXAMPLE"
     elif [ "$USE_SYSTEMD" = 1 ]; then
-        scp mijia-homie.service $TARGET_SSH:mijia-homie.service
-        ssh $TARGET_SSH sudo mv mijia-homie.service /etc/systemd/system/mijia-homie.service
-        ssh $TARGET_SSH sudo systemctl daemon-reload
-        ssh $TARGET_SSH sudo systemctl restart mijia-homie.service
-        ssh $TARGET_SSH sudo journalctl -u mijia-homie.service --output=cat --follow
+        scp mijia-homie.service "$TARGET_SSH:mijia-homie.service"
+        ssh "$TARGET_SSH" sudo mv mijia-homie.service /etc/systemd/system/mijia-homie.service
+        ssh "$TARGET_SSH" sudo systemctl daemon-reload
+        ssh "$TARGET_SSH" sudo systemctl restart mijia-homie.service
+        ssh "$TARGET_SSH" sudo journalctl -u mijia-homie.service --output=cat --follow
     else
-        ssh $TARGET_SSH ./mijia-homie
+        ssh "$TARGET_SSH" ./mijia-homie
     fi
 fi
