@@ -49,6 +49,9 @@ jobs:
     - name: Install cargo-deb
       run: cargo install cargo-deb --version ${{ env.cargo-deb-version }}
 
+    - Name: Docker build
+      run: docker run "--userns" "host" "-e" "PKG_CONFIG_ALLOW_CROSS=1" "--rm" "-e" "CARGO_HOME=/cargo" "-e" "CARGO_TARGET_DIR=/target" "-e" "USER=qwandor" "-e" "CROSS_RUNNER=" "-v" "$HOME/.cargo:/cargo:Z" "-v" "/cargo/bin" "-v" "$GITHUB_WORKSPACE:$GITHUB_WORKSPACE:Z" "-v" "/home/runner/.rustup/toolchains/stable-x86_64-unknown-linux-gnu:/rust:Z,ro" "-v" "$GITHUB_WORKSPACE/target:/target:Z" "-w" "$GITHUB_WORKSPACE" "alsuren/xiaomi-temp-rpi-builder" "sh" "-c" "PATH=$PATH:/rust/bin cargo build --release --target armv7-unknown-linux-gnueabihf --verbose"
+
     - name: Cross build
       uses: actions-rs/cargo@v1
       with:
