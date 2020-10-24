@@ -69,6 +69,14 @@ jobs:
     - name: Install dependencies
       run: sudo apt-get install libdbus-1-dev
 
+    - name: Cache .cargo and target
+      uses: actions/cache@v2
+      with:
+        path: |
+          ~/.cargo/git
+          ~/.cargo/registry
+          target
+        key: ${{ runner.os }}-package-cargo-${{ hashFiles('**/Cargo.lock') }}
     - name: Cache cargo-deb and cross
       id: cache-cargo-deb
       uses: actions/cache@v2
