@@ -10,7 +10,7 @@ if [ -z "$TARGET" ]; then
   cd mijia-homie
   cargo deb
 else
-  cross build --release --target $TARGET --bin mijia-homie
+  cross build --release --target "$TARGET" --bin mijia-homie
   cd mijia-homie
-  cargo deb --target $TARGET --no-build
+  cargo deb --target "$TARGET" --no-build
 fi
