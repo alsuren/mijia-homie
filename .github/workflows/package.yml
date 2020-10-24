@@ -53,13 +53,36 @@ jobs:
           use-cross: true
           command: build
           args: --release --target ${{ env.target }}
+
+      - name: Make a "nightly" package version
+        id: version
+        run: echo "::set-output name=date::$(cargo read-manifest --manifest-path mijia-homie/Cargo.toml  | jq -r .version)-$(date +'%Y-%m-%d')"
+
       - name: Package
-        run: cd mijia-homie && cargo deb --target ${{ env.target }} --no-build
+        run: cd mijia-homie && cargo deb --target ${{ env.target }} --no-build  --deb-version=${{ steps.version.outputs.version }}
+
       - name: Upload package
         uses: actions/upload-artifact@v2
         with:
           name: debian-packages
           path: target/${{ env.target }}/debian/
+
+      - name: Upload deb package to Bintray
+        uses: bpicode/github-action-upload-bintray@master
+        with:
+          file: ./target/armv7-unknown-linux-gnueabihf/debian/mijia-homie_${{ steps.version.outputs.version }}_armhf.deb
+          api_user: alsuren
+          api_key: ${{ secrets.BINTRAY_API_KEY }}
+          repository_user: alsuren
+          repository: mijia-homie
+          package: mijia-homie
+          version: ${{ steps.version.outputs.version }}
+          upload_path: pool/main/m # Typical for debian repository layout
+          publish: 1
+          calculate_metadata: true # Schedule metadata calculation after upload
+          deb_distribution: buster
+          deb_component: main
+          deb_architecture: armhf
 
   build:
     runs-on: ubuntu-latest
