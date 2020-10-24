@@ -244,11 +244,13 @@ pub fn hashmap_from_file(filename: &str) -> Result<HashMap<MacAddress, String>, 
     if let Ok(file) = File::open(filename) {
         for line in BufReader::new(file).lines() {
             let line = line?;
-            let parts: Vec<&str> = line.splitn(2, '=').collect();
-            if parts.len() != 2 {
-                eyre::bail!("Invalid line '{}'", line);
+            if !line.starts_with('#') {
+                let parts: Vec<&str> = line.splitn(2, '=').collect();
+                if parts.len() != 2 {
+                    eyre::bail!("Invalid line '{}'", line);
+                }
+                map.insert(parts[0].parse()?, parts[1].to_string());
             }
-            map.insert(parts[0].parse()?, parts[1].to_string());
         }
     }
     Ok(map)
