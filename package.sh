@@ -1,9 +1,16 @@
 #!/bin/bash
 
+# Build a Debian package for the given target, or the default host target if none is set.
+
 set -euo pipefail
 
-cross build --release --target armv7-unknown-linux-gnueabihf --bin mijia-homie
+TARGET=${TARGET:-}
 
-cd mijia-homie
-cargo deb --target armv7-unknown-linux-gnueabihf --no-build
-cargo deb
+if [ -z "$TARGET" ]; then
+  cd mijia-homie
+  cargo deb
+else
+  cross build --release --target $TARGET --bin mijia-homie
+  cd mijia-homie
+  cargo deb --target $TARGET --no-build
+fi
