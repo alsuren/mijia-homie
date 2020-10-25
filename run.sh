@@ -12,11 +12,9 @@ RUN=${RUN:-1}
 USE_SYSTEMD=${USE_SYSTEMD:-1}
 ## Set EXAMPLE=list-sensors to run the list-sensors example rather than mijia-homie.
 EXAMPLE=${EXAMPLE:-}
-
-# Target architecture for Raspbian on a Raspberry Pi.
-# Changing this requires changes to Cross.toml. Send a patch if you want this
-# to be made configurable again.
-TARGET=armv7-unknown-linux-gnueabihf
+## Set TARGET=aarch64-unknown-linux-gnu to build for aarch64 instead.
+##   The default is armv7 for Raspbian on a Raspberry Pi.
+TARGET=${TARGET:-armv7-unknown-linux-gnueabihf}
 
 if [ $# != 0 ]; then
     echo "ERROR: $0 should be configured via the following environment variables:"
