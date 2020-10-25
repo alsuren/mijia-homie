@@ -38,10 +38,12 @@ fi
 cargo install cross
 
 if [ "${EXAMPLE}" != "" ]; then
-    time cross build "$PROFILE_FLAG" --target $TARGET --example "$EXAMPLE"
+    # shellcheck disable=SC2086
+    time cross build $PROFILE_FLAG --target "$TARGET" --example "$EXAMPLE"
     time rsync --progress "target/$TARGET/$PROFILE/examples/$EXAMPLE" "$TARGET_SSH:$EXAMPLE"
 else
-    time cross build "$PROFILE_FLAG" --target $TARGET --bin mijia-homie
+    # shellcheck disable=SC2086
+    time cross build $PROFILE_FLAG --target "$TARGET" --bin mijia-homie
     time rsync --progress "target/$TARGET/$PROFILE/mijia-homie" "$TARGET_SSH:mijia-homie"
 fi
 
