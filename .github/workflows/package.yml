@@ -66,12 +66,14 @@ jobs:
           args: --release --target ${{ matrix.target }}
       - name: Package
         if: matrix.target != ''
-        run: cd mijia-homie && cargo deb --target ${{ matrix.target }} --no-build
+        working-directory: mijia-homie
+        run: cargo deb --target ${{ matrix.target }} --no-build
 
       # If no target is set, build directly.
       - name: Build and package
         if: matrix.target == ''
-        run: cd mijia-homie && cargo deb
+        working-directory: mijia-homie
+        run: cargo deb
 
       - name: Upload package
         uses: actions/upload-artifact@v2
