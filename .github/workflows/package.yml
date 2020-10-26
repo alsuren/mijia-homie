@@ -9,21 +9,28 @@ env:
   cargo-deb-version: 1.28.0
 
 jobs:
-  build-armv7:
+  build-all:
     runs-on: ubuntu-latest
-    env:
-      target: armv7-unknown-linux-gnueabihf
-      binutils: binutils-arm-linux-gnueabihf
+    strategy:
+      matrix:
+        target:
+          - armv7-unknown-linux-gnueabihf
+          - aarch64-unknown-linux-gnu
+        include:
+          - target: armv7-unknown-linux-gnueabihf
+            binutils: binutils-arm-linux-gnueabihf
+          - target: aarch64-unknown-linux-gnu
+            binutils: binutils-aarch64-linux-gnu
 
     steps:
       - uses: actions/checkout@v2
       - name: Install dependencies
-        run: sudo apt-get install libdbus-1-dev ${{ env.binutils }}
+        run: sudo apt-get install libdbus-1-dev ${{ matrix.binutils }}
       - name: Toolchain
         uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
-          target: ${{ env.target }}
+          target: ${{ matrix.target }}
           override: true
 
       - name: Cache .cargo and target
@@ -52,14 +59,14 @@ jobs:
         with:
           use-cross: true
           command: build
-          args: --release --target ${{ env.target }}
+          args: --release --target ${{ matrix.target }}
       - name: Package
-        run: cd mijia-homie && cargo deb --target ${{ env.target }} --no-build
+        run: cd mijia-homie && cargo deb --target ${{ matrix.target }} --no-build
       - name: Upload package
         uses: actions/upload-artifact@v2
         with:
           name: debian-packages
-          path: target/${{ env.target }}/debian/
+          path: target/${{ matrix.target }}/debian/
 
   build:
     runs-on: ubuntu-latest
