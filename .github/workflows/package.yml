@@ -17,7 +17,7 @@ jobs:
         target:
           - armv7-unknown-linux-gnueabihf
           - aarch64-unknown-linux-gnu
-          -  # Empty target to build for host architecture (x86_64-unknown-linux-gnu) without cross.
+          - x86_64-unknown-linux-gnu
         include:
           - target: armv7-unknown-linux-gnueabihf
             binutils: binutils-arm-linux-gnueabihf
@@ -29,7 +29,6 @@ jobs:
       - name: Install dependencies
         run: sudo apt-get install libdbus-1-dev ${{ matrix.binutils }}
       - name: Toolchain
-        if: matrix.target != ''
         uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
@@ -57,24 +56,15 @@ jobs:
       - name: Install cargo-deb
         run: cargo install cargo-deb --version ${{ env.cargo-deb-version }}
 
-      # If a target is set, build with cross.
       - name: Cross build
-        if: matrix.target != ''
         uses: actions-rs/cargo@v1
         with:
           use-cross: true
           command: build
           args: --release --target ${{ matrix.target }}
       - name: Package
-        if: matrix.target != ''
         working-directory: mijia-homie
         run: cargo deb --target ${{ matrix.target }} --no-build
-
-      # If no target is set, build directly.
-      - name: Build and package
-        if: matrix.target == ''
-        working-directory: mijia-homie
-        run: cargo deb
 
       - name: Upload package
         uses: actions/upload-artifact@v2
