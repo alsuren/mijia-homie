@@ -5,7 +5,7 @@ use core::future::Future;
 use dbus::arg::{RefArg, Variant};
 use dbus::nonblock::stdintf::org_freedesktop_dbus::ObjectManager;
 use dbus::nonblock::SyncConnection;
-use eyre::WrapErr;
+use eyre::{bail, WrapErr};
 use futures::FutureExt;
 use itertools::Itertools;
 use std::collections::HashMap;
@@ -109,19 +109,38 @@ impl BluetoothSession {
         ))
     }
 
-    /// Power on the bluetooth adapter adapter and start scanning for devices.
+    /// Power on all bluetooth adapters and start scanning for devices.
     pub async fn start_discovery(&self) -> Result<(), eyre::Error> {
-        let adapter = dbus::nonblock::Proxy::new(
+        let bluez_root = dbus::nonblock::Proxy::new(
             "org.bluez",
-            "/org/bluez/hci0",
+            "/",
             DBUS_METHOD_CALL_TIMEOUT,
             self.connection.clone(),
         );
-        adapter.set_powered(true).await?;
-        adapter
-            .start_discovery()
-            .await
-            .unwrap_or_else(|err| println!("starting discovery failed {:?}", err));
+        let tree = bluez_root.get_managed_objects().await?;
+        let adapters: Vec<_> = tree
+            .into_iter()
+            .filter_map(|(path, interfaces)| interfaces.get("org.bluez.Adapter1").map(|_| path))
+            .collect();
+
+        if adapters.is_empty() {
+            bail!("No bluetooth adapters found.");
+        }
+
+        for path in adapters {
+            log::trace!("Starting discovery on adapter {}", path);
+            let adapter = dbus::nonblock::Proxy::new(
+                "org.bluez",
+                path,
+                DBUS_METHOD_CALL_TIMEOUT,
+                self.connection.clone(),
+            );
+            adapter.set_powered(true).await?;
+            adapter
+                .start_discovery()
+                .await
+                .unwrap_or_else(|err| println!("starting discovery failed {:?}", err));
+        }
         Ok(())
     }
 

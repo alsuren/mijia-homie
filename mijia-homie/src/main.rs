@@ -1,4 +1,4 @@
-#![type_length_limit = "1129369"]
+#![type_length_limit = "1138969"]
 
 use backoff::{future::FutureOperation, ExponentialBackoff};
 use futures::stream::StreamExt;
