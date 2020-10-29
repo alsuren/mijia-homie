@@ -637,18 +637,11 @@ mod tests {
 
     fn expect_subscriptions(requests_rx: &Receiver<Request>, subscription_topics: &[&str]) {
         let requests: Vec<_> = (0..subscription_topics.len())
-            .map(|_| {
-                let request = requests_rx.try_recv().unwrap();
-                if let Request::Subscribe(subscribe) = request {
-                    subscribe
-                } else {
-                    panic!("Expected subscribe but got {:?}", request);
-                }
-            })
+            .map(|_| requests_rx.try_recv().unwrap())
             .collect();
 
         for topic in subscription_topics {
-            let expected = Subscribe::new(*topic, QoS::AtLeastOnce);
+            let expected = Request::Subscribe(Subscribe::new(*topic, QoS::AtLeastOnce));
             assert!(requests.contains(&expected));
         }
     }
