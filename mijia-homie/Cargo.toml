@@ -12,10 +12,10 @@ categories = ["network-programming"]
 [dependencies]
 backoff = { version = "0.2.1", features = ["tokio"] }
 color-backtrace = "0.4.2"
-eyre = "0.6.1"
+eyre = "0.6.2"
 dotenv = "0.15.0"
-futures = "0.3.6"
-futures-channel = "0.3.6"
+futures = "0.3.7"
+futures-channel = "0.3.7"
 homie-device = { version = "0.2.0", path = "../homie-device" }
 itertools = "0.9.0"
 log = "0.4.11"
