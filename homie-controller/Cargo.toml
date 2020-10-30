@@ -11,11 +11,11 @@ categories = ["network-programming"]
 
 [dependencies]
 log = "0.4.11"
-rumqttc = "0.1.2"
+rumqttc = "0.2.0"
 thiserror = "1.0.21"
 
 [dev-dependencies]
 async-channel = "1.5.1"
-futures = "0.3.6"
+futures = "0.3.7"
 pretty_env_logger = "0.4.0"
 tokio = "0.2.22"

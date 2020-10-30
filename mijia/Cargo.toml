@@ -10,8 +10,8 @@ repository = "https://github.com/alsuren/mijia-homie/"
 bluez-generated = { version = "0.1.0", path = "../bluez-generated" }
 dbus = { version = "0.9.0", features = ["futures"] }
 dbus-tokio = "0.6.0"
-eyre = "0.6.1"
-futures = "0.3.6"
+eyre = "0.6.2"
+futures = "0.3.7"
 itertools = "0.9.0"
 log = "0.4.11"
 tokio = "0.2.22"

@@ -165,12 +165,13 @@ impl HomieDeviceBuilder {
         Option<UpdateCallback>,
     ) {
         let mut mqtt_options = self.mqtt_options;
-        mqtt_options.set_last_will(LastWill::new(
+        let mut last_will = LastWill::new(
             format!("{}/$state", self.device_base),
-            State::Lost,
             QoS::AtLeastOnce,
-            true,
-        ));
+            State::Lost,
+        );
+        last_will.retain = true;
+        mqtt_options.set_last_will(last_will);
         let (client, event_loop) = AsyncClient::new(mqtt_options, REQUESTS_CAP);
 
         let publisher = DevicePublisher::new(client, self.device_base);
