@@ -636,7 +636,8 @@ mod tests {
     }
 
     fn expect_subscriptions(requests_rx: &Receiver<Request>, subscription_topics: &[&str]) {
-        let requests: Vec<_> = (0..subscription_topics.len())
+        let requests: Vec<_> = subscription_topics
+            .iter()
             .map(|_| requests_rx.try_recv().unwrap())
             .collect();
 
