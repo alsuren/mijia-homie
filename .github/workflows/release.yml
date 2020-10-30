@@ -1,0 +1,44 @@
+name: Release
+
+on:
+  release:
+    # A release, pre-release, or draft of a release is published.
+    types: [published]
+
+env:
+  CARGO_TERM_COLOR: always
+  cargo-deb-version: 1.28.0
+
+jobs:
+  push:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        asset: ${{ github.event.release.assets }}
+    steps:
+      - run: echo "${{ toJSON(matrix.asset) }}"
+      - name: Download package from release
+        run: wget ${{ matrix.asset.browser_download_url }}
+      - name: Parse filename
+        id: parse_filename
+        uses: actions-ecosystem/action-regex-match@v2
+        with:
+          text: ${{ matrix.asset.name }}
+          regex: '^([a-z0-9-]+)_([0-9.-]+)_([a-z0-9]+).deb$'
+      - name: Upload deb package to Bintray
+        if: ${{ steps.parse_filename.outputs.match != '' }}
+        uses: bpicode/github-action-upload-bintray@master
+        with:
+          file: ${{ matrix.asset.name }}
+          api_user: alsuren
+          api_key: ${{ secrets.BINTRAY_API_KEY }}
+          repository_user: alsuren
+          repository: mijia-homie
+          package: ${{ steps.parse_filename.outputs.group1 }}
+          version: ${{ steps.parse_filename.outputs.group2 }}
+          upload_path: pool/stable/main
+          publish: 1
+          calculate_metadata: true # Schedule metadata calculation after upload
+          deb_distribution: stable
+          deb_component: main
+          deb_architecture: ${{ steps.parse_filename.outputs.group3 }}

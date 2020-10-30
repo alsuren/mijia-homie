@@ -15,9 +15,9 @@ and some ideas came from a
 [Python utility for talking to the same sensors](https://github.com/JsBergbau/MiTemperature2),
 especially [this issue thread](https://github.com/JsBergbau/MiTemperature2/issues/1).
 
-If you want a bit more back-story, there is also a [slide deck](https://alsuren.github.io/mijia-homie/doc/presentation/).
+If you want a bit more back-story, there is also a [slide deck](https://alsuren.github.io/mijia-homie/docs/presentation/).
 
-![Serving Suggestion](./doc/presentation/title.jpg)
+![Serving Suggestion](./docs/presentation/title.jpg)
 
 ## License
 
@@ -47,7 +47,7 @@ To run this code on your Raspberry Pi, you will need:
 
 After following these steps, you should end up with something that looks like this:
 
-[](./doc/setup-system-overview.svg)
+[](./docs/setup-system-overview.svg)
 
 - Start by finding out which sensors you have:
 
