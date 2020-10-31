@@ -3,7 +3,7 @@ name: Package
 on:
   push:
     branches: [master]
-    tags: ['mijia-homie-*']
+    tags: ["mijia-homie-*"]
 
 env:
   CARGO_TERM_COLOR: always
@@ -17,7 +17,7 @@ jobs:
         target:
           - armv7-unknown-linux-gnueabihf
           - aarch64-unknown-linux-gnu
-          - # Empty target to build for host architecture (x86_64-unknown-linux-gnu) without cross.
+          -  # Empty target to build for host architecture (x86_64-unknown-linux-gnu) without cross.
         include:
           - target: armv7-unknown-linux-gnueabihf
             binutils: binutils-arm-linux-gnueabihf
@@ -97,8 +97,8 @@ jobs:
         uses: frabert/replace-string-action@v1.2
         with:
           string: ${{ github.ref }}
-          pattern: 'refs/tags/mijia-homie-(.+)'
-          replace-with: '$1'
+          pattern: "refs/tags/mijia-homie-(.+)"
+          replace-with: "$1"
       - name: Create draft release
         id: create_release
         uses: actions/create-release@v1
@@ -113,5 +113,5 @@ jobs:
         uses: shogo82148/actions-upload-release-asset@v1
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: '*.deb'
+          asset_path: "*.deb"
           asset_content_type: application/vnd.debian.binary-package
