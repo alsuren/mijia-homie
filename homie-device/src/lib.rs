@@ -3,7 +3,8 @@
 //!
 //! See the examples directory for examples of how to use it.
 
-use futures::future::try_join;
+use async_trait::async_trait;
+use futures::future::{self, try_join, try_join_all};
 use futures::FutureExt;
 use local_ipaddress;
 use mac_address::get_mac_address;
@@ -138,19 +139,22 @@ impl HomieDeviceBuilder {
     pub async fn spawn(
         self,
     ) -> Result<(HomieDevice, impl Future<Output = Result<(), SpawnError>>), ClientError> {
-        let (event_loop, mut homie, stats, firmware, update_callback) = self.build();
+        let (event_loop, mut homie, extensions, update_callback) = self.build();
 
         // This needs to be spawned before we wait for anything to be sent, as the start() calls below do.
         let event_task = homie.spawn(event_loop, update_callback);
 
-        stats.start().await?;
-        if let Some(firmware) = firmware {
-            firmware.start().await?;
+        for extension in &extensions {
+            extension.start().await?;
         }
         homie.start().await?;
 
-        let stats_task = stats.spawn();
-        let join_handle = try_join(event_task, stats_task).map(simplify_unit_pair);
+        let mut handles: Vec<_> = extensions
+            .into_iter()
+            .map(|extension| extension.spawn())
+            .collect();
+        handles.push(Box::new(event_task));
+        let join_handle = try_join_all(handles).map(simplify_unit_vec);
 
         Ok((homie, join_handle))
     }
@@ -160,8 +164,7 @@ impl HomieDeviceBuilder {
     ) -> (
         EventLoop,
         HomieDevice,
-        HomieStats,
-        Option<HomieFirmware>,
+        Vec<Box<dyn HomieExtension>>,
         Option<UpdateCallback>,
     ) {
         let mut mqtt_options = self.mqtt_options;
@@ -176,24 +179,26 @@ impl HomieDeviceBuilder {
 
         let publisher = DevicePublisher::new(client, self.device_base);
 
-        let mut extension_ids = vec![HomieStats::EXTENSION_ID];
         let stats = HomieStats::new(publisher.clone());
-        let firmware = if let (Some(firmware_name), Some(firmware_version)) =
+        let mut extensions: Vec<Box<dyn HomieExtension>> = vec![Box::new(stats)];
+
+        if let (Some(firmware_name), Some(firmware_version)) =
             (self.firmware_name, self.firmware_version)
         {
-            extension_ids.push(HomieFirmware::EXTENSION_ID);
-            Some(HomieFirmware::new(
+            extensions.push(Box::new(HomieFirmware::new(
                 publisher.clone(),
                 firmware_name,
                 firmware_version,
-            ))
-        } else {
-            None
-        };
+            )));
+        }
 
+        let extension_ids: Vec<_> = extensions
+            .iter()
+            .map(|extension| extension.extension_id())
+            .collect();
         let homie = HomieDevice::new(publisher, self.device_name, &extension_ids);
 
-        (event_loop, homie, stats, firmware, self.update_callback)
+        (event_loop, homie, extensions, self.update_callback)
     }
 }
 
@@ -516,6 +521,17 @@ impl DevicePublisher {
     }
 }
 
+#[async_trait]
+trait HomieExtension {
+    fn extension_id(&self) -> &'static str;
+
+    /// Send initial topics.
+    async fn start(&self) -> Result<(), ClientError>;
+
+    /// Start any tasks needed to do further work.
+    fn spawn(self: Box<Self>) -> Box<dyn Future<Output = Result<(), SpawnError>> + Unpin>;
+}
+
 /// Legacy stats extension.
 #[derive(Debug)]
 struct HomieStats {
@@ -524,14 +540,19 @@ struct HomieStats {
 }
 
 impl HomieStats {
-    const EXTENSION_ID: &'static str = "org.homie.legacy-stats:0.1.1:[4.x]";
-
     fn new(publisher: DevicePublisher) -> Self {
         let now = Instant::now();
         Self {
             publisher,
             start_time: now,
         }
+    }
+}
+
+#[async_trait]
+impl HomieExtension for HomieStats {
+    fn extension_id(&self) -> &'static str {
+        "org.homie.legacy-stats:0.1.1:[4.x]"
     }
 
     /// Send initial topics.
@@ -542,7 +563,7 @@ impl HomieStats {
     }
 
     /// Periodically send stats.
-    fn spawn(self) -> impl Future<Output = Result<(), SpawnError>> {
+    fn spawn(self: Box<Self>) -> Box<dyn Future<Output = Result<(), SpawnError>> + Unpin> {
         let task: JoinHandle<Result<(), SpawnError>> = task::spawn(async move {
             loop {
                 let uptime = Instant::now() - self.start_time;
@@ -552,7 +573,7 @@ impl HomieStats {
                 delay_for(STATS_INTERVAL).await;
             }
         });
-        task.map(|res| Ok(res??))
+        Box::new(task.map(|res| Ok(res??)))
     }
 }
 
@@ -565,14 +586,19 @@ struct HomieFirmware {
 }
 
 impl HomieFirmware {
-    const EXTENSION_ID: &'static str = "org.homie.legacy-firmware:0.1.1:[4.x]";
-
     fn new(publisher: DevicePublisher, firmware_name: String, firmware_version: String) -> Self {
         Self {
             publisher,
             firmware_name,
             firmware_version,
         }
+    }
+}
+
+#[async_trait]
+impl HomieExtension for HomieFirmware {
+    fn extension_id(&self) -> &'static str {
+        "org.homie.legacy-firmware:0.1.1:[4.x]"
     }
 
     /// Send initial topics.
@@ -590,6 +616,11 @@ impl HomieFirmware {
             .publish_retained("$fw/version", self.firmware_version.as_str())
             .await?;
         Ok(())
+    }
+
+    /// Do nothing.
+    fn spawn(self: Box<Self>) -> Box<dyn Future<Output = Result<(), SpawnError>> + Unpin> {
+        Box::new(future::ok(()))
     }
 }
 
@@ -616,6 +647,10 @@ where
 
 fn simplify_unit_pair<E>(m: Result<((), ()), E>) -> Result<(), E> {
     m.map(|((), ())| ())
+}
+
+fn simplify_unit_vec<E>(m: Result<Vec<()>, E>) -> Result<(), E> {
+    m.map(|_| ())
 }
 
 #[cfg(test)]
@@ -735,11 +770,11 @@ mod tests {
             MqttOptions::new("client_id", "hostname", 1234),
         );
 
-        let (_event_loop, homie, _stats, firmware, _callback) = builder.build();
+        let (_event_loop, homie, extensions, _callback) = builder.build();
 
         assert_eq!(homie.device_name, "Test device");
         assert_eq!(homie.publisher.device_base, "homie/test-device");
-        assert!(firmware.is_none());
+        assert_eq!(extensions.len(), 1);
 
         Ok(())
     }
@@ -754,13 +789,12 @@ mod tests {
 
         builder.set_firmware("firmware_name", "firmware_version");
 
-        let (_event_loop, homie, _stats, firmware, _callback) = builder.build();
+        let (_event_loop, homie, extensions, _callback) = builder.build();
 
         assert_eq!(homie.device_name, "Test device");
         assert_eq!(homie.publisher.device_base, "homie/test-device");
-        let firmware = firmware.unwrap();
-        assert_eq!(firmware.firmware_name, "firmware_name");
-        assert_eq!(firmware.firmware_version, "firmware_version");
+        assert_eq!(extensions.len(), 2);
+        // TODO: Test that the firmware extension has the right name and version, somehow.
 
         Ok(())
     }
