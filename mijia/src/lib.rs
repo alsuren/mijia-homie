@@ -1,3 +1,5 @@
+//! A library for connecting to Xiaomi Mijia 2 Bluetooth temperature/humidity sensors.
+
 use bluez_generated::OrgBluezGattCharacteristic1;
 use core::future::Future;
 use dbus::nonblock::MsgMatch;
@@ -19,9 +21,13 @@ const CONNECTION_INTERVAL_CHARACTERISTIC_PATH: &str = "/service0021/char0045";
 const CONNECTION_INTERVAL_500_MS: [u8; 3] = [0xF4, 0x01, 0x00];
 const DBUS_METHOD_CALL_TIMEOUT: Duration = Duration::from_secs(30);
 
+/// The MAC address and opaque connection ID of a Mijia sensor which was discovered.
 #[derive(Clone, Debug)]
 pub struct SensorProps {
+    /// An opaque identifier for the sensor, including a reference to which Bluetooth adapter it was
+    /// discovered on. This can be used to connect to it.
     pub id: DeviceId,
+    /// The MAC address of the sensor.
     pub mac_address: MacAddress,
 }
 
@@ -29,7 +35,9 @@ pub struct SensorProps {
 /// An event from a Mijia sensor.
 #[derive(Clone)]
 pub enum MijiaEvent {
+    /// A sensor has sent a new set of readings.
     Readings { id: DeviceId, readings: Readings },
+    /// The Bluetooth connection to a sensor has been lost.
     Disconnected { id: DeviceId },
 }
 

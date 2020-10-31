@@ -14,7 +14,9 @@ use std::fmt::{self, Display, Formatter};
 use std::str::FromStr;
 use std::sync::Arc;
 
-/// Opaque identifier for a Bluetooth device which the system knows about.
+/// Opaque identifier for a Bluetooth device which the system knows about. This includes a reference
+/// to which Bluetooth adapter it was discovered on, which means that any attempt to connect to it
+/// will also happen from that adapter (in case the system has more than one).
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct DeviceId {
     pub(crate) object_path: String,
@@ -38,6 +40,7 @@ impl Display for MacAddress {
     }
 }
 
+/// An error parsing a MAC address from a string.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ParseMacAddressError();
 
@@ -69,14 +72,23 @@ impl FromStr for MacAddress {
     }
 }
 
+/// Information about a Bluetooth device which was discovered.
 #[derive(Clone, Debug)]
 pub struct DeviceInfo {
+    /// An opaque identifier for the device, including a reference to which adapter it was
+    /// discovered on. This can be used to connect to it.
     pub id: DeviceId,
+    /// The MAC address of the device.
     pub mac_address: MacAddress,
+    /// The human-readable name of the device, if available.
     pub name: Option<String>,
+    /// The GATT service data from the device's advertisement, if any. This is a map from the
+    /// service UUID to its data.
     pub service_data: HashMap<String, Vec<u8>>,
 }
 
+/// A connection to the Bluetooth daemon. This can be cheaply cloned and passed around to be used
+/// from different places.
 #[derive(Clone)]
 pub struct BluetoothSession {
     pub connection: Arc<SyncConnection>,
