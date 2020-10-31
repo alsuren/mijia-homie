@@ -67,6 +67,6 @@ After following these steps, you should end up with something that looks like th
 
   This will start the publisher under systemd and show you the logs.
 
-- It takes a while to connect to all of the sensors and start getting readings. Once everything is running, you can HoDD to see your readings.
+- It takes a while to connect to all of the sensors and start getting readings. Once everything is running, you can use HoDD to see your readings.
 
 - If everything is visible in HoDD then you can add other integrations. Anything that understands Homie should be able to read your sensors. OpenHAB is what we're using, but take a look at the [Homie Implementations page](https://homieiot.github.io/implementations/) and see if anything inspires you.
