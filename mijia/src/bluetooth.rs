@@ -100,6 +100,9 @@ impl Debug for BluetoothSession {
     }
 }
 
+// TESTME: #[automock] can mock this out if we want. Currently returning
+// impl Future is painful though, if the bugs are anything to go by.
+// faux might be better suited to this case.
 impl BluetoothSession {
     /// Returns a tuple of (join handle, Self).
     /// If the join handle ever completes then you're in trouble and should

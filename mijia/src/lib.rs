@@ -31,7 +31,11 @@ pub struct SensorProps {
     pub mac_address: MacAddress,
 }
 
-// TODO before publishing to crates.io: annotate this enum as non-exhaustive.
+// TODO: before publishing 1.0 to crates.io: annotate this enum as non-exhaustive.
+// TESTME:
+// * move this into its own event.rs
+// * Construct dbus::message::Message examples, and assert that they are decoded
+//   into the appropriate events.
 /// An event from a Mijia sensor.
 #[derive(Clone)]
 pub enum MijiaEvent {
@@ -45,7 +49,7 @@ impl MijiaEvent {
     fn from(conn_msg: Message) -> Option<Self> {
         match BluetoothEvent::from(conn_msg) {
             Some(BluetoothEvent::Value { object_path, value }) => {
-                // TODO: Make this less hacky.
+                // TESTME: Make this less hacky.
                 let object_path = object_path.strip_suffix(SENSOR_READING_CHARACTERISTIC_PATH)?;
                 let readings = Readings::decode(&value)?;
                 Some(MijiaEvent::Readings {
@@ -84,6 +88,7 @@ impl MijiaSession {
     pub async fn get_sensors(&self) -> Result<Vec<SensorProps>, eyre::Error> {
         let devices = self.bt_session.get_devices().await?;
 
+        // TESTME (low priority): split this into filter_sensors() and test it.
         let sensors = devices
             .into_iter()
             .filter_map(|device| {
@@ -119,6 +124,9 @@ impl MijiaSession {
             DBUS_METHOD_CALL_TIMEOUT,
             self.bt_session.connection.clone(),
         );
+        // TESTME: start_notify() is a trait method, so we might be able to mock it
+        // if we make a wrapper around dbus::nonblock::Proxy::new() that can be
+        // mocked out for testing.
         temp_humidity.start_notify().await?;
 
         let connection_interval_path =
@@ -141,6 +149,7 @@ impl MijiaSession {
     pub async fn event_stream(
         &self,
     ) -> Result<(MsgMatch, impl Stream<Item = MijiaEvent>), eyre::Error> {
+        // TESTME?: split out the `rule` constructor and test that it has the right shape?
         let mut rule = dbus::message::MatchRule::new();
         rule.msg_type = Some(dbus::message::MessageType::Signal);
         rule.sender = Some(dbus::strings::BusName::new("org.bluez").map_err(|s| eyre::eyre!(s))?);
