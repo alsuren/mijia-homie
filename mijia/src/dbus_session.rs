@@ -1,3 +1,4 @@
+use bluez_generated::OrgBluezGattCharacteristic1;
 use dbus::arg::RefArg;
 use dbus::arg::Variant;
 use dbus::nonblock::stdintf::org_freedesktop_dbus::ObjectManager;
@@ -8,7 +9,7 @@ use std::{sync::Arc, time::Duration};
 /// Convenience wrappers around low-level dbus details.
 #[cfg_attr(test, faux::create)]
 #[derive(Clone)]
-pub(crate) struct DBusSession {
+pub struct DBusSession {
     connection: Arc<SyncConnection>,
     timeout: Duration,
     address: &'static str,
@@ -43,5 +44,23 @@ impl DBusSession {
     > {
         let root = dbus::nonblock::Proxy::new(self.address, "/", self.timeout, self.connection());
         root.get_managed_objects().await
+    }
+
+    pub(crate) async fn start_notify(&self, path: &str) -> Result<(), dbus::Error> {
+        let proxy = dbus::nonblock::Proxy::new(self.address, path, self.timeout, self.connection());
+        proxy.start_notify().await
+    }
+
+    pub(crate) fn write_value(
+        &self,
+        path: &str,
+        value: Vec<u8>,
+        options: ::std::collections::HashMap<
+            &'static str,
+            dbus::arg::Variant<Box<dyn dbus::arg::RefArg>>,
+        >,
+    ) -> dbus::nonblock::MethodReply<()> {
+        let proxy = dbus::nonblock::Proxy::new(self.address, path, self.timeout, self.connection());
+        proxy.write_value(value, options)
     }
 }

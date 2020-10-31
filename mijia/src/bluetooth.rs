@@ -107,7 +107,7 @@ impl DeviceInfo {
 #[cfg_attr(test, faux::create)]
 #[derive(Clone)]
 pub struct BluetoothSession {
-    dbus: DBusSession,
+    pub(crate) dbus: DBusSession,
 }
 
 impl Debug for BluetoothSession {
@@ -152,6 +152,10 @@ impl BluetoothSession {
 
     pub fn connection(&self) -> Arc<SyncConnection> {
         self.dbus.connection()
+    }
+
+    pub(crate) fn dbus(&self) -> DBusSession {
+        self.dbus.clone()
     }
 
     /// Power on all Bluetooth adapters and start scanning for devices.
