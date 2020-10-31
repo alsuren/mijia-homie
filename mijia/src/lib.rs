@@ -9,6 +9,7 @@ use std::time::Duration;
 
 pub mod bluetooth;
 mod bluetooth_event;
+mod dbus_session;
 pub mod decode;
 pub use bluetooth::{BluetoothSession, DeviceId, MacAddress};
 use bluetooth_event::BluetoothEvent;

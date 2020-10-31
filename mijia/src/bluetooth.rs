@@ -1,9 +1,9 @@
+use crate::dbus_session::DBusSession;
 use crate::DBUS_METHOD_CALL_TIMEOUT;
 use bluez_generated::{OrgBluezAdapter1, OrgBluezDevice1};
 use core::fmt::Debug;
 use core::future::Future;
 use dbus::arg::{RefArg, Variant};
-use dbus::nonblock::stdintf::org_freedesktop_dbus::ObjectManager;
 use dbus::nonblock::SyncConnection;
 use eyre::{bail, WrapErr};
 use futures::FutureExt;
@@ -107,7 +107,7 @@ impl DeviceInfo {
 #[cfg_attr(test, faux::create)]
 #[derive(Clone)]
 pub struct BluetoothSession {
-    connection: Arc<SyncConnection>,
+    dbus: DBusSession,
 }
 
 impl Debug for BluetoothSession {
@@ -135,30 +135,24 @@ impl BluetoothSession {
         });
         Ok((
             dbus_handle.map(|res| Ok(res??)),
-            BluetoothSession::from_connection(connection),
+            BluetoothSession::from_dbus(DBusSession::new(connection, DBUS_METHOD_CALL_TIMEOUT)),
         ))
     }
 }
 
 #[cfg_attr(test, faux::methods)]
 impl BluetoothSession {
-    fn from_connection(connection: Arc<SyncConnection>) -> Self {
-        Self { connection }
+    fn from_dbus(dbus: DBusSession) -> Self {
+        Self { dbus }
     }
 
     pub fn connection(&self) -> Arc<SyncConnection> {
-        self.connection.clone()
+        self.dbus.connection()
     }
 
     /// Power on all Bluetooth adapters and start scanning for devices.
     pub async fn start_discovery(&self) -> Result<(), eyre::Error> {
-        let bluez_root = dbus::nonblock::Proxy::new(
-            "org.bluez",
-            "/",
-            DBUS_METHOD_CALL_TIMEOUT,
-            self.connection.clone(),
-        );
-        let tree = bluez_root.get_managed_objects().await?;
+        let tree = self.dbus.get_managed_objects("org.bluez").await?;
         let adapters: Vec<_> = tree
             .into_iter()
             .filter_map(|(path, interfaces)| interfaces.get("org.bluez.Adapter1").map(|_| path))
@@ -174,7 +168,7 @@ impl BluetoothSession {
                 "org.bluez",
                 path,
                 DBUS_METHOD_CALL_TIMEOUT,
-                self.connection.clone(),
+                self.dbus.connection(),
             );
             adapter.set_powered(true).await?;
             adapter
@@ -187,13 +181,7 @@ impl BluetoothSession {
 
     /// Get a list of all Bluetooth devices which have been discovered so far.
     pub async fn get_devices(&self) -> Result<Vec<DeviceInfo>, eyre::Error> {
-        let bluez_root = dbus::nonblock::Proxy::new(
-            "org.bluez",
-            "/",
-            DBUS_METHOD_CALL_TIMEOUT,
-            self.connection.clone(),
-        );
-        let tree = bluez_root.get_managed_objects().await?;
+        let tree = self.dbus.get_managed_objects("org.bluez").await?;
 
         let sensors = tree
             .into_iter()
@@ -236,7 +224,7 @@ impl BluetoothSession {
             "org.bluez",
             id.object_path.to_owned(),
             DBUS_METHOD_CALL_TIMEOUT,
-            self.connection.clone(),
+            self.dbus.connection(),
         )
     }
 
