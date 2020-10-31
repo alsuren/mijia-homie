@@ -1,6 +1,6 @@
 use crate::dbus_session::DBusSession;
 use crate::DBUS_METHOD_CALL_TIMEOUT;
-use bluez_generated::{OrgBluezAdapter1, OrgBluezDevice1};
+use bluez_generated::OrgBluezDevice1;
 use core::fmt::Debug;
 use core::future::Future;
 use dbus::arg::{RefArg, Variant};
@@ -172,15 +172,9 @@ impl BluetoothSession {
 
         for path in adapters {
             log::trace!("Starting discovery on adapter {}", path);
-            let adapter = dbus::nonblock::Proxy::new(
-                "org.bluez",
-                path,
-                DBUS_METHOD_CALL_TIMEOUT,
-                self.dbus.connection(),
-            );
-            adapter.set_powered(true).await?;
-            adapter
-                .start_discovery()
+            self.dbus.set_powered(&path, true).await?;
+            self.dbus
+                .start_discovery(&path)
                 .await
                 .unwrap_or_else(|err| println!("starting discovery failed {:?}", err));
         }
