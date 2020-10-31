@@ -6,6 +6,22 @@
 
 See [the main project readme](https://github.com/alsuren/mijia-homie#readme) for more details and background.
 
+## Installation
+
+It is recommended to install the latest release from our Debian repository:
+
+```sh
+$ curl -L https://bintray.com/user/downloadSubjectPublicKey?username=homie-rs | sudo apt-key add -
+$ echo "deb https://dl.bintray.com/homie-rs/homie-rs stable main" | sudo tee /etc/apt/sources.list.d/homie-rs.list
+$ sudo apt update && sudo apt install mijia-homie
+```
+
+Alternatively, you may install with cargo install, but that will require some more setup:
+
+```sh
+$ cargo install mijia-homie
+```
+
 ## Usage
 
 If you have installed the Debian package, the service will be set up with systemd for you already. Otherwise, copy the `mijia-homie` binary to `/usr/bin`, copy `debian/mijia-homie.service` to `/lib/systemd/system`, create a `mijia-homie` user to run as, and create `/etc/mijia-homie` for configuration files.
