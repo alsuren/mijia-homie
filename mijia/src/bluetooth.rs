@@ -87,8 +87,24 @@ pub struct DeviceInfo {
     pub service_data: HashMap<String, Vec<u8>>,
 }
 
+#[cfg(test)]
+impl DeviceInfo {
+    fn fake_with_name(i: usize, name: &str) -> Self {
+        Self {
+            // This isn't actually valid, but is good for debugging.
+            mac_address: MacAddress(format!("{}", i)),
+            name: Some(name.to_string()),
+            id: DeviceId {
+                object_path: "obviously rubbish".to_string(),
+            },
+            service_data: HashMap::new(),
+        }
+    }
+}
+
 /// A connection to the Bluetooth daemon. This can be cheaply cloned and passed around to be used
 /// from different places.
+#[cfg_attr(test, faux::create)]
 #[derive(Clone)]
 pub struct BluetoothSession {
     connection: Arc<SyncConnection>,
@@ -100,9 +116,8 @@ impl Debug for BluetoothSession {
     }
 }
 
-// TESTME: #[automock] can mock this out if we want. Currently returning
-// impl Future is painful though, if the bugs are anything to go by.
-// faux might be better suited to this case.
+// ::new() cannot be mocked because Faux doesn't undertand how to rewrite the
+// complex return type that involves Self.
 impl BluetoothSession {
     /// Returns a tuple of (join handle, Self).
     /// If the join handle ever completes then you're in trouble and should
@@ -120,8 +135,15 @@ impl BluetoothSession {
         });
         Ok((
             dbus_handle.map(|res| Ok(res??)),
-            BluetoothSession { connection },
+            BluetoothSession::from_connection(connection),
         ))
+    }
+}
+
+#[cfg_attr(test, faux::methods)]
+impl BluetoothSession {
+    fn from_connection(connection: Arc<SyncConnection>) -> Self {
+        Self { connection }
     }
 
     pub fn connection(&self) -> Arc<SyncConnection> {
@@ -232,6 +254,20 @@ impl BluetoothSession {
             .disconnect()
             .await
             .wrap_err_with(|| format!("disconnecting from {:?}", id))
+    }
+}
+
+#[cfg(test)]
+impl BluetoothSession {
+    pub fn fake_with_device_names(names: &[&str]) -> Self {
+        let devices: Vec<_> = names
+            .into_iter()
+            .enumerate()
+            .map(|(i, s)| DeviceInfo::fake_with_name(i, *s))
+            .collect();
+        let mut bt_session = BluetoothSession::faux();
+        faux::when!(bt_session.get_devices).safe_then(move |_| Ok(devices.clone()));
+        bt_session
     }
 }
 

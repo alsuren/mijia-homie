@@ -22,7 +22,7 @@ const CONNECTION_INTERVAL_500_MS: [u8; 3] = [0xF4, 0x01, 0x00];
 const DBUS_METHOD_CALL_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// The MAC address and opaque connection ID of a Mijia sensor which was discovered.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct SensorProps {
     /// An opaque identifier for the sensor, including a reference to which Bluetooth adapter it was
     /// discovered on. This can be used to connect to it.
@@ -165,5 +165,28 @@ impl MijiaSession {
             msg_match,
             Box::pin(events.filter_map(|event| async move { MijiaEvent::from(event) })),
         ))
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[tokio::test]
+    async fn get_sensors_filters_out_sensors_with_wrong_name() -> Result<(), eyre::Report> {
+        let bt_session = BluetoothSession::fake_with_device_names(&["ignored", "LYWSD03MMC"]);
+        let session = MijiaSession { bt_session };
+
+        let result = session.get_sensors().await?;
+
+        assert_eq!(
+            result
+                .iter()
+                .map(|s| s.mac_address.to_string())
+                .collect::<Vec<_>>(),
+            vec!["1"]
+        );
+
+        Ok(())
     }
 }
