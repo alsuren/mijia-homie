@@ -40,7 +40,7 @@ dual licensed as above, without any additional terms or conditions.
 
 To run this code on your Raspberry Pi, you will need:
 
-- Some Xiaomi Mijia version 2 bluetooth temperature and humidity sensors.
+- Some Xiaomi Mijia version 2 Bluetooth temperature and humidity sensors.
 - A working Rust toolchain and Docker on your laptop.
 - An MQTT broker to connect to (test.mosquitto.org works okay for testing, but you will want to deploy your own if you're monitoring your house).
 - Something to read the measurements from MQTT. [Homie Device Discovery](https://rroemhild.github.io/hodd/) is probably easiest for debugging.

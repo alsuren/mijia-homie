@@ -1,6 +1,6 @@
 # Monitoring Temperature
 
-<pre>(with too many bluetooth thermometers)</pre>
+<pre>(with too many Bluetooth thermometers)</pre>
 
 ![](./title.jpg)
 
@@ -156,7 +156,7 @@
 
 The Rust Bluetooth story is a bit sad (all wrappers around BlueZ).
 
-- `blurz` - "bluetooth from before there was tokio"
+- `blurz` - "Bluetooth from before there was tokio"
 
   - Started with this.
   - Talks to BlueZ over D-Bus (single-threaded).
@@ -169,7 +169,7 @@ The Rust Bluetooth story is a bit sad (all wrappers around BlueZ).
   - Theoretically cross platform.
   - Tried switching to this (but gave up after too many panicking threads).
 
-- `dbus-rs` - "roll your own bluetooth library"
+- `dbus-rs` - "roll your own Bluetooth library"
   - Generates code from D-Bus introspection.
   - Single-threaded because return types are !Send (but that's okay).
   - Async or Blocking (up to you).
@@ -179,7 +179,7 @@ The Rust Bluetooth story is a bit sad (all wrappers around BlueZ).
 
 # Concurrency
 
-- Problem with single-threaded blocking bluetooth library:
+- Problem with single-threaded blocking Bluetooth library:
   ![](./single-threaded-blocking.svg)
 
 ---

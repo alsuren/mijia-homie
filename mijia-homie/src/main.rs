@@ -79,7 +79,7 @@ async fn main() -> Result<(), eyre::Report> {
 
     let local = task::LocalSet::new();
 
-    // Connect a bluetooth session.
+    // Connect a Bluetooth session.
     let (dbus_handle, session) = MijiaSession::new().await?;
 
     let sensor_handle = local.run_until(async move { run_sensor_system(homie, &session).await });
