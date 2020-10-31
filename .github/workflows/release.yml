@@ -32,8 +32,8 @@ jobs:
           file: ${{ matrix.asset.name }}
           api_user: alsuren
           api_key: ${{ secrets.BINTRAY_API_KEY }}
-          repository_user: alsuren
-          repository: mijia-homie
+          repository_user: homie-rs
+          repository: homie-rs
           package: ${{ steps.parse_filename.outputs.group1 }}
           version: ${{ steps.parse_filename.outputs.group2 }}
           upload_path: pool/stable/main
