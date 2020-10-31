@@ -56,8 +56,8 @@ impl MijiaEvent {
     }
 }
 
-/// A wrapper around a bluetooth session which adds some methods for dealing with Mijia sensors.
-/// The underlying bluetooth session may still be accessed.
+/// A wrapper around a Bluetooth session which adds some methods for dealing with Mijia sensors.
+/// The underlying Bluetooth session may still be accessed.
 pub struct MijiaSession {
     pub bt_session: BluetoothSession,
 }

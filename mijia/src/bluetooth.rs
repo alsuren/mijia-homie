@@ -14,7 +14,7 @@ use std::fmt::{self, Display, Formatter};
 use std::str::FromStr;
 use std::sync::Arc;
 
-/// Opaque identifier for a bluetooth device which the system knows about.
+/// Opaque identifier for a Bluetooth device which the system knows about.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct DeviceId {
     pub(crate) object_path: String,
@@ -28,7 +28,7 @@ impl DeviceId {
     }
 }
 
-/// MAC address of a bluetooth device.
+/// MAC address of a Bluetooth device.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct MacAddress(String);
 
@@ -109,7 +109,7 @@ impl BluetoothSession {
         ))
     }
 
-    /// Power on all bluetooth adapters and start scanning for devices.
+    /// Power on all Bluetooth adapters and start scanning for devices.
     pub async fn start_discovery(&self) -> Result<(), eyre::Error> {
         let bluez_root = dbus::nonblock::Proxy::new(
             "org.bluez",
@@ -124,7 +124,7 @@ impl BluetoothSession {
             .collect();
 
         if adapters.is_empty() {
-            bail!("No bluetooth adapters found.");
+            bail!("No Bluetooth adapters found.");
         }
 
         for path in adapters {
@@ -144,7 +144,7 @@ impl BluetoothSession {
         Ok(())
     }
 
-    /// Get a list of all bluetooth devices which have been discovered so far.
+    /// Get a list of all Bluetooth devices which have been discovered so far.
     pub async fn get_devices(&self) -> Result<Vec<DeviceInfo>, eyre::Error> {
         let bluez_root = dbus::nonblock::Proxy::new(
             "org.bluez",
@@ -199,7 +199,7 @@ impl BluetoothSession {
         )
     }
 
-    /// Connect to the bluetooth device with the given D-Bus object path.
+    /// Connect to the Bluetooth device with the given D-Bus object path.
     pub async fn connect(&self, id: &DeviceId) -> Result<(), eyre::Error> {
         self.device(id)
             .connect()
@@ -207,7 +207,7 @@ impl BluetoothSession {
             .wrap_err_with(|| format!("connecting to {:?}", id))
     }
 
-    /// Disconnect from the bluetooth device with the given D-Bus object path.
+    /// Disconnect from the Bluetooth device with the given D-Bus object path.
     pub async fn disconnect(&self, id: &DeviceId) -> Result<(), eyre::Error> {
         self.device(id)
             .disconnect()
