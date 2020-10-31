@@ -47,7 +47,7 @@ To run this code on your Raspberry Pi, you will need:
 
 After following these steps, you should end up with something that looks like this:
 
-[](./docs/setup-system-overview.svg)
+![System overview](./docs/setup-system-overview.svg)
 
 - Start by finding out which sensors you have:
 
