@@ -91,7 +91,7 @@ pub struct DeviceInfo {
 /// from different places.
 #[derive(Clone)]
 pub struct BluetoothSession {
-    pub connection: Arc<SyncConnection>,
+    connection: Arc<SyncConnection>,
 }
 
 impl Debug for BluetoothSession {
@@ -122,6 +122,10 @@ impl BluetoothSession {
             dbus_handle.map(|res| Ok(res??)),
             BluetoothSession { connection },
         ))
+    }
+
+    pub fn connection(&self) -> Arc<SyncConnection> {
+        self.connection.clone()
     }
 
     /// Power on all Bluetooth adapters and start scanning for devices.

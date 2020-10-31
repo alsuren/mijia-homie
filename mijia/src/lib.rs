@@ -122,7 +122,7 @@ impl MijiaSession {
             "org.bluez",
             temp_humidity_path,
             DBUS_METHOD_CALL_TIMEOUT,
-            self.bt_session.connection.clone(),
+            self.bt_session.connection(),
         );
         // TESTME: start_notify() is a trait method, so we might be able to mock it
         // if we make a wrapper around dbus::nonblock::Proxy::new() that can be
@@ -135,7 +135,7 @@ impl MijiaSession {
             "org.bluez",
             connection_interval_path,
             DBUS_METHOD_CALL_TIMEOUT,
-            self.bt_session.connection.clone(),
+            self.bt_session.connection(),
         );
         connection_interval
             .write_value(CONNECTION_INTERVAL_500_MS.to_vec(), Default::default())
@@ -156,7 +156,7 @@ impl MijiaSession {
 
         let (msg_match, events) = self
             .bt_session
-            .connection
+            .connection()
             .add_match(rule)
             .await?
             .msg_stream();
