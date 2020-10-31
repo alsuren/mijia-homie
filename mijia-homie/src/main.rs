@@ -73,9 +73,9 @@ async fn main() -> Result<(), eyre::Report> {
     let mqtt_prefix =
         std::env::var("MQTT_PREFIX").unwrap_or_else(|_| DEFAULT_MQTT_PREFIX.to_string());
     let device_base = format!("{}/{}", mqtt_prefix, device_id);
-    let (homie, homie_handle) = HomieDevice::builder(&device_base, &device_name, mqttoptions)
-        .spawn()
-        .await?;
+    let mut homie_builder = HomieDevice::builder(&device_base, &device_name, mqttoptions);
+    homie_builder.set_firmware(env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
+    let (homie, homie_handle) = homie_builder.spawn().await?;
 
     let local = task::LocalSet::new();
 
