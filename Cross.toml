@@ -18,3 +18,9 @@ image = "alsuren/xiaomi-temp-aarch64-builder"
 
 # context = "./docker"
 # dockerfile = "./docker/Dockerfile.buster-gst-aarch64-unknown-linux-gnu"
+
+[target.x86_64-unknown-linux-gnu]
+image = "alsuren/xiaomi-temp-x86_64-builder"
+
+# context = "./docker"
+# dockerfile = "./docker/Dockerfile.buster-gst-x86_64-unknown-linux-gnu"
