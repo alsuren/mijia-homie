@@ -271,6 +271,7 @@ impl BluetoothSession {
     }
 }
 
+// TESTME: This really wants testing, if we can construct the appropriate Variants.
 fn get_service_data(
     device_properties: &HashMap<String, Variant<Box<dyn RefArg>>>,
 ) -> Option<HashMap<String, Vec<u8>>> {
