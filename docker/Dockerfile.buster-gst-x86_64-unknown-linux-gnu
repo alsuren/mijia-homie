@@ -1,0 +1,15 @@
+FROM alsuren/cross-context:latest as context
+
+FROM debian:buster
+
+COPY  --from=context common.sh /
+RUN /common.sh
+
+COPY  --from=context cmake.sh /
+RUN /cmake.sh
+
+COPY  --from=context xargo.sh /
+RUN /xargo.sh
+
+RUN apt-get update && \
+    apt-get install -y libssl-dev libdbus-1-dev
