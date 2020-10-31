@@ -24,7 +24,7 @@ $ sudo systemctl restart mijia-homie.service
 You may find it helpful to watch the logs to see whether it is managing to connect to your sensors:
 
 ```sh
-$ sudo journalctl -u mijia-homie.service --follow
+$ sudo journalctl -u mijia-homie.service --output=cat --follow
 ```
 
 Once it is running, try connecting to your MQTT broker with a [Homie controller](https://homieiot.github.io/implementations/#controller) such as [HoDD](https://rroemhild.github.io/hodd/) or [openHAB](https://www.openhab.org/) to see your sensors.
