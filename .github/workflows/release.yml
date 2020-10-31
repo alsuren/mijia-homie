@@ -16,7 +16,6 @@ jobs:
       matrix:
         asset: ${{ github.event.release.assets }}
     steps:
-      - run: echo "${{ toJSON(matrix.asset) }}"
       - name: Download package from release
         run: wget ${{ matrix.asset.browser_download_url }}
       - name: Parse filename
