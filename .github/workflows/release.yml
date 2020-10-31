@@ -16,7 +16,6 @@ jobs:
       matrix:
         asset: ${{ github.event.release.assets }}
     steps:
-      - run: echo "${{ toJSON(matrix.asset) }}"
       - name: Download package from release
         run: wget ${{ matrix.asset.browser_download_url }}
       - name: Parse filename
@@ -24,7 +23,7 @@ jobs:
         uses: actions-ecosystem/action-regex-match@v2
         with:
           text: ${{ matrix.asset.name }}
-          regex: '^([a-z0-9-]+)_([0-9.-]+)_([a-z0-9]+).deb$'
+          regex: "^([a-z0-9-]+)_([0-9.-]+)_([a-z0-9]+).deb$"
       - name: Upload deb package to Bintray
         if: ${{ steps.parse_filename.outputs.match != '' }}
         uses: bpicode/github-action-upload-bintray@master
@@ -32,8 +31,8 @@ jobs:
           file: ${{ matrix.asset.name }}
           api_user: alsuren
           api_key: ${{ secrets.BINTRAY_API_KEY }}
-          repository_user: alsuren
-          repository: mijia-homie
+          repository_user: homie-rs
+          repository: homie-rs
           package: ${{ steps.parse_filename.outputs.group1 }}
           version: ${{ steps.parse_filename.outputs.group2 }}
           upload_path: pool/stable/main
