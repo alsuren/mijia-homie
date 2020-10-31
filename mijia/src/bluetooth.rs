@@ -1,6 +1,5 @@
 use crate::dbus_session::DBusSession;
 use crate::DBUS_METHOD_CALL_TIMEOUT;
-use bluez_generated::OrgBluezDevice1;
 use core::fmt::Debug;
 use core::future::Future;
 use dbus::arg::{RefArg, Variant};
@@ -221,27 +220,18 @@ impl BluetoothSession {
         Ok(sensors)
     }
 
-    fn device(&self, id: &DeviceId) -> impl OrgBluezDevice1 {
-        dbus::nonblock::Proxy::new(
-            "org.bluez",
-            id.object_path.to_owned(),
-            DBUS_METHOD_CALL_TIMEOUT,
-            self.dbus.connection(),
-        )
-    }
-
     /// Connect to the Bluetooth device with the given D-Bus object path.
     pub async fn connect(&self, id: &DeviceId) -> Result<(), eyre::Error> {
-        self.device(id)
-            .connect()
+        self.dbus
+            .connect(&id.object_path)
             .await
             .wrap_err_with(|| format!("connecting to {:?}", id))
     }
 
     /// Disconnect from the Bluetooth device with the given D-Bus object path.
     pub async fn disconnect(&self, id: &DeviceId) -> Result<(), eyre::Error> {
-        self.device(id)
-            .disconnect()
+        self.dbus
+            .disconnect(&id.object_path)
             .await
             .wrap_err_with(|| format!("disconnecting from {:?}", id))
     }

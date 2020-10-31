@@ -1,4 +1,5 @@
 use bluez_generated::OrgBluezAdapter1;
+use bluez_generated::OrgBluezDevice1;
 use bluez_generated::OrgBluezGattCharacteristic1;
 use dbus::arg::RefArg;
 use dbus::arg::Variant;
@@ -73,5 +74,15 @@ impl DBusSession {
     pub(crate) fn start_discovery(&self, path: &str) -> dbus::nonblock::MethodReply<()> {
         let proxy = dbus::nonblock::Proxy::new(self.address, path, self.timeout, self.connection());
         proxy.start_discovery()
+    }
+
+    pub(crate) fn connect(&self, path: &str) -> dbus::nonblock::MethodReply<()> {
+        let proxy = dbus::nonblock::Proxy::new(self.address, path, self.timeout, self.connection());
+        proxy.connect()
+    }
+
+    pub(crate) fn disconnect(&self, path: &str) -> dbus::nonblock::MethodReply<()> {
+        let proxy = dbus::nonblock::Proxy::new(self.address, path, self.timeout, self.connection());
+        proxy.disconnect()
     }
 }
