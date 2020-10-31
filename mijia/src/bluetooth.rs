@@ -135,7 +135,11 @@ impl BluetoothSession {
         });
         Ok((
             dbus_handle.map(|res| Ok(res??)),
-            BluetoothSession::from_dbus(DBusSession::new(connection, DBUS_METHOD_CALL_TIMEOUT)),
+            BluetoothSession::from_dbus(DBusSession::new(
+                connection,
+                DBUS_METHOD_CALL_TIMEOUT,
+                "org.bluez",
+            )),
         ))
     }
 }
@@ -152,7 +156,7 @@ impl BluetoothSession {
 
     /// Power on all Bluetooth adapters and start scanning for devices.
     pub async fn start_discovery(&self) -> Result<(), eyre::Error> {
-        let tree = self.dbus.get_managed_objects("org.bluez").await?;
+        let tree = self.dbus.get_managed_objects().await?;
         let adapters: Vec<_> = tree
             .into_iter()
             .filter_map(|(path, interfaces)| interfaces.get("org.bluez.Adapter1").map(|_| path))
@@ -181,7 +185,7 @@ impl BluetoothSession {
 
     /// Get a list of all Bluetooth devices which have been discovered so far.
     pub async fn get_devices(&self) -> Result<Vec<DeviceInfo>, eyre::Error> {
-        let tree = self.dbus.get_managed_objects("org.bluez").await?;
+        let tree = self.dbus.get_managed_objects().await?;
 
         let sensors = tree
             .into_iter()

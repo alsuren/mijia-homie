@@ -11,14 +11,20 @@ use std::{sync::Arc, time::Duration};
 pub(crate) struct DBusSession {
     connection: Arc<SyncConnection>,
     timeout: Duration,
+    address: &'static str,
 }
 
 #[cfg_attr(test, faux::methods)]
 impl DBusSession {
-    pub(crate) fn new(connection: Arc<SyncConnection>, timeout: Duration) -> Self {
+    pub(crate) fn new(
+        connection: Arc<SyncConnection>,
+        timeout: Duration,
+        address: &'static str,
+    ) -> Self {
         Self {
             connection,
             timeout,
+            address,
         }
     }
 
@@ -28,7 +34,6 @@ impl DBusSession {
 
     pub(crate) async fn get_managed_objects(
         &self,
-        address: &str,
     ) -> Result<
         HashMap<
             dbus::Path<'static>,
@@ -36,7 +41,7 @@ impl DBusSession {
         >,
         dbus::Error,
     > {
-        let root = dbus::nonblock::Proxy::new(address, "/", self.timeout, self.connection());
+        let root = dbus::nonblock::Proxy::new(self.address, "/", self.timeout, self.connection());
         root.get_managed_objects().await
     }
 }
