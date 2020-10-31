@@ -34,7 +34,8 @@ maintainer-scripts = "debian-scripts"
 conf-files = ["/etc/mijia-homie/.env"]
 assets = [
 	["target/release/mijia-homie", "usr/bin/", "755"],
-	[".env.example", "/etc/mijia-homie/.env", "644"],
+	[".env.example", "etc/mijia-homie/.env", "644"],
+	["README.md", "usr/share/doc/mijia-homie/", "644"],
 ]
 
 # This section needs to be here even if it's empty, for the systemd integration to work.
