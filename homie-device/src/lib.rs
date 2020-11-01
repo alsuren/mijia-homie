@@ -25,8 +25,6 @@ pub use crate::types::{Datatype, Node, Property};
 
 const HOMIE_VERSION: &str = "4.0";
 const HOMIE_IMPLEMENTATION: &str = "homie-rs";
-const DEFAULT_FIRMWARE_NAME: &str = env!("CARGO_PKG_NAME");
-const DEFAULT_FIRMWARE_VERSION: &str = env!("CARGO_PKG_VERSION");
 const STATS_INTERVAL: Duration = Duration::from_secs(60);
 const REQUESTS_CAP: usize = 10;
 
@@ -88,8 +86,8 @@ type UpdateCallback = Box<
 pub struct HomieDeviceBuilder {
     device_base: String,
     device_name: String,
-    firmware_name: String,
-    firmware_version: String,
+    firmware_name: Option<String>,
+    firmware_version: Option<String>,
     mqtt_options: MqttOptions,
     update_callback: Option<UpdateCallback>,
 }
@@ -115,8 +113,8 @@ impl HomieDeviceBuilder {
     ///
     /// If this is not set, it will default to the cargo package name and version.
     pub fn set_firmware(&mut self, firmware_name: &str, firmware_version: &str) {
-        self.firmware_name = firmware_name.to_string();
-        self.firmware_version = firmware_version.to_string();
+        self.firmware_name = Some(firmware_name.to_string());
+        self.firmware_version = Some(firmware_version.to_string());
     }
 
     pub fn set_update_callback<F, Fut>(&mut self, mut update_callback: F)
@@ -146,7 +144,9 @@ impl HomieDeviceBuilder {
         let event_task = homie.spawn(event_loop, update_callback);
 
         stats.start().await?;
-        firmware.start().await?;
+        if let Some(firmware) = firmware {
+            firmware.start().await?;
+        }
         homie.start().await?;
 
         let stats_task = stats.spawn();
@@ -161,7 +161,7 @@ impl HomieDeviceBuilder {
         EventLoop,
         HomieDevice,
         HomieStats,
-        HomieFirmware,
+        Option<HomieFirmware>,
         Option<UpdateCallback>,
     ) {
         let mut mqtt_options = self.mqtt_options;
@@ -175,16 +175,27 @@ impl HomieDeviceBuilder {
         let (client, event_loop) = AsyncClient::new(mqtt_options, REQUESTS_CAP);
 
         let publisher = DevicePublisher::new(client, self.device_base);
-        let homie = HomieDevice::new(publisher.clone(), self.device_name, &EXTENSION_IDS);
 
+        let mut extension_ids = vec![HomieStats::EXTENSION_ID];
         let stats = HomieStats::new(publisher.clone());
-        let firmware = HomieFirmware::new(publisher, self.firmware_name, self.firmware_version);
+        let firmware = if let (Some(firmware_name), Some(firmware_version)) =
+            (self.firmware_name, self.firmware_version)
+        {
+            extension_ids.push(HomieFirmware::EXTENSION_ID);
+            Some(HomieFirmware::new(
+                publisher.clone(),
+                firmware_name,
+                firmware_version,
+            ))
+        } else {
+            None
+        };
+
+        let homie = HomieDevice::new(publisher, self.device_name, &extension_ids);
 
         (event_loop, homie, stats, firmware, self.update_callback)
     }
 }
-
-const EXTENSION_IDS: [&str; 2] = [HomieStats::EXTENSION_ID, HomieFirmware::EXTENSION_ID];
 
 /// A Homie [device](https://homieiot.github.io/specification/#devices). This corresponds to a
 /// single MQTT connection.
@@ -215,8 +226,8 @@ impl HomieDevice {
         HomieDeviceBuilder {
             device_base: device_base.to_string(),
             device_name: device_name.to_string(),
-            firmware_name: DEFAULT_FIRMWARE_NAME.to_string(),
-            firmware_version: DEFAULT_FIRMWARE_VERSION.to_string(),
+            firmware_name: None,
+            firmware_version: None,
             mqtt_options,
             update_callback: None,
         }
@@ -728,8 +739,7 @@ mod tests {
 
         assert_eq!(homie.device_name, "Test device");
         assert_eq!(homie.publisher.device_base, "homie/test-device");
-        assert_eq!(firmware.firmware_name, DEFAULT_FIRMWARE_NAME);
-        assert_eq!(firmware.firmware_version, DEFAULT_FIRMWARE_VERSION);
+        assert!(firmware.is_none());
 
         Ok(())
     }
@@ -748,6 +758,7 @@ mod tests {
 
         assert_eq!(homie.device_name, "Test device");
         assert_eq!(homie.publisher.device_base, "homie/test-device");
+        let firmware = firmware.unwrap();
         assert_eq!(firmware.firmware_name, "firmware_name");
         assert_eq!(firmware.firmware_version, "firmware_version");
 
