@@ -521,8 +521,10 @@ impl DevicePublisher {
     }
 }
 
+/// A Homie [extension](https://homieiot.github.io/extensions/).
 #[async_trait]
 trait HomieExtension {
+    /// The unique ID of the extension.
     fn extension_id(&self) -> &'static str;
 
     /// Send initial topics.
