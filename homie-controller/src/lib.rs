@@ -279,6 +279,11 @@ impl HomieController {
                 device.firmware_version = Some(payload.to_owned());
                 Some(Event::device_updated(device))
             }
+            [_device_id, "$stats"] => {
+                // Homie 3.0 list of available stats. We don't need this, so ignore it without
+                // logging a warning.
+                None
+            }
             [device_id, "$stats", "interval"] => {
                 let interval = payload.parse()?;
                 let device = get_mut_device_for(devices, "Got stats/interval for", device_id)?;
