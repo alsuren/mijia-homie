@@ -480,7 +480,11 @@ impl HomieController {
                 property.retained = retained;
                 Some(Event::property_updated(device_id, node_id, property))
             }
-            [device_id, node_id, property_id] if !property_id.starts_with('$') => {
+            [device_id, node_id, property_id]
+                if !device_id.starts_with('$')
+                    && !node_id.starts_with('$')
+                    && !property_id.starts_with('$') =>
+            {
                 // TODO: What about values of properties we don't yet know about? They may arrive
                 // before the $properties of the node, because the "homie/node_id/+" subscription
                 // matches both.
