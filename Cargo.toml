@@ -4,6 +4,7 @@ members = [
     "bluez-generated",
     "homie-controller",
     "homie-device",
+    "homie-influx",
     "mijia",
     "mijia-homie",
 ]
