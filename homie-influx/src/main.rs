@@ -21,6 +21,23 @@ async fn main() -> Result<(), eyre::Report> {
     pretty_env_logger::init();
     color_backtrace::install();
 
+    let mqtt_options = get_mqtt_options();
+
+    let mut join_handles: Vec<_> = Vec::new();
+    for homie_prefix in &HOMIE_PREFIXES {
+        let (controller, event_loop) = HomieController::new(mqtt_options.clone(), homie_prefix);
+        let controller = Arc::new(controller);
+        let handle = spawn_homie_poll_loop(event_loop, controller.clone());
+        controller.start().await?;
+        join_handles.push(handle.map(|res| Ok(res??)));
+    }
+
+    simplify_unit_vec(try_join_all(join_handles).await)
+}
+
+/// Construct the `MqttOptions` for connecting to the MQTT broker based on configuration options or
+/// defaults.
+fn get_mqtt_options() -> MqttOptions {
     let client_name =
         std::env::var("MQTT_CLIENT_NAME").unwrap_or_else(|_| DEFAULT_MQTT_CLIENT_NAME.to_string());
 
@@ -31,33 +48,23 @@ async fn main() -> Result<(), eyre::Report> {
         .and_then(|val| val.parse::<u16>().ok())
         .unwrap_or(DEFAULT_MQTT_PORT);
 
-    let mut mqttoptions = MqttOptions::new(client_name, mqtt_host, mqtt_port);
+    let mut mqtt_options = MqttOptions::new(client_name, mqtt_host, mqtt_port);
+    mqtt_options.set_keep_alive(5);
 
     let mqtt_username = std::env::var("MQTT_USERNAME").ok();
     let mqtt_password = std::env::var("MQTT_PASSWORD").ok();
-
-    mqttoptions.set_keep_alive(5);
-    if let (Some(u), Some(p)) = (mqtt_username, mqtt_password) {
-        mqttoptions.set_credentials(u, p);
+    if let (Some(username), Some(password)) = (mqtt_username, mqtt_password) {
+        mqtt_options.set_credentials(username, password);
     }
 
     if std::env::var("MQTT_USE_TLS").is_ok() {
         let mut client_config = ClientConfig::new();
         client_config.root_store = rustls_native_certs::load_native_certs()
             .expect("Failed to load platform certificates.");
-        mqttoptions.set_tls_client_config(Arc::new(client_config));
+        mqtt_options.set_tls_client_config(Arc::new(client_config));
     }
 
-    let mut join_handles: Vec<_> = Vec::new();
-    for homie_prefix in &HOMIE_PREFIXES {
-        let (controller, event_loop) = HomieController::new(mqttoptions.clone(), homie_prefix);
-        let controller = Arc::new(controller);
-        let handle = spawn_homie_poll_loop(event_loop, controller.clone());
-        controller.start().await?;
-        join_handles.push(handle.map(|res| Ok(res??)));
-    }
-
-    simplify_unit_vec(try_join_all(join_handles).await)
+    mqtt_options
 }
 
 fn spawn_homie_poll_loop(
