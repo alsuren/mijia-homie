@@ -8,9 +8,9 @@ use stable_eyre::eyre::WrapErr;
 use std::sync::Arc;
 use tokio::task::{self, JoinHandle};
 
-const DEFAULT_CLIENT_NAME: &str = "homie-influx";
-const DEFAULT_HOST: &str = "test.mosquitto.org";
-const DEFAULT_PORT: u16 = 1883;
+const DEFAULT_MQTT_CLIENT_NAME: &str = "homie-influx";
+const DEFAULT_MQTT_HOST: &str = "test.mosquitto.org";
+const DEFAULT_MQTT_PORT: u16 = 1883;
 
 const HOMIE_PREFIXES: [&str; 1] = ["homie"];
 
@@ -22,27 +22,26 @@ async fn main() -> Result<(), eyre::Report> {
     color_backtrace::install();
 
     let client_name =
-        std::env::var("CLIENT_NAME").unwrap_or_else(|_| DEFAULT_CLIENT_NAME.to_string());
+        std::env::var("MQTT_CLIENT_NAME").unwrap_or_else(|_| DEFAULT_MQTT_CLIENT_NAME.to_string());
 
-    let host = std::env::var("HOST").unwrap_or_else(|_| DEFAULT_HOST.to_string());
+    let mqtt_host = std::env::var("MQTT_HOST").unwrap_or_else(|_| DEFAULT_MQTT_HOST.to_string());
 
-    let port = std::env::var("PORT")
+    let mqtt_port = std::env::var("MQTT_PORT")
         .ok()
         .and_then(|val| val.parse::<u16>().ok())
-        .unwrap_or(DEFAULT_PORT);
+        .unwrap_or(DEFAULT_MQTT_PORT);
 
-    let mut mqttoptions = MqttOptions::new(client_name, host, port);
+    let mut mqttoptions = MqttOptions::new(client_name, mqtt_host, mqtt_port);
 
-    let username = std::env::var("USERNAME").ok();
-    let password = std::env::var("PASSWORD").ok();
+    let mqtt_username = std::env::var("MQTT_USERNAME").ok();
+    let mqtt_password = std::env::var("MQTT_PASSWORD").ok();
 
     mqttoptions.set_keep_alive(5);
-    if let (Some(u), Some(p)) = (username, password) {
+    if let (Some(u), Some(p)) = (mqtt_username, mqtt_password) {
         mqttoptions.set_credentials(u, p);
     }
 
-    // Use `env -u USE_TLS` to unset this variable if you need to clear it.
-    if std::env::var("USE_TLS").is_ok() {
+    if std::env::var("MQTT_USE_TLS").is_ok() {
         let mut client_config = ClientConfig::new();
         client_config.root_store = rustls_native_certs::load_native_certs()
             .expect("Failed to load platform certificates.");
