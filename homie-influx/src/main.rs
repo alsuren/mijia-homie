@@ -1,6 +1,8 @@
 use futures::future::try_join_all;
 use futures::FutureExt;
 use homie_controller::{Event, HomieController, HomieEventLoop, PollError};
+use influx_db_client::reqwest::Url;
+use influx_db_client::Client;
 use rumqttc::MqttOptions;
 use rustls::ClientConfig;
 use stable_eyre::eyre;
@@ -11,6 +13,7 @@ use tokio::task::{self, JoinHandle};
 const DEFAULT_MQTT_CLIENT_NAME: &str = "homie-influx";
 const DEFAULT_MQTT_HOST: &str = "test.mosquitto.org";
 const DEFAULT_MQTT_PORT: u16 = 1883;
+const DEFAULT_INFLUXDB_URL: &str = "http://localhost:8086";
 
 const HOMIE_PREFIXES: [&str; 1] = ["homie"];
 
@@ -20,6 +23,12 @@ async fn main() -> Result<(), eyre::Report> {
     dotenv::dotenv().wrap_err("reading .env")?;
     pretty_env_logger::init();
     color_backtrace::install();
+
+    let influxdb_url: Url = std::env::var("INFLUXDB_URL")
+        .unwrap_or_else(|_| DEFAULT_INFLUXDB_URL.to_string())
+        .parse()?;
+    let influxdb_database = "test";
+    let influxdb_client = Client::new(influxdb_url, influxdb_database);
 
     let mqtt_options = get_mqtt_options();
 
