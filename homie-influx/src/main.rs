@@ -203,6 +203,9 @@ fn point_for_property_value(
     if let Some(unit) = property.unit.to_owned() {
         point = point.add_tag("unit", Value::String(unit));
     }
+    if let Some(node_type) = node.node_type.to_owned() {
+        point = point.add_tag("node_type", Value::String(node_type))
+    }
 
     Some(point)
 }
