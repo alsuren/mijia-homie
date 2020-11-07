@@ -187,11 +187,12 @@ fn point_for_property_value(
     timestamp: SystemTime,
     devices: &HashMap<String, Device>,
 ) -> Point {
-    let device = devices.get(&device_id);
-    let node = device.and_then(|device| device.nodes.get(&node_id));
-    let property = node.and_then(|node| node.properties.get(&property_id));
+    let device = devices.get(&device_id).unwrap();
+    let node = device.nodes.get(&node_id).unwrap();
+    let property = node.properties.get(&property_id).unwrap();
+    let datatype = property.datatype.unwrap();
 
-    let mut point = Point::new("measurement")
+    let mut point = Point::new(&datatype.to_string())
         .add_timestamp(
             timestamp
                 .duration_since(SystemTime::UNIX_EPOCH)
@@ -202,19 +203,16 @@ fn point_for_property_value(
         .add_tag("device_id", Value::String(device_id))
         .add_tag("node_id", Value::String(node_id))
         .add_tag("property_id", Value::String(property_id));
-    if let Some(device_name) = device.and_then(|device| device.name.to_owned()) {
+    if let Some(device_name) = device.name.to_owned() {
         point = point.add_field("device_name", Value::String(device_name));
     }
-    if let Some(node_name) = node.and_then(|node| node.name.to_owned()) {
+    if let Some(node_name) = node.name.to_owned() {
         point = point.add_field("node_name", Value::String(node_name));
     }
-    if let Some(property_name) = property.and_then(|property| property.name.to_owned()) {
+    if let Some(property_name) = property.name.to_owned() {
         point = point.add_field("property_name", Value::String(property_name));
     }
-    if let Some(datatype) = property.and_then(|property| property.datatype) {
-        point = point.add_tag("datatype", Value::String(datatype.to_string()));
-    }
-    if let Some(unit) = property.and_then(|property| property.unit.to_owned()) {
+    if let Some(unit) = property.unit.to_owned() {
         point = point.add_tag("unit", Value::String(unit));
     }
 
