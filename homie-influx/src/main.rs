@@ -15,7 +15,12 @@ const DEFAULT_MQTT_HOST: &str = "test.mosquitto.org";
 const DEFAULT_MQTT_PORT: u16 = 1883;
 const DEFAULT_INFLUXDB_URL: &str = "http://localhost:8086";
 
-const HOMIE_PREFIXES: [&str; 1] = ["homie"];
+/// A mapping from a Homie prefix to monitor to an InfluxDB database where its data should be
+/// stored.
+struct Mapping {
+    pub homie_prefix: String,
+    pub influxdb_database: String,
+}
 
 #[tokio::main]
 async fn main() -> Result<(), eyre::Report> {
@@ -24,18 +29,24 @@ async fn main() -> Result<(), eyre::Report> {
     pretty_env_logger::init();
     color_backtrace::install();
 
+    let mappings = vec![Mapping {
+        homie_prefix: "homie".to_owned(),
+        influxdb_database: "test".to_owned(),
+    }];
+
     let influxdb_url: Url = std::env::var("INFLUXDB_URL")
         .unwrap_or_else(|_| DEFAULT_INFLUXDB_URL.to_string())
         .parse()?;
-    let influxdb_database = "test";
-    let influxdb_client = Client::new(influxdb_url, influxdb_database);
 
     let mqtt_options = get_mqtt_options();
 
     let mut join_handles: Vec<_> = Vec::new();
-    for homie_prefix in &HOMIE_PREFIXES {
-        let (controller, event_loop) = HomieController::new(mqtt_options.clone(), homie_prefix);
+    for mapping in &mappings {
+        let (controller, event_loop) =
+            HomieController::new(mqtt_options.clone(), &mapping.homie_prefix);
         let controller = Arc::new(controller);
+        let influxdb_client = Client::new(influxdb_url.clone(), &mapping.influxdb_database);
+
         let handle = spawn_homie_poll_loop(event_loop, controller.clone());
         controller.start().await?;
         join_handles.push(handle.map(|res| Ok(res??)));
