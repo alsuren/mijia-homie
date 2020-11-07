@@ -1,7 +1,7 @@
 use futures::future::try_join_all;
 use futures::FutureExt;
 use homie_controller::{
-    Datatype, Device, Event, HomieController, HomieEventLoop, PollError, Property,
+    Datatype, Device, Event, HomieController, HomieEventLoop, Node, PollError, Property,
 };
 use influx_db_client::reqwest::Url;
 use influx_db_client::{Client, Point, Precision, Value};
@@ -9,7 +9,6 @@ use rumqttc::MqttOptions;
 use rustls::ClientConfig;
 use stable_eyre::eyre;
 use stable_eyre::eyre::WrapErr;
-use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::SystemTime;
 use tokio::task::{self, JoinHandle};
@@ -140,27 +139,20 @@ async fn send_property_value(
     node_id: String,
     property_id: String,
 ) {
-    if let Some(property) = controller
-        .devices()
-        .get(&device_id)
-        .and_then(|device| device.nodes.get(&node_id))
-        .and_then(|node| node.properties.get(&property_id))
-    {
-        if let Some(value) = influx_value_for_homie_property(property) {
-            let point = point_for_property_value(
-                device_id,
-                node_id,
-                property_id,
-                value,
-                SystemTime::now(),
-                controller.devices().as_ref(),
-            );
-            // TODO: What should rp be?
-            // TODO: Handle errors
-            influx_db_client
-                .write_point(point, INFLUXDB_PRECISION, None)
-                .await
-                .unwrap();
+    if let Some(device) = controller.devices().get(&device_id) {
+        if let Some(node) = device.nodes.get(&node_id) {
+            if let Some(property) = node.properties.get(&property_id) {
+                if let Some(point) =
+                    point_for_property_value(device, node, property, SystemTime::now())
+                {
+                    // TODO: What should rp be?
+                    // TODO: Handle errors
+                    influx_db_client
+                        .write_point(point, INFLUXDB_PRECISION, None)
+                        .await
+                        .unwrap();
+                }
+            }
         }
     }
 }
@@ -180,17 +172,13 @@ fn influx_value_for_homie_property(property: &Property) -> Option<Value> {
 
 /// Construct an InfluxDB `Point` corresponding to the given Homie property value update.
 fn point_for_property_value(
-    device_id: String,
-    node_id: String,
-    property_id: String,
-    value: Value,
+    device: &Device,
+    node: &Node,
+    property: &Property,
     timestamp: SystemTime,
-    devices: &HashMap<String, Device>,
-) -> Point {
-    let device = devices.get(&device_id).unwrap();
-    let node = device.nodes.get(&node_id).unwrap();
-    let property = node.properties.get(&property_id).unwrap();
-    let datatype = property.datatype.unwrap();
+) -> Option<Point> {
+    let datatype = property.datatype?;
+    let value = influx_value_for_homie_property(property)?;
 
     let mut point = Point::new(&datatype.to_string())
         .add_timestamp(
@@ -200,9 +188,9 @@ fn point_for_property_value(
                 .as_millis() as i64,
         )
         .add_field("value", value)
-        .add_tag("device_id", Value::String(device_id))
-        .add_tag("node_id", Value::String(node_id))
-        .add_tag("property_id", Value::String(property_id));
+        .add_tag("device_id", Value::String(device.id.to_owned()))
+        .add_tag("node_id", Value::String(node.id.to_owned()))
+        .add_tag("property_id", Value::String(property.id.to_owned()));
     if let Some(device_name) = device.name.to_owned() {
         point = point.add_field("device_name", Value::String(device_name));
     }
@@ -216,7 +204,7 @@ fn point_for_property_value(
         point = point.add_tag("unit", Value::String(unit));
     }
 
-    point
+    Some(point)
 }
 
 fn simplify_unit_vec<E>(m: Result<Vec<()>, E>) -> Result<(), E> {
