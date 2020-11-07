@@ -108,9 +108,13 @@ fn spawn_homie_poll_loop(
                         value,
                         fresh,
                     } => {
-                        println!(
+                        log::trace!(
                             "{}/{}/{} = {} ({})",
-                            device_id, node_id, property_id, value, fresh
+                            device_id,
+                            node_id,
+                            property_id,
+                            value,
+                            fresh
                         );
                         if fresh {
                             send_property_value(
