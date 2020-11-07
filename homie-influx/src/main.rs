@@ -9,6 +9,8 @@ use rumqttc::MqttOptions;
 use rustls::ClientConfig;
 use stable_eyre::eyre;
 use stable_eyre::eyre::WrapErr;
+use std::fs::File;
+use std::io::{BufRead, BufReader};
 use std::sync::Arc;
 use std::time::SystemTime;
 use tokio::task::{self, JoinHandle};
@@ -17,6 +19,7 @@ const DEFAULT_MQTT_CLIENT_NAME: &str = "homie-influx";
 const DEFAULT_MQTT_HOST: &str = "test.mosquitto.org";
 const DEFAULT_MQTT_PORT: u16 = 1883;
 const DEFAULT_INFLUXDB_URL: &str = "http://localhost:8086";
+const DEFAULT_MAPPINGS_FILENAME: &str = "mappings.conf";
 
 const INFLUXDB_PRECISION: Option<Precision> = Some(Precision::Milliseconds);
 
@@ -34,14 +37,20 @@ async fn main() -> Result<(), eyre::Report> {
     pretty_env_logger::init();
     color_backtrace::install();
 
-    let mappings = vec![Mapping {
-        homie_prefix: "homie".to_owned(),
-        influxdb_database: "test".to_owned(),
-    }];
+    let mappings_filename = std::env::var("MAPPINGS_FILENAME")
+        .unwrap_or_else(|_| DEFAULT_MAPPINGS_FILENAME.to_string());
+    let mappings = mappings_from_file(&mappings_filename)?;
+    if mappings.len() == 0 {
+        eyre::bail!(
+            "At least one mapping must be configured in {}.",
+            mappings_filename
+        );
+    }
 
     let influxdb_client = get_influxdb_client()?;
     let mqtt_options = get_mqtt_options();
 
+    // Start a task per mapping to poll the Homie MQTT connection and send values to InfluxDB.
     let mut join_handles: Vec<_> = Vec::new();
     for mapping in &mappings {
         let (controller, event_loop) =
@@ -57,6 +66,30 @@ async fn main() -> Result<(), eyre::Report> {
     }
 
     simplify_unit_vec(try_join_all(join_handles).await)
+}
+
+/// Read mappings of the form "homie_prefix:influxdb_database" from the given file, ignoring any
+/// lines starting with '#'.
+fn mappings_from_file(filename: &str) -> Result<Vec<Mapping>, eyre::Error> {
+    let mut mappings = Vec::new();
+    let file = File::open(filename)?;
+    for line in BufReader::new(file).lines() {
+        let line = line?;
+        if !line.starts_with('#') {
+            let parts: Vec<&str> = line.splitn(2, ':').collect();
+            if parts.len() != 2 {
+                eyre::bail!("Invalid line '{}'", line);
+            }
+            let homie_prefix = parts[0].to_owned();
+            let influxdb_database = parts[1].to_owned();
+            mappings.push(Mapping {
+                homie_prefix,
+                influxdb_database,
+            });
+        }
+    }
+
+    Ok(mappings)
 }
 
 /// Construct a new InfluxDB `Client` based on configuration options or defaults.

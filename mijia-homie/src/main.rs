@@ -239,7 +239,7 @@ async fn run_sensor_system(
 
 /// Read the given file of key-value pairs into a hashmap.
 /// Returns an empty hashmap if the file doesn't exist, or an error if it is malformed.
-pub fn hashmap_from_file(filename: &str) -> Result<HashMap<MacAddress, String>, eyre::Error> {
+fn hashmap_from_file(filename: &str) -> Result<HashMap<MacAddress, String>, eyre::Error> {
     let mut map: HashMap<MacAddress, String> = HashMap::new();
     if let Ok(file) = File::open(filename) {
         for line in BufReader::new(file).lines() {
