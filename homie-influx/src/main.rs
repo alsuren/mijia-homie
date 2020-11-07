@@ -39,10 +39,7 @@ async fn main() -> Result<(), eyre::Report> {
         influxdb_database: "test".to_owned(),
     }];
 
-    let influxdb_url: Url = std::env::var("INFLUXDB_URL")
-        .unwrap_or_else(|_| DEFAULT_INFLUXDB_URL.to_string())
-        .parse()?;
-
+    let influxdb_client = get_influxdb_client()?;
     let mqtt_options = get_mqtt_options();
 
     let mut join_handles: Vec<_> = Vec::new();
@@ -50,7 +47,9 @@ async fn main() -> Result<(), eyre::Report> {
         let (controller, event_loop) =
             HomieController::new(mqtt_options.clone(), &mapping.homie_prefix);
         let controller = Arc::new(controller);
-        let influxdb_client = Client::new(influxdb_url.clone(), &mapping.influxdb_database);
+
+        let mut influxdb_client = influxdb_client.clone();
+        influxdb_client.switch_database(&mapping.influxdb_database);
 
         let handle = spawn_homie_poll_loop(event_loop, controller.clone(), influxdb_client);
         controller.start().await?;
@@ -58,6 +57,24 @@ async fn main() -> Result<(), eyre::Report> {
     }
 
     simplify_unit_vec(try_join_all(join_handles).await)
+}
+
+/// Construct a new InfluxDB `Client` based on configuration options or defaults.
+///
+/// The database name is not set; make sure to set it before using the client.
+fn get_influxdb_client() -> Result<Client, eyre::Report> {
+    let influxdb_url: Url = std::env::var("INFLUXDB_URL")
+        .unwrap_or_else(|_| DEFAULT_INFLUXDB_URL.to_string())
+        .parse()?;
+    let influxdb_username = std::env::var("INFLUXDB_USERNAME").ok();
+    let influxdb_password = std::env::var("INFLUXDB_PASSWORD").ok();
+
+    // Set empty database name initially; it will be overridden before the client is used.
+    let mut influxdb_client = Client::new(influxdb_url, "");
+    if let (Some(username), Some(password)) = (influxdb_username, influxdb_password) {
+        influxdb_client = influxdb_client.set_authentication(username, password);
+    }
+    Ok(influxdb_client)
 }
 
 /// Construct the `MqttOptions` for connecting to the MQTT broker based on configuration options or
