@@ -1,0 +1,9 @@
+#!/bin/sh
+
+set -e
+
+if [ "$1" = "configure" ] ; then
+  adduser --system --home /etc/homie-influx homie-influx
+fi
+
+#DEBHELPER#

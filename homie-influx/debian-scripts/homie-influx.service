@@ -1,0 +1,15 @@
+[Unit]
+Description=Service to log Homie MQTT device properties to InfluxDB.
+After=network.target
+
+[Service]
+Type=simple
+User=homie-influx
+WorkingDirectory=/etc/homie-influx
+Environment=RUST_BACKTRACE=1
+Environment=RUST_LIB_BACKTRACE=1
+ExecStart=/usr/bin/homie-influx
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

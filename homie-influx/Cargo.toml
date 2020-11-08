@@ -23,3 +23,18 @@ rustls = "0.18.1"
 rustls-native-certs = "0.4.0"
 stable-eyre = "0.2.1"
 tokio = "0.2.22"
+
+[package.metadata.deb]
+depends = "$auto, adduser"
+section = "net"
+maintainer-scripts = "debian-scripts"
+conf-files = ["/etc/homie-influx/.env", "/ect/homie-influx/mappings.conf"]
+assets = [
+	["target/release/homie-influx", "usr/bin/", "755"],
+	[".env.example", "etc/homie-influx/.env", "644"],
+	["mappings.conf.example", "etc/homie-influx/mappings.conf", "644"],
+	["README.md", "usr/share/doc/homie-influx/", "644"],
+]
+
+# This section needs to be here even if it's empty, for the systemd integration to work.
+[package.metadata.deb.systemd-units]
