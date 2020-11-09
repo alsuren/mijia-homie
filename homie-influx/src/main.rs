@@ -246,13 +246,13 @@ fn point_for_property_value(
         .add_tag("node_id", Value::String(node.id.to_owned()))
         .add_tag("property_id", Value::String(property.id.to_owned()));
     if let Some(device_name) = device.name.to_owned() {
-        point = point.add_field("device_name", Value::String(device_name));
+        point = point.add_tag("device_name", Value::String(device_name));
     }
     if let Some(node_name) = node.name.to_owned() {
-        point = point.add_field("node_name", Value::String(node_name));
+        point = point.add_tag("node_name", Value::String(node_name));
     }
     if let Some(property_name) = property.name.to_owned() {
-        point = point.add_field("property_name", Value::String(property_name));
+        point = point.add_tag("property_name", Value::String(property_name));
     }
     if let Some(unit) = property.unit.to_owned() {
         point = point.add_tag("unit", Value::String(unit));
