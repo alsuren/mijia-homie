@@ -70,9 +70,9 @@ async fn main() -> Result<(), eyre::Report> {
 
 /// Read mappings of the form "homie_prefix:influxdb_database" from the given file, ignoring any
 /// lines starting with '#'.
-fn mappings_from_file(filename: &str) -> Result<Vec<Mapping>, eyre::Error> {
+fn mappings_from_file(filename: &str) -> Result<Vec<Mapping>, eyre::Report> {
     let mut mappings = Vec::new();
-    let file = File::open(filename)?;
+    let file = File::open(filename).wrap_err_with(|| format!("Failed to open {}", filename))?;
     for line in BufReader::new(file).lines() {
         let line = line?;
         if !line.starts_with('#') {
