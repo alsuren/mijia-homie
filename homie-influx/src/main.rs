@@ -199,7 +199,7 @@ async fn send_property_value(
                 if let Some(point) =
                     point_for_property_value(device, node, property, SystemTime::now())
                 {
-                    // TODO: What should rp be?
+                    // Passing None for rp should use the default retention policy for the database.
                     // TODO: Handle errors
                     influx_db_client
                         .write_point(point, INFLUXDB_PRECISION, None)
