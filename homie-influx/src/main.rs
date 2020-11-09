@@ -76,7 +76,7 @@ fn mappings_from_file(filename: &str) -> Result<Vec<Mapping>, eyre::Error> {
     for line in BufReader::new(file).lines() {
         let line = line?;
         if !line.starts_with('#') {
-            let parts: Vec<&str> = line.splitn(2, ':').collect();
+            let parts: Vec<&str> = line.split(':').collect();
             if parts.len() != 2 {
                 eyre::bail!("Invalid line '{}'", line);
             }
