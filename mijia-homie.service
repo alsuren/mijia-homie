@@ -2,6 +2,9 @@
 Description=mijia-homie - send temperature readings to mqtt
 After=network.target
 
+# https://selivan.github.io/2017/12/30/systemd-serice-always-restart.html
+StartLimitIntervalSec=0
+
 [Service]
 Type=simple
 User=pi
@@ -10,6 +13,7 @@ Environment=RUST_BACKTRACE=1
 Environment=RUST_LIB_BACKTRACE=1
 ExecStart=/home/pi/mijia-homie
 Restart=always
+RestartSec=1
 
 [Install]
 WantedBy=multi-user.target
