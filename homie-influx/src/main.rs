@@ -1,8 +1,6 @@
 use futures::future::try_join_all;
 use futures::FutureExt;
-use homie_controller::{
-    Datatype, Device, Event, HomieController, HomieEventLoop, Node, PollError, Property,
-};
+use homie_controller::{Datatype, Device, Event, HomieController, HomieEventLoop, Node, Property};
 use influx_db_client::reqwest::Url;
 use influx_db_client::{Client, Point, Precision, Value};
 use rumqttc::MqttOptions;
@@ -143,10 +141,14 @@ fn spawn_homie_poll_loop(
     mut event_loop: HomieEventLoop,
     controller: Arc<HomieController>,
     influx_db_client: Client,
-) -> JoinHandle<Result<(), PollError>> {
+) -> JoinHandle<Result<(), eyre::Report>> {
     task::spawn(async move {
         loop {
-            if let Some(event) = controller.poll(&mut event_loop).await? {
+            if let Some(event) = controller
+                .poll(&mut event_loop)
+                .await
+                .wrap_err("Failed to poll HomieController.")?
+            {
                 match event {
                     Event::PropertyValueChanged {
                         device_id,
