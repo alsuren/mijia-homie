@@ -13,7 +13,7 @@ Environment=RUST_BACKTRACE=1
 Environment=RUST_LIB_BACKTRACE=1
 ExecStart=/home/pi/mijia-homie
 Restart=always
-RestartSec=1
+RestartSec=10
 
 [Install]
 WantedBy=multi-user.target
