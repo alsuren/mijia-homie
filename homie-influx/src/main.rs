@@ -47,7 +47,6 @@ async fn main() -> Result<(), eyre::Report> {
         );
     }
 
-    let influxdb_client = get_influxdb_client()?;
     let mqtt_options = get_mqtt_options();
 
     // Start a task per mapping to poll the Homie MQTT connection and send values to InfluxDB.
@@ -57,8 +56,7 @@ async fn main() -> Result<(), eyre::Report> {
             HomieController::new(mqtt_options.clone(), &mapping.homie_prefix);
         let controller = Arc::new(controller);
 
-        let mut influxdb_client = influxdb_client.clone();
-        influxdb_client.switch_database(&mapping.influxdb_database);
+        let influxdb_client = get_influxdb_client(&mapping.influxdb_database)?;
 
         let handle = spawn_homie_poll_loop(event_loop, controller.clone(), influxdb_client);
         controller.start().await?;
@@ -95,15 +93,14 @@ fn mappings_from_file(filename: &str) -> Result<Vec<Mapping>, eyre::Report> {
 /// Construct a new InfluxDB `Client` based on configuration options or defaults.
 ///
 /// The database name is not set; make sure to set it before using the client.
-fn get_influxdb_client() -> Result<Client, eyre::Report> {
+fn get_influxdb_client(database: &str) -> Result<Client, eyre::Report> {
     let influxdb_url: Url = std::env::var("INFLUXDB_URL")
         .unwrap_or_else(|_| DEFAULT_INFLUXDB_URL.to_string())
         .parse()?;
     let influxdb_username = std::env::var("INFLUXDB_USERNAME").ok();
     let influxdb_password = std::env::var("INFLUXDB_PASSWORD").ok();
 
-    // Set empty database name initially; it will be overridden before the client is used.
-    let mut influxdb_client = Client::new(influxdb_url, "");
+    let mut influxdb_client = Client::new(influxdb_url, database);
     if let (Some(username), Some(password)) = (influxdb_username, influxdb_password) {
         influxdb_client = influxdb_client.set_authentication(username, password);
     }
