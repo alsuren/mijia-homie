@@ -86,12 +86,6 @@ fn point_for_property_value(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fmt::Debug;
-
-    // TODO: Remove once Value implements PartialEq.
-    fn assert_debug_eq(a: impl Debug, b: impl Debug) {
-        assert_eq!(format!("{:?}", a), format!("{:?}", b));
-    }
 
     #[test]
     fn influx_value_for_integer() {
@@ -105,7 +99,7 @@ mod tests {
             format: None,
             value: Some("42".to_owned()),
         };
-        assert_debug_eq(
+        assert_eq!(
             influx_value_for_homie_property(&property).unwrap(),
             Value::Integer(42),
         );
@@ -123,7 +117,7 @@ mod tests {
             format: None,
             value: Some("42.3".to_owned()),
         };
-        assert_debug_eq(
+        assert_eq!(
             influx_value_for_homie_property(&property).unwrap(),
             Value::Float(42.3),
         );
@@ -141,7 +135,7 @@ mod tests {
             format: None,
             value: Some("true".to_owned()),
         };
-        assert_debug_eq(
+        assert_eq!(
             influx_value_for_homie_property(&property).unwrap(),
             Value::Boolean(true),
         );
@@ -159,7 +153,7 @@ mod tests {
             format: None,
             value: Some("abc".to_owned()),
         };
-        assert_debug_eq(
+        assert_eq!(
             influx_value_for_homie_property(&property).unwrap(),
             Value::String("abc".to_owned()),
         );
@@ -177,7 +171,7 @@ mod tests {
             format: None,
             value: Some("abc".to_owned()),
         };
-        assert_debug_eq(
+        assert_eq!(
             influx_value_for_homie_property(&property).unwrap(),
             Value::String("abc".to_owned()),
         );
@@ -195,7 +189,7 @@ mod tests {
             format: None,
             value: Some("12,34,56".to_owned()),
         };
-        assert_debug_eq(
+        assert_eq!(
             influx_value_for_homie_property(&property).unwrap(),
             Value::String("12,34,56".to_owned()),
         );
