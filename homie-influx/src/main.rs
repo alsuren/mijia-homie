@@ -76,7 +76,7 @@ fn spawn_homie_poll_loop(
                                 node_id,
                                 property_id,
                             )
-                            .await;
+                            .await?;
                         }
                     }
                     _ => {
