@@ -47,11 +47,12 @@ fn spawn_homie_poll_loop(
 ) -> JoinHandle<Result<(), eyre::Report>> {
     task::spawn(async move {
         loop {
-            if let Some(event) = controller
-                .poll(&mut event_loop)
-                .await
-                .wrap_err("Failed to poll HomieController.")?
-            {
+            if let Some(event) = controller.poll(&mut event_loop).await.wrap_err_with(|| {
+                format!(
+                    "Failed to poll HomieController for base topic '{}'.",
+                    controller.base_topic()
+                )
+            })? {
                 match event {
                     Event::PropertyValueChanged {
                         device_id,
