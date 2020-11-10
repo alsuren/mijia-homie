@@ -19,8 +19,12 @@ async fn main() -> Result<(), PollError> {
                     node_id,
                     property_id,
                     value,
+                    fresh,
                 } => {
-                    println!("{}/{}/{} = {}", device_id, node_id, property_id, value);
+                    println!(
+                        "{}/{}/{} = {} ({})",
+                        device_id, node_id, property_id, value, fresh
+                    );
                 }
                 _ => {
                     println!("Event: {:?}", event);

@@ -60,7 +60,11 @@ pub enum Event {
         device_id: String,
         node_id: String,
         property_id: String,
+        /// The new value.
         value: String,
+        /// Whether the new value is fresh, i.e. it has just been sent by the device, as opposed to
+        /// being the initial value because the controller just connected to the MQTT broker.
+        fresh: bool,
     },
 }
 
@@ -89,12 +93,13 @@ impl Event {
         }
     }
 
-    fn property_value(device_id: &str, node_id: &str, property: &Property) -> Self {
+    fn property_value(device_id: &str, node_id: &str, property: &Property, fresh: bool) -> Self {
         Event::PropertyValueChanged {
             device_id: device_id.to_owned(),
             node_id: node_id.to_owned(),
             property_id: property.id.to_owned(),
             value: property.value.to_owned().unwrap(),
+            fresh,
         }
     }
 }
@@ -278,6 +283,11 @@ impl HomieController {
                 let device = get_mut_device_for(devices, "Got fw/version for", device_id)?;
                 device.firmware_version = Some(payload.to_owned());
                 Some(Event::device_updated(device))
+            }
+            [_device_id, "$stats"] => {
+                // Homie 3.0 list of available stats. We don't need this, so ignore it without
+                // logging a warning.
+                None
             }
             [device_id, "$stats", "interval"] => {
                 let interval = payload.parse()?;
@@ -475,7 +485,11 @@ impl HomieController {
                 property.retained = retained;
                 Some(Event::property_updated(device_id, node_id, property))
             }
-            [device_id, node_id, property_id] if !property_id.starts_with('$') => {
+            [device_id, node_id, property_id]
+                if !device_id.starts_with('$')
+                    && !node_id.starts_with('$')
+                    && !property_id.starts_with('$') =>
+            {
                 // TODO: What about values of properties we don't yet know about? They may arrive
                 // before the $properties of the node, because the "homie/node_id/+" subscription
                 // matches both.
@@ -487,7 +501,12 @@ impl HomieController {
                     property_id,
                 )?;
                 property.value = Some(payload.to_owned());
-                Some(Event::property_value(device_id, node_id, property))
+                Some(Event::property_value(
+                    device_id,
+                    node_id,
+                    property,
+                    !publish.retain,
+                ))
             }
             [_device_id, _node_id, _property_id, "set"] => {
                 // Value set message may have been sent by us or another controller. Either way,

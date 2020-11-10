@@ -43,37 +43,12 @@ async fn main() -> Result<(), eyre::Report> {
     let device_id = std::env::var("DEVICE_ID").unwrap_or_else(|_| DEFAULT_DEVICE_ID.to_string());
     let device_name =
         std::env::var("DEVICE_NAME").unwrap_or_else(|_| DEFAULT_DEVICE_NAME.to_string());
-    let client_name = std::env::var("CLIENT_NAME").unwrap_or_else(|_| device_id.clone());
 
-    let host = std::env::var("HOST").unwrap_or_else(|_| DEFAULT_HOST.to_string());
-
-    let port = std::env::var("PORT")
-        .ok()
-        .and_then(|val| val.parse::<u16>().ok())
-        .unwrap_or(DEFAULT_PORT);
-
-    let mut mqttoptions = MqttOptions::new(client_name, host, port);
-
-    let username = std::env::var("USERNAME").ok();
-    let password = std::env::var("PASSWORD").ok();
-
-    mqttoptions.set_keep_alive(5);
-    if let (Some(u), Some(p)) = (username, password) {
-        mqttoptions.set_credentials(u, p);
-    }
-
-    // Use `env -u USE_TLS` to unset this variable if you need to clear it.
-    if std::env::var("USE_TLS").is_ok() {
-        let mut client_config = ClientConfig::new();
-        client_config.root_store =
-            rustls_native_certs::load_native_certs().expect("could not load platform certs");
-        mqttoptions.set_tls_client_config(Arc::new(client_config));
-    }
-
+    let mqtt_options = get_mqtt_options(&device_id);
     let mqtt_prefix =
         std::env::var("MQTT_PREFIX").unwrap_or_else(|_| DEFAULT_MQTT_PREFIX.to_string());
     let device_base = format!("{}/{}", mqtt_prefix, device_id);
-    let mut homie_builder = HomieDevice::builder(&device_base, &device_name, mqttoptions);
+    let mut homie_builder = HomieDevice::builder(&device_base, &device_name, mqtt_options);
     homie_builder.set_firmware(env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
     let (homie, homie_handle) = homie_builder.spawn().await?;
 
@@ -95,6 +70,37 @@ async fn main() -> Result<(), eyre::Report> {
     };
     res?;
     Ok(())
+}
+
+/// Construct the `MqttOptions` for connecting to the MQTT broker based on configuration options or
+/// defaults.
+fn get_mqtt_options(device_id: &str) -> MqttOptions {
+    let client_name = std::env::var("CLIENT_NAME").unwrap_or_else(|_| device_id.to_owned());
+
+    let host = std::env::var("HOST").unwrap_or_else(|_| DEFAULT_HOST.to_string());
+    let port = std::env::var("PORT")
+        .ok()
+        .and_then(|val| val.parse::<u16>().ok())
+        .unwrap_or(DEFAULT_PORT);
+
+    let mut mqtt_options = MqttOptions::new(client_name, host, port);
+
+    let username = std::env::var("USERNAME").ok();
+    let password = std::env::var("PASSWORD").ok();
+
+    mqtt_options.set_keep_alive(5);
+    if let (Some(u), Some(p)) = (username, password) {
+        mqtt_options.set_credentials(u, p);
+    }
+
+    // Use `env -u USE_TLS` to unset this variable if you need to clear it.
+    if std::env::var("USE_TLS").is_ok() {
+        let mut client_config = ClientConfig::new();
+        client_config.root_store =
+            rustls_native_certs::load_native_certs().expect("could not load platform certs");
+        mqtt_options.set_tls_client_config(Arc::new(client_config));
+    }
+    mqtt_options
 }
 
 #[derive(Debug, Copy, Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -239,7 +245,7 @@ async fn run_sensor_system(
 
 /// Read the given file of key-value pairs into a hashmap.
 /// Returns an empty hashmap if the file doesn't exist, or an error if it is malformed.
-pub fn hashmap_from_file(filename: &str) -> Result<HashMap<MacAddress, String>, eyre::Error> {
+fn hashmap_from_file(filename: &str) -> Result<HashMap<MacAddress, String>, eyre::Error> {
     let mut map: HashMap<MacAddress, String> = HashMap::new();
     if let Ok(file) = File::open(filename) {
         for line in BufReader::new(file).lines() {

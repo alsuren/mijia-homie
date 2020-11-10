@@ -1,0 +1,25 @@
+[package]
+name = "homie-influx"
+version = "0.1.0"
+authors = ["Andrew Walbran <qwandor@google.com>"]
+edition = "2018"
+license = "MIT OR Apache-2.0"
+description = "Service to connect to an MQTT broker and log properties of devices following the Homie convention to an InfluxDB database."
+repository = "https://github.com/alsuren/mijia-homie/"
+keywords = ["homie", "mqtt"]
+categories = ["network-programming"]
+
+[dependencies]
+color-backtrace = "0.4.2"
+dotenv = "0.15.0"
+eyre = "0.6.2"
+futures = "0.3.7"
+homie-controller = { version = "0.1.0", path = "../homie-controller" }
+influx_db_client = "0.4.4"
+log = "0.4.11"
+pretty_env_logger = "0.4.0"
+rumqttc = "0.2.0"
+rustls = "0.18.1"
+rustls-native-certs = "0.4.0"
+stable-eyre = "0.2.1"
+tokio = "0.2.22"
