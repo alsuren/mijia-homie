@@ -21,13 +21,12 @@ async fn main() -> Result<(), eyre::Report> {
 
     let mappings = read_mappings()?;
 
-    let mqtt_options = get_mqtt_options();
-
     // Start a task per mapping to poll the Homie MQTT connection and send values to InfluxDB.
     let mut join_handles: Vec<_> = Vec::new();
     for mapping in &mappings {
-        let (controller, event_loop) =
-            HomieController::new(mqtt_options.clone(), &mapping.homie_prefix);
+        // Include Homie base topic in client name, because client name must be unique.
+        let mqtt_options = get_mqtt_options(&mapping.homie_prefix);
+        let (controller, event_loop) = HomieController::new(mqtt_options, &mapping.homie_prefix);
         let controller = Arc::new(controller);
 
         let influxdb_client = get_influxdb_client(&mapping.influxdb_database)?;
