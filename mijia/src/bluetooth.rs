@@ -113,7 +113,7 @@ impl BluetoothSession {
         let dbus_handle = tokio::spawn(async {
             let err = dbus_resource.await;
             // TODO: work out why this err isn't 'static and use eyre::Error::new instead
-            Err::<(), eyre::Error>(eyre::eyre!(err))
+            Err(eyre::eyre!(err))
         });
         Ok((
             dbus_handle.map(|res| Ok(res??)),
