@@ -24,7 +24,7 @@ $ cargo install mijia-homie
 
 ## Usage
 
-If you have installed the Debian package, the service will be set up with systemd for you already. Otherwise, copy the `mijia-homie` binary to `/usr/bin`, copy `debian/mijia-homie.service` to `/lib/systemd/system`, create a `mijia-homie` user to run as, and create `/etc/mijia-homie` for configuration files.
+If you have installed the Debian package, the service will be set up with systemd for you already. Otherwise, copy the `mijia-homie` binary to `/usr/bin`, copy `debian-scripts/mijia-homie.service` to `/lib/systemd/system`, create a `mijia-homie` user to run as, and create `/etc/mijia-homie` for configuration files.
 
 There should be two config files under `/etc/mijia-homie`:
 

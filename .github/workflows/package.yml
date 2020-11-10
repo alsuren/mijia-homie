@@ -3,7 +3,7 @@ name: Package
 on:
   push:
     branches: [master]
-    tags: ["mijia-homie-*"]
+    tags: ["homie-influx-*", "mijia-homie-*"]
 
 env:
   CARGO_TERM_COLOR: always
@@ -62,7 +62,10 @@ jobs:
           use-cross: true
           command: build
           args: --release --target ${{ matrix.target }}
-      - name: Package
+      - name: Package homie-influx
+        working-directory: homie-influx
+        run: cargo deb --target ${{ matrix.target }} --no-build
+      - name: Package mijia-homie
         working-directory: mijia-homie
         run: cargo deb --target ${{ matrix.target }} --no-build
 
@@ -76,19 +79,18 @@ jobs:
     name: Draft release
     runs-on: ubuntu-latest
     needs: build
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/mijia-homie-')
+    if: github.event_name == 'push' && (startsWith(github.ref, 'refs/tags/homie-influx-') || startsWith(github.ref, 'refs/tags/mijia-homie-'))
     steps:
       - name: Download packages
         uses: actions/download-artifact@v2
         with:
           name: debian-packages
-      - name: Get version
-        id: version
-        uses: frabert/replace-string-action@v1.2
+      - name: Parse tag for package and version
+        id: parse_tag
+        uses: actions-ecosystem/action-regex-match@v2
         with:
-          string: ${{ github.ref }}
-          pattern: "refs/tags/mijia-homie-(.+)"
-          replace-with: "$1"
+          text: ${{ github.ref }}
+          regex: "^refs/tags/(homie-influx|mijia-homie)-(.+)$"
       - name: Create draft release
         id: create_release
         uses: actions/create-release@v1
@@ -96,12 +98,12 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # This token is provided by Actions.
         with:
           tag_name: ${{ github.ref }}
-          release_name: mijia-homie release ${{ steps.version.outputs.replaced }}
+          release_name: ${{ steps.parse_tag.outputs.group1 }} release ${{ steps.parse_tag.outputs.group2 }}
           draft: true
           prerelease: false
       - name: Upload packages to release
         uses: shogo82148/actions-upload-release-asset@v1
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: "*.deb"
+          asset_path: "${{ steps.parse_tag.outputs.group1 }}_*.deb"
           asset_content_type: application/vnd.debian.binary-package
