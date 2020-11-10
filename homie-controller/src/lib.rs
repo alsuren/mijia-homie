@@ -147,6 +147,11 @@ impl HomieController {
         self.devices.lock().unwrap().clone()
     }
 
+    /// Get the Homie base topic which the controller was configured to use.
+    pub fn base_topic(&self) -> &str {
+        &self.base_topic
+    }
+
     /// Poll the `EventLoop`, and maybe return a Homie event.
     pub async fn poll(&self, event_loop: &mut HomieEventLoop) -> Result<Option<Event>, PollError> {
         let notification = event_loop.event_loop.poll().await?;

@@ -21,13 +21,12 @@ async fn main() -> Result<(), eyre::Report> {
 
     let mappings = read_mappings()?;
 
-    let mqtt_options = get_mqtt_options();
-
     // Start a task per mapping to poll the Homie MQTT connection and send values to InfluxDB.
     let mut join_handles: Vec<_> = Vec::new();
     for mapping in &mappings {
-        let (controller, event_loop) =
-            HomieController::new(mqtt_options.clone(), &mapping.homie_prefix);
+        // Include Homie base topic in client name, because client name must be unique.
+        let mqtt_options = get_mqtt_options(&mapping.homie_prefix);
+        let (controller, event_loop) = HomieController::new(mqtt_options, &mapping.homie_prefix);
         let controller = Arc::new(controller);
 
         let influxdb_client = get_influxdb_client(&mapping.influxdb_database)?;
@@ -47,11 +46,12 @@ fn spawn_homie_poll_loop(
 ) -> JoinHandle<Result<(), eyre::Report>> {
     task::spawn(async move {
         loop {
-            if let Some(event) = controller
-                .poll(&mut event_loop)
-                .await
-                .wrap_err("Failed to poll HomieController.")?
-            {
+            if let Some(event) = controller.poll(&mut event_loop).await.wrap_err_with(|| {
+                format!(
+                    "Failed to poll HomieController for base topic '{}'.",
+                    controller.base_topic()
+                )
+            })? {
                 match event {
                     Event::PropertyValueChanged {
                         device_id,
@@ -76,7 +76,7 @@ fn spawn_homie_poll_loop(
                                 node_id,
                                 property_id,
                             )
-                            .await;
+                            .await?;
                         }
                     }
                     _ => {

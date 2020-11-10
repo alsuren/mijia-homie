@@ -8,7 +8,7 @@ use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::sync::Arc;
 
-const DEFAULT_MQTT_CLIENT_NAME: &str = "homie-influx";
+const DEFAULT_MQTT_CLIENT_PREFIX: &str = "homie-influx";
 const DEFAULT_MQTT_HOST: &str = "test.mosquitto.org";
 const DEFAULT_MQTT_PORT: u16 = 1883;
 const DEFAULT_INFLUXDB_URL: &str = "http://localhost:8086";
@@ -78,9 +78,10 @@ pub fn get_influxdb_client(database: &str) -> Result<Client, eyre::Report> {
 
 /// Construct the `MqttOptions` for connecting to the MQTT broker based on configuration options or
 /// defaults.
-pub fn get_mqtt_options() -> MqttOptions {
-    let client_name =
-        std::env::var("MQTT_CLIENT_NAME").unwrap_or_else(|_| DEFAULT_MQTT_CLIENT_NAME.to_string());
+pub fn get_mqtt_options(client_name_suffix: &str) -> MqttOptions {
+    let client_name_prefix = std::env::var("MQTT_CLIENT_PREFIX")
+        .unwrap_or_else(|_| DEFAULT_MQTT_CLIENT_PREFIX.to_string());
+    let client_name = format!("{}-{}", client_name_prefix, client_name_suffix);
 
     let mqtt_host = std::env::var("MQTT_HOST").unwrap_or_else(|_| DEFAULT_MQTT_HOST.to_string());
 

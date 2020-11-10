@@ -1,3 +1,4 @@
+use eyre::WrapErr;
 use homie_controller::{Datatype, Device, HomieController, Node, Property};
 use influx_db_client::{Client, Point, Precision, Value};
 use std::time::SystemTime;
@@ -10,7 +11,7 @@ pub async fn send_property_value(
     device_id: String,
     node_id: String,
     property_id: String,
-) {
+) -> Result<(), eyre::Report> {
     if let Some(device) = controller.devices().get(&device_id) {
         if let Some(node) = device.nodes.get(&node_id) {
             if let Some(property) = node.properties.get(&property_id) {
@@ -18,15 +19,15 @@ pub async fn send_property_value(
                     point_for_property_value(device, node, property, SystemTime::now())
                 {
                     // Passing None for rp should use the default retention policy for the database.
-                    // TODO: Handle errors
                     influx_db_client
                         .write_point(point, INFLUXDB_PRECISION, None)
                         .await
-                        .unwrap();
+                        .wrap_err("Failed to send property value update to InfluxDB")?;
                 }
             }
         }
     }
+    Ok(())
 }
 
 /// Convert the value of the given Homie property to an InfluxDB value of the appropriate type, if
