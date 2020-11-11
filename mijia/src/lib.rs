@@ -5,7 +5,8 @@ use core::future::Future;
 use dbus::nonblock::MsgMatch;
 use dbus::Message;
 use futures::{Stream, StreamExt};
-use std::time::Duration;
+use std::collections::HashMap;
+use std::time::{Duration, SystemTime};
 
 pub mod bluetooth;
 mod bluetooth_event;
@@ -13,10 +14,12 @@ pub mod decode;
 pub use bluetooth::{BluetoothSession, DeviceId, MacAddress};
 use bluetooth_event::BluetoothEvent;
 pub use decode::Readings;
+use decode::{decode_time, encode_time};
 
 const MIJIA_NAME: &str = "LYWSD03MMC";
 const SENSOR_READING_CHARACTERISTIC_PATH: &str = "/service0021/char0035";
 const CONNECTION_INTERVAL_CHARACTERISTIC_PATH: &str = "/service0021/char0045";
+const CLOCK_CHARACTERISTIC_PATH: &str = "/service0021/char0022";
 /// 500 in little-endian
 const CONNECTION_INTERVAL_500_MS: [u8; 3] = [0xF4, 0x01, 0x00];
 const DBUS_METHOD_CALL_TIMEOUT: Duration = Duration::from_secs(30);
@@ -104,6 +107,31 @@ impl MijiaSession {
             })
             .collect();
         Ok(sensors)
+    }
+
+    pub async fn get_time(&self, id: &DeviceId) -> Result<SystemTime, eyre::Error> {
+        let clock_path = id.object_path.to_string() + CLOCK_CHARACTERISTIC_PATH;
+        let clock = dbus::nonblock::Proxy::new(
+            "org.bluez",
+            clock_path,
+            DBUS_METHOD_CALL_TIMEOUT,
+            self.bt_session.connection.clone(),
+        );
+        let time_bytes = clock.read_value(HashMap::new()).await?;
+        decode_time(&time_bytes)
+    }
+
+    pub async fn set_time(&self, id: &DeviceId, time: SystemTime) -> Result<(), eyre::Error> {
+        let clock_path = id.object_path.to_string() + CLOCK_CHARACTERISTIC_PATH;
+        let clock = dbus::nonblock::Proxy::new(
+            "org.bluez",
+            clock_path,
+            DBUS_METHOD_CALL_TIMEOUT,
+            self.bt_session.connection.clone(),
+        );
+        let time_bytes = encode_time(time)?;
+        clock.write_value(time_bytes.into(), HashMap::new()).await?;
+        Ok(())
     }
 
     /// Assuming that the given device ID refers to a Mijia sensor device and that it has already
