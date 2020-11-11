@@ -23,7 +23,8 @@ async fn main() -> Result<(), eyre::Error> {
             println!("Failed to connect to {}: {:?}", sensor.mac_address, e);
         } else {
             let sensor_time = session.get_time(&sensor.id).await?;
-            println!("Time: {:?}", sensor_time);
+            let temperature_unit = session.get_temperature_unit(&sensor.id).await?;
+            println!("Time: {:?}, Unit: {:?}", sensor_time, temperature_unit);
         }
     }
 

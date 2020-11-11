@@ -51,6 +51,36 @@ impl Readings {
     }
 }
 
+/// The temperature unit which a Mijia sensor uses for its display.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum TemperatureUnit {
+    /// ºC
+    Celcius,
+    /// ºF
+    Fahrenheit,
+}
+
+impl TemperatureUnit {
+    pub(crate) fn decode(value: &[u8]) -> Result<TemperatureUnit, eyre::Report> {
+        if value.len() != 1 {
+            bail!("Wrong length {} for temperature unit", value.len());
+        }
+
+        match value[0] {
+            0x00 => Ok(TemperatureUnit::Celcius),
+            0x01 => Ok(TemperatureUnit::Fahrenheit),
+            byte => bail!("Invalid temperature unit value 0x{:x}", byte),
+        }
+    }
+
+    pub(crate) fn encode(&self) -> [u8; 1] {
+        match self {
+            TemperatureUnit::Celcius => [0x00],
+            TemperatureUnit::Fahrenheit => [0x01],
+        }
+    }
+}
+
 pub(crate) fn decode_time(value: &[u8]) -> Result<SystemTime, eyre::Report> {
     if value.len() != 4 {
         bail!("Wrong length {} for time", value.len());
