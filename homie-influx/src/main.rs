@@ -61,7 +61,8 @@ fn spawn_homie_poll_loop(
                         fresh,
                     } => {
                         log::trace!(
-                            "{}/{}/{} = {} ({})",
+                            "{}/{}/{}/{} = {} ({})",
+                            controller.base_topic(),
                             device_id,
                             node_id,
                             property_id,
@@ -80,7 +81,7 @@ fn spawn_homie_poll_loop(
                         }
                     }
                     _ => {
-                        log::info!("Event: {:?}", event);
+                        log::info!("{} Event: {:?}", controller.base_topic(), event);
                     }
                 }
             }

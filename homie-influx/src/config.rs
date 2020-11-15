@@ -42,7 +42,7 @@ fn mappings_from_file(filename: &str) -> Result<Vec<Mapping>, eyre::Report> {
     let file = File::open(filename).wrap_err_with(|| format!("Failed to open {}", filename))?;
     for line in BufReader::new(file).lines() {
         let line = line?;
-        if !line.starts_with('#') {
+        if line.len() > 0 && !line.starts_with('#') {
             let parts: Vec<&str> = line.split(':').collect();
             if parts.len() != 2 {
                 eyre::bail!("Invalid line '{}'", line);

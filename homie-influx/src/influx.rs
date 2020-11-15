@@ -86,12 +86,9 @@ fn point_for_property_value(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fmt::Debug;
-
-    // TODO: Remove once Value implements PartialEq.
-    fn assert_debug_eq(a: impl Debug, b: impl Debug) {
-        assert_eq!(format!("{:?}", a), format!("{:?}", b));
-    }
+    use homie_controller::State;
+    use std::collections::HashMap;
+    use std::time::Duration;
 
     #[test]
     fn influx_value_for_integer() {
@@ -105,7 +102,7 @@ mod tests {
             format: None,
             value: Some("42".to_owned()),
         };
-        assert_debug_eq(
+        assert_eq!(
             influx_value_for_homie_property(&property).unwrap(),
             Value::Integer(42),
         );
@@ -123,7 +120,7 @@ mod tests {
             format: None,
             value: Some("42.3".to_owned()),
         };
-        assert_debug_eq(
+        assert_eq!(
             influx_value_for_homie_property(&property).unwrap(),
             Value::Float(42.3),
         );
@@ -141,7 +138,7 @@ mod tests {
             format: None,
             value: Some("true".to_owned()),
         };
-        assert_debug_eq(
+        assert_eq!(
             influx_value_for_homie_property(&property).unwrap(),
             Value::Boolean(true),
         );
@@ -159,7 +156,7 @@ mod tests {
             format: None,
             value: Some("abc".to_owned()),
         };
-        assert_debug_eq(
+        assert_eq!(
             influx_value_for_homie_property(&property).unwrap(),
             Value::String("abc".to_owned()),
         );
@@ -177,7 +174,7 @@ mod tests {
             format: None,
             value: Some("abc".to_owned()),
         };
-        assert_debug_eq(
+        assert_eq!(
             influx_value_for_homie_property(&property).unwrap(),
             Value::String("abc".to_owned()),
         );
@@ -195,9 +192,134 @@ mod tests {
             format: None,
             value: Some("12,34,56".to_owned()),
         };
-        assert_debug_eq(
+        assert_eq!(
             influx_value_for_homie_property(&property).unwrap(),
             Value::String("12,34,56".to_owned()),
+        );
+    }
+
+    fn property_set(properties: Vec<Property>) -> HashMap<String, Property> {
+        properties
+            .into_iter()
+            .map(|property| (property.id.clone(), property))
+            .collect()
+    }
+
+    fn node_set(nodes: Vec<Node>) -> HashMap<String, Node> {
+        nodes
+            .into_iter()
+            .map(|node| (node.id.clone(), node))
+            .collect()
+    }
+
+    #[test]
+    fn point_for_minimal_property() {
+        let property = Property {
+            id: "property_id".to_owned(),
+            name: None,
+            datatype: Some(Datatype::Integer),
+            settable: false,
+            retained: true,
+            unit: None,
+            format: None,
+            value: Some("42".to_owned()),
+        };
+        let node = Node {
+            id: "node_id".to_owned(),
+            name: None,
+            node_type: None,
+            properties: property_set(vec![property.clone()]),
+        };
+        let device = Device {
+            id: "device_id".to_owned(),
+            homie_version: "4.0".to_owned(),
+            name: None,
+            state: State::Unknown,
+            implementation: None,
+            nodes: node_set(vec![node.clone()]),
+            extensions: Vec::default(),
+            local_ip: None,
+            mac: None,
+            firmware_name: None,
+            firmware_version: None,
+            stats_interval: None,
+            stats_uptime: None,
+            stats_signal: None,
+            stats_cputemp: None,
+            stats_cpuload: None,
+            stats_battery: None,
+            stats_freeheap: None,
+            stats_supply: None,
+        };
+        let timestamp_millis = 123456789;
+        let timestamp = SystemTime::UNIX_EPOCH + Duration::from_millis(timestamp_millis as u64);
+        let point = point_for_property_value(&device, &node, &property, timestamp).unwrap();
+        assert_eq!(
+            point,
+            Point::new("integer")
+                .add_timestamp(timestamp_millis)
+                .add_tag("device_id", Value::String("device_id".to_owned()))
+                .add_tag("node_id", Value::String("node_id".to_owned()))
+                .add_tag("property_id", Value::String("property_id".to_owned()))
+                .add_field("value", Value::Integer(42)),
+        );
+    }
+
+    #[test]
+    fn point_for_full_property() {
+        let property = Property {
+            id: "property_id".to_owned(),
+            name: Some("Property name".to_owned()),
+            datatype: Some(Datatype::Integer),
+            settable: false,
+            retained: true,
+            unit: None,
+            format: None,
+            value: Some("42".to_owned()),
+        };
+        let node = Node {
+            id: "node_id".to_owned(),
+            name: Some("Node name".to_owned()),
+            node_type: Some("node type".to_owned()),
+            properties: property_set(vec![property.clone()]),
+        };
+        let device = Device {
+            id: "device_id".to_owned(),
+            homie_version: "4.0".to_owned(),
+            name: Some("Device name".to_owned()),
+            state: State::Unknown,
+            implementation: None,
+            nodes: node_set(vec![node.clone()]),
+            extensions: Vec::default(),
+            local_ip: None,
+            mac: None,
+            firmware_name: None,
+            firmware_version: None,
+            stats_interval: None,
+            stats_uptime: None,
+            stats_signal: None,
+            stats_cputemp: None,
+            stats_cpuload: None,
+            stats_battery: None,
+            stats_freeheap: None,
+            stats_supply: None,
+        };
+
+        let timestamp_millis = 123456789;
+        let timestamp = SystemTime::UNIX_EPOCH + Duration::from_millis(timestamp_millis as u64);
+        let point = point_for_property_value(&device, &node, &property, timestamp).unwrap();
+        assert_eq!(
+            point,
+            Point::new("integer")
+                .add_timestamp(timestamp_millis)
+                .add_tag("device_id", Value::String("device_id".to_owned()))
+                .add_tag("node_id", Value::String("node_id".to_owned()))
+                .add_tag("property_id", Value::String("property_id".to_owned()))
+                .add_tag("node_type", Value::String("node type".to_owned()))
+                .add_tag("device_name", Value::String("Device name".to_owned()))
+                .add_tag("node_name", Value::String("Node name".to_owned()))
+                .add_tag("property_name", Value::String("Property name".to_owned()))
+                .add_field("value", Value::Integer(42)),
         );
     }
 }
