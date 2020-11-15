@@ -287,43 +287,40 @@ impl HomieDevice {
         let incoming_task: JoinHandle<Result<(), SpawnError>> =
             task::spawn(async move {
                 loop {
-                    match incoming_rx.recv().await.map_err(|_| {
+                    if let Incoming::Publish(publish) = incoming_rx.recv().await.map_err(|_| {
                         SpawnError::Internal("Incoming event channel sender closed.")
                     })? {
-                        Incoming::Publish(publish) => {
-                            if let Some(rest) = publish.topic.strip_prefix(&device_base) {
-                                if let ([node_id, property_id, "set"], Ok(payload)) = (
-                                    rest.split('/').collect::<Vec<&str>>().as_slice(),
-                                    str::from_utf8(&publish.payload),
-                                ) {
-                                    log::trace!(
-                                        "set node {:?} property {:?} to {:?}",
-                                        node_id,
-                                        property_id,
-                                        payload
-                                    );
-                                    if let Some(callback) = update_callback.as_mut() {
-                                        if let Some(value) = callback(
-                                            node_id.to_string(),
-                                            property_id.to_string(),
-                                            payload.to_string(),
-                                        )
-                                        .await
-                                        {
-                                            publisher
-                                                .publish_retained(
-                                                    &format!("{}/{}", node_id, property_id),
-                                                    value,
-                                                )
-                                                .await?;
-                                        }
+                        if let Some(rest) = publish.topic.strip_prefix(&device_base) {
+                            if let ([node_id, property_id, "set"], Ok(payload)) = (
+                                rest.split('/').collect::<Vec<&str>>().as_slice(),
+                                str::from_utf8(&publish.payload),
+                            ) {
+                                log::trace!(
+                                    "set node {:?} property {:?} to {:?}",
+                                    node_id,
+                                    property_id,
+                                    payload
+                                );
+                                if let Some(callback) = update_callback.as_mut() {
+                                    if let Some(value) = callback(
+                                        node_id.to_string(),
+                                        property_id.to_string(),
+                                        payload.to_string(),
+                                    )
+                                    .await
+                                    {
+                                        publisher
+                                            .publish_retained(
+                                                &format!("{}/{}", node_id, property_id),
+                                                value,
+                                            )
+                                            .await?;
                                     }
                                 }
-                            } else {
-                                log::warn!("Unexpected publish: {:?}", publish);
                             }
+                        } else {
+                            log::warn!("Unexpected publish: {:?}", publish);
                         }
-                        _ => {}
                     }
                 }
             });
