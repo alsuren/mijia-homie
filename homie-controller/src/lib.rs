@@ -124,6 +124,7 @@ impl HomieEventLoop {
     }
 }
 
+/// Internal struct for the return value of HomieController::handle_publish_sync()
 struct PublishResponse {
     event: Option<Event>,
     topics_to_subscribe: Vec<String>,
