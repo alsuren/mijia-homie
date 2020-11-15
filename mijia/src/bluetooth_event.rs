@@ -60,8 +60,11 @@ pub enum BluetoothEvent {
 
 impl BluetoothEvent {
     pub fn from(conn_msg: Message) -> Option<BluetoothEvent> {
-        let result: Result<(&str, HashMap<String, Variant<Box<dyn RefArg>>>), TypeMismatchError> =
-            conn_msg.read2();
+        #[allow(clippy::type_complexity)]
+        let result: Result<
+            (&str, HashMap<String, Variant<Box<dyn RefArg>>>),
+            TypeMismatchError,
+        > = conn_msg.read2();
 
         match result {
             Ok((_, properties)) => {
