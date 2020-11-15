@@ -78,6 +78,8 @@ if [ "$GENERATE" = 1 ]; then
             --interfaces="$interface" \
             --client=nonblock \
             --methodtype=none \
+            | grep -v '^use dbus as dbus;$' \
+            | rustfmt \
             > "src/$modname.rs"
         echo "pub mod $modname;" >> src/lib.rs
         echo "pub use $modname::*;" >> src/lib.rs
