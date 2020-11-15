@@ -56,7 +56,7 @@ impl FromStr for MacAddress {
     type Err = ParseMacAddressError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let octets: Vec<_> = s.split(":").collect();
+        let octets: Vec<_> = s.split(':').collect();
         if octets.len() != 6 {
             return Err(ParseMacAddressError());
         }

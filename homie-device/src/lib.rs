@@ -5,7 +5,7 @@
 
 use futures::future::try_join;
 use futures::FutureExt;
-use local_ipaddress;
+
 use mac_address::get_mac_address;
 use rumqttc::{
     self, AsyncClient, ClientError, ConnectionError, Event, EventLoop, Incoming, LastWill,
@@ -293,7 +293,7 @@ impl HomieDevice {
                         Incoming::Publish(publish) => {
                             if let Some(rest) = publish.topic.strip_prefix(&device_base) {
                                 if let ([node_id, property_id, "set"], Ok(payload)) = (
-                                    rest.split("/").collect::<Vec<&str>>().as_slice(),
+                                    rest.split('/').collect::<Vec<&str>>().as_slice(),
                                     str::from_utf8(&publish.payload),
                                 ) {
                                     log::trace!(
