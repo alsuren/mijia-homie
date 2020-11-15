@@ -124,6 +124,12 @@ impl HomieEventLoop {
     }
 }
 
+struct PublishResponse {
+    event: Option<Event>,
+    topics_to_subscribe: Vec<String>,
+    topics_to_unsubscribe: Vec<String>,
+}
+
 impl HomieController {
     /// Create a new `HomieController` connected to an MQTT broker.
     ///
@@ -185,8 +191,11 @@ impl HomieController {
     /// subscriptions as appropriate and possibly returning an event to send back to the controller
     /// application.
     async fn handle_publish(&self, publish: Publish) -> Result<Option<Event>, HandleError> {
-        let (event, topics_to_subscribe, topics_to_unsubscribe) =
-            self.handle_publish_sync(publish)?;
+        let PublishResponse {
+            event,
+            topics_to_subscribe,
+            topics_to_unsubscribe,
+        } = self.handle_publish_sync(publish)?;
 
         for topic in topics_to_subscribe {
             log::trace!("Subscribe to {}", topic);
@@ -205,10 +214,7 @@ impl HomieController {
     ///
     /// This is separate from `handle_publish` because it takes the `devices` lock, to ensure that
     /// no async operations are awaited while the lock is held.
-    fn handle_publish_sync(
-        &self,
-        publish: Publish,
-    ) -> Result<(Option<Event>, Vec<String>, Vec<String>), HandleError> {
+    fn handle_publish_sync(&self, publish: Publish) -> Result<PublishResponse, HandleError> {
         let base_topic = format!("{}/", self.base_topic);
         let payload = str::from_utf8(&publish.payload)
             .map_err(|e| format!("Payload not valid UTF-8: {}", e))?;
@@ -524,7 +530,11 @@ impl HomieController {
             }
         };
 
-        Ok((event, topics_to_subscribe, topics_to_unsubscribe))
+        Ok(PublishResponse {
+            event,
+            topics_to_subscribe,
+            topics_to_unsubscribe,
+        })
     }
 
     /// Start discovering Homie devices.
