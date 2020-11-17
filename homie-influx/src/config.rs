@@ -26,7 +26,7 @@ pub fn read_mappings() -> Result<Vec<Mapping>, eyre::Report> {
     let mappings_filename = std::env::var("MAPPINGS_FILENAME")
         .unwrap_or_else(|_| DEFAULT_MAPPINGS_FILENAME.to_string());
     let mappings = mappings_from_file(&mappings_filename)?;
-    if mappings.len() == 0 {
+    if mappings.is_empty() {
         eyre::bail!(
             "At least one mapping must be configured in {}.",
             mappings_filename
@@ -42,7 +42,7 @@ fn mappings_from_file(filename: &str) -> Result<Vec<Mapping>, eyre::Report> {
     let file = File::open(filename).wrap_err_with(|| format!("Failed to open {}", filename))?;
     for line in BufReader::new(file).lines() {
         let line = line?;
-        if line.len() > 0 && !line.starts_with('#') {
+        if !line.is_empty() && !line.starts_with('#') {
             let parts: Vec<&str> = line.split(':').collect();
             if parts.len() != 2 {
                 eyre::bail!("Invalid line '{}'", line);

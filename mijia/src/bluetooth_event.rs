@@ -60,8 +60,11 @@ pub enum BluetoothEvent {
 
 impl BluetoothEvent {
     pub fn from(conn_msg: Message) -> Option<BluetoothEvent> {
-        let result: Result<(&str, HashMap<String, Variant<Box<dyn RefArg>>>), TypeMismatchError> =
-            conn_msg.read2();
+        #[allow(clippy::type_complexity)]
+        let result: Result<
+            (&str, HashMap<String, Variant<Box<dyn RefArg>>>),
+            TypeMismatchError,
+        > = conn_msg.read2();
 
         match result {
             Ok((_, properties)) => {
@@ -70,7 +73,7 @@ impl BluetoothEvent {
                 if let Some(value) = properties.get("Powered") {
                     if let Some(powered) = cast::<bool>(&value.0) {
                         let event = BluetoothEvent::Powered {
-                            object_path: object_path.clone(),
+                            object_path,
                             powered: *powered,
                         };
 
@@ -81,7 +84,7 @@ impl BluetoothEvent {
                 if let Some(value) = properties.get("Discovering") {
                     if let Some(discovering) = cast::<bool>(&value.0) {
                         let event = BluetoothEvent::Discovering {
-                            object_path: object_path.clone(),
+                            object_path,
                             discovering: *discovering,
                         };
 
@@ -92,7 +95,7 @@ impl BluetoothEvent {
                 if let Some(value) = properties.get("Connected") {
                     if let Some(connected) = cast::<bool>(&value.0) {
                         let event = BluetoothEvent::Connected {
-                            object_path: object_path.clone(),
+                            object_path,
                             connected: *connected,
                         };
 
@@ -103,7 +106,7 @@ impl BluetoothEvent {
                 if let Some(value) = properties.get("ServicesResolved") {
                     if let Some(services_resolved) = cast::<bool>(&value.0) {
                         let event = BluetoothEvent::ServicesResolved {
-                            object_path: object_path.clone(),
+                            object_path,
                             services_resolved: *services_resolved,
                         };
 
@@ -114,7 +117,7 @@ impl BluetoothEvent {
                 if let Some(value) = properties.get("Value") {
                     if let Some(value) = cast::<Vec<u8>>(&value.0) {
                         let event = BluetoothEvent::Value {
-                            object_path: object_path.clone(),
+                            object_path,
                             value: value.clone().into_boxed_slice(),
                         };
 
@@ -125,7 +128,7 @@ impl BluetoothEvent {
                 if let Some(value) = properties.get("RSSI") {
                     if let Some(rssi) = cast::<i16>(&value.0) {
                         let event = BluetoothEvent::RSSI {
-                            object_path: object_path.clone(),
+                            object_path,
                             rssi: *rssi,
                         };
 

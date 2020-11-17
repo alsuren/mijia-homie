@@ -355,8 +355,7 @@ async fn check_for_sensors(
             && !state
                 .sensors
                 .values()
-                .find(|s| s.mac_address == props.mac_address)
-                .is_some()
+                .any(|s| s.mac_address == props.mac_address)
         {
             let sensor = Sensor::new(props, &sensor_names);
             state.sensors.insert(sensor.id.clone(), sensor);
