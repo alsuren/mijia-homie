@@ -1,7 +1,7 @@
 use eyre::bail;
 use std::cmp::max;
 use std::convert::TryInto;
-use std::fmt::{Display, Formatter};
+use std::fmt::{self, Display, Formatter};
 use std::time::{Duration, SystemTime};
 
 /// A set of readings from a Mijia sensor.
@@ -78,6 +78,19 @@ impl TemperatureUnit {
             TemperatureUnit::Celcius => [0x00],
             TemperatureUnit::Fahrenheit => [0x01],
         }
+    }
+
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Celcius => "ºC",
+            Self::Fahrenheit => "ºF",
+        }
+    }
+}
+
+impl Display for TemperatureUnit {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        f.write_str(self.as_str())
     }
 }
 
