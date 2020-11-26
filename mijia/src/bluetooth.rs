@@ -24,8 +24,6 @@ pub enum BluetoothError {
     /// There was an error talking to the BlueZ daemon over D-Bus.
     #[error(transparent)]
     DbusError(#[from] dbus::Error),
-    #[error("Invalid bus name: {0}")]
-    DbusInvalidBusName(String),
 }
 
 /// Error type for futures representing tasks spawned by this crate.

@@ -229,10 +229,9 @@ impl MijiaSession {
     ) -> Result<(MsgMatch, impl Stream<Item = MijiaEvent>), BluetoothError> {
         let mut rule = dbus::message::MatchRule::new();
         rule.msg_type = Some(dbus::message::MessageType::Signal);
-        rule.sender = Some(
-            dbus::strings::BusName::new("org.bluez")
-                .map_err(|e| BluetoothError::DbusInvalidBusName(e))?,
-        );
+        // BusName validation just checks that the length and format is valid, so it should never
+        // fail for a constant that we know is valid.
+        rule.sender = Some(dbus::strings::BusName::new("org.bluez").unwrap());
 
         let (msg_match, events) = self
             .bt_session
