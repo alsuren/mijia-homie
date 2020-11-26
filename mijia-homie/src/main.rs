@@ -422,7 +422,7 @@ async fn connect_and_subscribe_sensor_or_disconnect<'a>(
             .disconnect(id)
             .await
             .wrap_err_with(|| format!("disconnecting from {:?}", id))?;
-        Err(e)
+        Err(e.into())
     })
     .await
 }
