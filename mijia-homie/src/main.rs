@@ -62,7 +62,7 @@ async fn main() -> Result<(), eyre::Report> {
     // Poll everything to completion, until the first one bombs out.
     let res: Result<_, eyre::Error> = try_join! {
         // If this ever finishes, we lost connection to D-Bus.
-        dbus_handle,
+        dbus_handle.err_into(),
         // Bluetooth finished first. Convert error and get on with your life.
         sensor_handle.map(|res| Ok(res?)),
         // MQTT event loop finished first.
@@ -403,7 +403,11 @@ async fn connect_and_subscribe_sensor_or_disconnect<'a>(
     session: &MijiaSession,
     id: &DeviceId,
 ) -> Result<(), eyre::Error> {
-    session.bt_session.connect(id).await?;
+    session
+        .bt_session
+        .connect(id)
+        .await
+        .wrap_err_with(|| format!("connecting to {:?}", id))?;
 
     let mut backoff = ExponentialBackoff::default();
     backoff.max_elapsed_time = Some(SENSOR_CONNECT_RETRY_TIMEOUT);
@@ -413,7 +417,11 @@ async fn connect_and_subscribe_sensor_or_disconnect<'a>(
         backoff,
     )
     .or_else(|e| async {
-        session.bt_session.disconnect(id).await?;
+        session
+            .bt_session
+            .disconnect(id)
+            .await
+            .wrap_err_with(|| format!("disconnecting from {:?}", id))?;
         Err(e)
     })
     .await
@@ -439,7 +447,11 @@ async fn check_for_stale_sensor(
         // We could drop our state lock at this point, if it ends up taking
         // too long. As it is, it's quite nice that we can't attempt to connect
         // while we're in the middle of disconnecting.
-        session.bt_session.disconnect(&id).await?;
+        session
+            .bt_session
+            .disconnect(&id)
+            .await
+            .wrap_err_with(|| format!("disconnecting from {:?}", id))?;
     }
     Ok(())
 }

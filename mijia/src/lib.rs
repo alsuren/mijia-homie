@@ -10,7 +10,7 @@ use std::time::{Duration, SystemTime};
 pub mod bluetooth;
 mod bluetooth_event;
 mod decode;
-pub use bluetooth::{BluetoothSession, DeviceId, MacAddress};
+pub use bluetooth::{BluetoothError, BluetoothSession, DeviceId, MacAddress, SpawnError};
 use bluetooth_event::BluetoothEvent;
 pub use decode::comfort_level::ComfortLevel;
 pub use decode::readings::Readings;
@@ -80,8 +80,8 @@ impl MijiaSession {
     /// Returns a tuple of (join handle, Self).
     /// If the join handle ever completes then you're in trouble and should
     /// probably restart the process.
-    pub async fn new() -> Result<(impl Future<Output = Result<(), eyre::Error>>, Self), eyre::Error>
-    {
+    pub async fn new(
+    ) -> Result<(impl Future<Output = Result<(), SpawnError>>, Self), BluetoothError> {
         let (handle, bt_session) = BluetoothSession::new().await?;
         Ok((handle, MijiaSession { bt_session }))
     }
@@ -124,9 +124,10 @@ impl MijiaSession {
     /// Set the current time of the sensor.
     pub async fn set_time(&self, id: &DeviceId, time: SystemTime) -> Result<(), eyre::Error> {
         let time_bytes = encode_time(time)?;
-        self.bt_session
+        Ok(self
+            .bt_session
             .write_characteristic_value(id, CLOCK_CHARACTERISTIC_PATH, time_bytes)
-            .await
+            .await?)
     }
 
     /// Get the temperature unit which the sensor uses for its display.
@@ -147,9 +148,10 @@ impl MijiaSession {
         id: &DeviceId,
         unit: TemperatureUnit,
     ) -> Result<(), eyre::Error> {
-        self.bt_session
+        Ok(self
+            .bt_session
             .write_characteristic_value(id, TEMPERATURE_UNIT_CHARACTERISTIC_PATH, unit.encode())
-            .await
+            .await?)
     }
 
     /// Get the comfort level configuration which determines when the sensor displays a happy face.
@@ -167,13 +169,14 @@ impl MijiaSession {
         id: &DeviceId,
         comfort_level: &ComfortLevel,
     ) -> Result<(), eyre::Error> {
-        self.bt_session
+        Ok(self
+            .bt_session
             .write_characteristic_value(
                 id,
                 COMFORT_LEVEL_CHARACTERISTIC_PATH,
                 comfort_level.encode()?,
             )
-            .await
+            .await?)
     }
 
     /// Assuming that the given device ID refers to a Mijia sensor device and that it has already
