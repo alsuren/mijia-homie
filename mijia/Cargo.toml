@@ -17,6 +17,7 @@ eyre = "0.6.2"
 futures = "0.3.7"
 itertools = "0.9.0"
 log = "0.4.11"
+thiserror = "1.0.22"
 tokio = "0.2.22"
 
 [dev-dependencies]

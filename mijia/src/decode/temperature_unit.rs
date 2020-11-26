@@ -1,4 +1,4 @@
-use eyre::bail;
+use crate::decode::{check_length, DecodeError};
 use std::fmt::{self, Display, Formatter};
 
 /// The temperature unit which a Mijia sensor uses for its display.
@@ -11,15 +11,16 @@ pub enum TemperatureUnit {
 }
 
 impl TemperatureUnit {
-    pub(crate) fn decode(value: &[u8]) -> Result<TemperatureUnit, eyre::Report> {
-        if value.len() != 1 {
-            bail!("Wrong length {} for temperature unit", value.len());
-        }
+    pub(crate) fn decode(value: &[u8]) -> Result<TemperatureUnit, DecodeError> {
+        check_length(value.len(), 1)?;
 
         match value[0] {
             0x00 => Ok(TemperatureUnit::Celcius),
             0x01 => Ok(TemperatureUnit::Fahrenheit),
-            byte => bail!("Invalid temperature unit value 0x{:x}", byte),
+            byte => Err(DecodeError::InvalidValue(format!(
+                "Invalid temperature unit value 0x{:x}",
+                byte
+            ))),
         }
     }
 

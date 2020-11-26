@@ -118,7 +118,7 @@ impl MijiaSession {
             .bt_session
             .read_characteristic_value(id, CLOCK_CHARACTERISTIC_PATH)
             .await?;
-        decode_time(&value)
+        Ok(decode_time(&value)?)
     }
 
     /// Set the current time of the sensor.
@@ -138,7 +138,7 @@ impl MijiaSession {
             .bt_session
             .read_characteristic_value(id, TEMPERATURE_UNIT_CHARACTERISTIC_PATH)
             .await?;
-        TemperatureUnit::decode(&value)
+        Ok(TemperatureUnit::decode(&value)?)
     }
 
     /// Set the temperature unit which the sensor uses for its display.
@@ -158,7 +158,7 @@ impl MijiaSession {
             .bt_session
             .read_characteristic_value(id, COMFORT_LEVEL_CHARACTERISTIC_PATH)
             .await?;
-        ComfortLevel::decode(&value)
+        Ok(ComfortLevel::decode(&value)?)
     }
 
     /// Set the comfort level configuration which determines when the sensor displays a happy face.
