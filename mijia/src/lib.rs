@@ -53,7 +53,7 @@ impl MijiaEvent {
             Some(BluetoothEvent::Value { object_path, value }) => {
                 // TODO: Make this less hacky.
                 let object_path = object_path.strip_suffix(SENSOR_READING_CHARACTERISTIC_PATH)?;
-                let readings = Readings::decode(&value)?;
+                let readings = Readings::decode(&value).ok()?;
                 Some(MijiaEvent::Readings {
                     id: DeviceId::new(object_path),
                     readings,
