@@ -60,7 +60,7 @@ async fn main() -> Result<(), eyre::Report> {
     let sensor_handle = local.run_until(async move { run_sensor_system(homie, &session).await });
 
     // Poll everything to completion, until the first one bombs out.
-    let res: Result<_, eyre::Error> = try_join! {
+    let res: Result<_, eyre::Report> = try_join! {
         // If this ever finishes, we lost connection to D-Bus.
         dbus_handle.err_into(),
         // Bluetooth finished first. Convert error and get on with your life.
@@ -192,7 +192,7 @@ impl Sensor {
         &mut self,
         homie: &HomieDevice,
         readings: &Readings,
-    ) -> Result<(), eyre::Error> {
+    ) -> Result<(), eyre::Report> {
         println!("{} {} ({})", self.mac_address, readings, self.name);
 
         let node_id = self.node_id();
@@ -217,7 +217,7 @@ impl Sensor {
         Ok(())
     }
 
-    async fn mark_connected(&mut self, homie: &mut HomieDevice) -> Result<(), eyre::Error> {
+    async fn mark_connected(&mut self, homie: &mut HomieDevice) -> Result<(), eyre::Report> {
         homie.add_node(self.as_node()).await?;
         self.connection_status = ConnectionStatus::Connected;
         Ok(())
@@ -227,7 +227,7 @@ impl Sensor {
 async fn run_sensor_system(
     mut homie: HomieDevice,
     session: &MijiaSession,
-) -> Result<(), eyre::Error> {
+) -> Result<(), eyre::Report> {
     let sensor_names = hashmap_from_file(SENSOR_NAMES_FILENAME)
         .wrap_err(format!("reading {}", SENSOR_NAMES_FILENAME))?;
 
@@ -245,7 +245,7 @@ async fn run_sensor_system(
 
 /// Read the given file of key-value pairs into a hashmap.
 /// Returns an empty hashmap if the file doesn't exist, or an error if it is malformed.
-fn hashmap_from_file(filename: &str) -> Result<HashMap<MacAddress, String>, eyre::Error> {
+fn hashmap_from_file(filename: &str) -> Result<HashMap<MacAddress, String>, eyre::Report> {
     let mut map: HashMap<MacAddress, String> = HashMap::new();
     if let Ok(file) = File::open(filename) {
         for line in BufReader::new(file).lines() {
@@ -266,7 +266,7 @@ async fn bluetooth_connection_loop(
     state: Arc<Mutex<SensorState>>,
     session: &MijiaSession,
     sensor_names: &HashMap<MacAddress, String>,
-) -> Result<(), eyre::Error> {
+) -> Result<(), eyre::Report> {
     let mut next_scan_due = Instant::now();
     loop {
         // Print count and list of sensors in each state.
@@ -322,7 +322,7 @@ async fn action_sensor(
     session: &MijiaSession,
     id: DeviceId,
     status: ConnectionStatus,
-) -> Result<(), eyre::Error> {
+) -> Result<(), eyre::Report> {
     match status {
         ConnectionStatus::Connecting { reserved_until } if reserved_until > Instant::now() => {
             Ok(())
@@ -345,7 +345,7 @@ async fn check_for_sensors(
     state: Arc<Mutex<SensorState>>,
     session: &MijiaSession,
     sensor_names: &HashMap<MacAddress, String>,
-) -> Result<(), eyre::Error> {
+) -> Result<(), eyre::Report> {
     session.bt_session.start_discovery().await?;
 
     let sensors = session.get_sensors().await?;
@@ -368,7 +368,7 @@ async fn connect_sensor_with_id(
     state: Arc<Mutex<SensorState>>,
     session: &MijiaSession,
     id: DeviceId,
-) -> Result<(), eyre::Error> {
+) -> Result<(), eyre::Report> {
     // Update the state of the sensor to `Connecting`.
     {
         let mut state = state.lock().await;
@@ -402,7 +402,7 @@ async fn connect_sensor_with_id(
 async fn connect_and_subscribe_sensor_or_disconnect<'a>(
     session: &MijiaSession,
     id: &DeviceId,
-) -> Result<(), eyre::Error> {
+) -> Result<(), eyre::Report> {
     session
         .bt_session
         .connect(id)
@@ -432,7 +432,7 @@ async fn check_for_stale_sensor(
     state: Arc<Mutex<SensorState>>,
     session: &MijiaSession,
     id: DeviceId,
-) -> Result<(), eyre::Error> {
+) -> Result<(), eyre::Report> {
     let state = &mut *state.lock().await;
     let sensor = state.sensors.get_mut(&id).unwrap();
     let now = Instant::now();
@@ -459,7 +459,7 @@ async fn check_for_stale_sensor(
 async fn service_bluetooth_event_queue(
     state: Arc<Mutex<SensorState>>,
     session: &MijiaSession,
-) -> Result<(), eyre::Error> {
+) -> Result<(), eyre::Report> {
     println!("Subscribing to events");
     let (msg_match, mut events) = session.event_stream().await?;
     println!("Processing events");
@@ -481,7 +481,7 @@ async fn service_bluetooth_event_queue(
 async fn handle_bluetooth_event(
     state: Arc<Mutex<SensorState>>,
     event: MijiaEvent,
-) -> Result<(), eyre::Error> {
+) -> Result<(), eyre::Report> {
     let state = &mut *state.lock().await;
     let homie = &mut state.homie;
     let sensors = &mut state.sensors;

@@ -7,7 +7,7 @@ use tokio::time;
 const SCAN_DURATION: Duration = Duration::from_secs(5);
 
 #[tokio::main]
-async fn main() -> Result<(), eyre::Error> {
+async fn main() -> Result<(), eyre::Report> {
     pretty_env_logger::init();
 
     // If at least one command-line argument is given, we will only try to connect to sensors whose
