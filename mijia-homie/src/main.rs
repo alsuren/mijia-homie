@@ -2,7 +2,7 @@
 
 use backoff::{future::FutureOperation, ExponentialBackoff};
 use futures::stream::StreamExt;
-use futures::{FutureExt, TryFutureExt};
+use futures::TryFutureExt;
 use homie_device::{Datatype, HomieDevice, Node, Property};
 use itertools::Itertools;
 use mijia::{DeviceId, MacAddress, MijiaEvent, MijiaSession, Readings, SensorProps};
@@ -64,9 +64,9 @@ async fn main() -> Result<(), eyre::Report> {
         // If this ever finishes, we lost connection to D-Bus.
         dbus_handle.err_into(),
         // Bluetooth finished first. Convert error and get on with your life.
-        sensor_handle.map(|res| Ok(res?)),
+        sensor_handle.err_into(),
         // MQTT event loop finished first.
-        homie_handle.map_err(|err| eyre::eyre!(err)),
+        homie_handle.err_into(),
     };
     res?;
     Ok(())
