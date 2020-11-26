@@ -96,6 +96,16 @@ impl ComfortLevel {
     }
 }
 
+impl Display for ComfortLevel {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "Temperature: {:.2}–{:.2}ºC Humidity: {:?}–{:?}%",
+            self.temperature_min, self.humidity_max, self.humidity_min, self.humidity_max
+        )
+    }
+}
+
 fn decode_temperature(bytes: [u8; 2]) -> f32 {
     i16::from_le_bytes(bytes) as f32 * 0.01
 }

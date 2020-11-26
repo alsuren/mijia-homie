@@ -36,7 +36,7 @@ async fn main() -> Result<(), eyre::Error> {
             let temperature_unit = session.get_temperature_unit(&sensor.id).await?;
             let comfort_level = session.get_comfort_level(&sensor.id).await?;
             println!(
-                "Time: {}, Unit: {}, Comfort level: {:?}",
+                "Time: {}, Unit: {}, Comfort level: {}",
                 sensor_time, temperature_unit, comfort_level
             );
         }
