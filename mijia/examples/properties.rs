@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 use mijia::{MijiaSession, SensorProps};
+use std::process::exit;
 use std::time::Duration;
 use tokio::time;
 
@@ -11,7 +12,21 @@ async fn main() -> Result<(), eyre::Error> {
 
     // If at least one command-line argument is given, we will only try to connect to sensors whose
     // MAC address containts one of them as a sub-string.
-    let filters: Vec<_> = std::env::args().collect();
+    let mut args = std::env::args();
+    let binary_name = args
+        .next()
+        .ok_or_else(|| eyre::eyre!("Binary name missing"))?;
+    let filters: Vec<_> = args.collect();
+
+    if filters
+        .iter()
+        .any(|f| f.contains(|c: char| !(c.is_ascii_hexdigit() || c == ':')))
+    {
+        eprintln!("Invalid MAC addresses {:?}", filters);
+        eprintln!("Usage:");
+        eprintln!("  {} [MAC address]...", binary_name);
+        exit(1);
+    }
 
     let (_, session) = MijiaSession::new().await?;
 
