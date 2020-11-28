@@ -514,6 +514,7 @@ async fn handle_bluetooth_event(
                 println!("Unknown device {:?} disconnected.", id);
             }
         }
+        _ => {}
     };
 
     Ok(())

@@ -59,8 +59,8 @@ pub struct SensorProps {
     pub mac_address: MacAddress,
 }
 
-// TODO before publishing to crates.io: annotate this enum as non-exhaustive.
 /// An event from a Mijia sensor.
+#[non_exhaustive]
 #[derive(Clone, Debug)]
 pub enum MijiaEvent {
     /// A sensor has sent a new set of readings.
