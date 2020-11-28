@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
-use mijia::{MijiaSession, SensorProps};
+use futures::StreamExt;
+use mijia::{MijiaEvent, MijiaSession, SensorProps};
 use std::process::exit;
 use std::time::Duration;
 use tokio::time;
@@ -30,6 +31,8 @@ async fn main() -> Result<(), eyre::Report> {
 
     let (_, session) = MijiaSession::new().await?;
 
+    let (msg_match, mut events) = session.event_stream().await?;
+
     // Start scanning for Bluetooth devices, and wait a while for some to be discovered.
     session.bt_session.start_discovery().await?;
     time::delay_for(SCAN_DURATION).await;
@@ -55,8 +58,23 @@ async fn main() -> Result<(), eyre::Report> {
                 "Time: {}, Unit: {}, Comfort level: {}, Range: {:?} Last value: {}",
                 sensor_time, temperature_unit, comfort_level, history_range, last_record
             );
+            session.start_notify_history(&sensor.id).await?;
         }
     }
+
+    while let Some(event) = events.next().await {
+        match event {
+            MijiaEvent::HistoryRecord { id, record } => {
+                println!("{:?}: {}", id, record);
+            }
+            _ => println!("Event: {:?}", event),
+        }
+    }
+    session
+        .bt_session
+        .connection
+        .remove_match(msg_match.token())
+        .await?;
 
     Ok(())
 }

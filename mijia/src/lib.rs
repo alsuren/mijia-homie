@@ -30,6 +30,7 @@ const COMFORT_LEVEL_CHARACTERISTIC_PATH: &str = "/service0021/char0042";
 const HISTORY_RANGE_CHARACTERISTIC_PATH: &str = "/service0021/char0025";
 const HISTORY_DELETE_CHARACTERISTIC_PATH: &str = "/service0021/char003f";
 const HISTORY_LAST_RECORD_CHARACTERISTIC_PATH: &str = "/service0021/char002b";
+const HISTORY_RECORDS_CHARACTERISTIC_PATH: &str = "/service0021/char002e";
 /// 500 in little-endian
 const CONNECTION_INTERVAL_500_MS: [u8; 3] = [0xF4, 0x01, 0x00];
 const HISTORY_DELETE_VALUE: [u8; 1] = [0x01];
@@ -65,6 +66,8 @@ pub struct SensorProps {
 pub enum MijiaEvent {
     /// A sensor has sent a new set of readings.
     Readings { id: DeviceId, readings: Readings },
+    /// A sensor has sent a new historical record.
+    HistoryRecord { id: DeviceId, record: Record },
     /// The Bluetooth connection to a sensor has been lost.
     Disconnected { id: DeviceId },
 }
@@ -73,13 +76,40 @@ impl MijiaEvent {
     fn from(conn_msg: Message) -> Option<Self> {
         match BluetoothEvent::from(conn_msg) {
             Some(BluetoothEvent::Value { object_path, value }) => {
-                // TODO: Make this less hacky.
-                let object_path = object_path.strip_suffix(SENSOR_READING_CHARACTERISTIC_PATH)?;
-                let readings = Readings::decode(&value).ok()?;
-                Some(MijiaEvent::Readings {
-                    id: DeviceId::new(object_path),
-                    readings,
-                })
+                if let Some(object_path) =
+                    object_path.strip_suffix(SENSOR_READING_CHARACTERISTIC_PATH)
+                {
+                    match Readings::decode(&value) {
+                        Ok(readings) => Some(MijiaEvent::Readings {
+                            id: DeviceId::new(object_path),
+                            readings,
+                        }),
+                        Err(e) => {
+                            log::error!("Error decoding readings: {:?}", e);
+                            None
+                        }
+                    }
+                } else if let Some(object_path) =
+                    object_path.strip_suffix(HISTORY_RECORDS_CHARACTERISTIC_PATH)
+                {
+                    match Record::decode(&value) {
+                        Ok(record) => Some(MijiaEvent::HistoryRecord {
+                            id: DeviceId::new(object_path),
+                            record,
+                        }),
+                        Err(e) => {
+                            log::error!("Error decoding historical record: {:?}", e);
+                            None
+                        }
+                    }
+                } else {
+                    log::trace!(
+                        "Got BluetoothEvent::Value for object path {} with value {:?}",
+                        object_path,
+                        value
+                    );
+                    None
+                }
             }
             Some(BluetoothEvent::Connected {
                 object_path,
@@ -227,6 +257,20 @@ impl MijiaSession {
         Ok(Record::decode(&value)?)
     }
 
+    /// Start receiving historical records from the sensor.
+    pub async fn start_notify_history(&self, id: &DeviceId) -> Result<(), BluetoothError> {
+        self.bt_session
+            .start_notify(id, HISTORY_RECORDS_CHARACTERISTIC_PATH)
+            .await
+    }
+
+    /// Stop receiving historical records from the sensor.
+    pub async fn stop_notify_history(&self, id: &DeviceId) -> Result<(), BluetoothError> {
+        self.bt_session
+            .stop_notify(id, HISTORY_RECORDS_CHARACTERISTIC_PATH)
+            .await
+    }
+
     /// Assuming that the given device ID refers to a Mijia sensor device and that it has already
     /// been connected, subscribe to notifications of temperature/humidity readings, and adjust the
     /// connection interval to save power.
@@ -246,7 +290,7 @@ impl MijiaSession {
         Ok(())
     }
 
-    /// Get a stream of reading/disconnected events for all sensors.
+    /// Get a stream of reading/history/disconnected events for all sensors.
     ///
     /// If the MsgMatch is dropped then the Stream will close.
     pub async fn event_stream(

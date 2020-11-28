@@ -273,6 +273,18 @@ impl BluetoothSession {
         Ok(())
     }
 
+    /// Stop notifications on the characteristic of the given device with the given path. The path
+    /// should be of the form "/service0001/char0002".
+    pub(crate) async fn stop_notify(
+        &self,
+        id: &DeviceId,
+        characteristic_path: &str,
+    ) -> Result<(), BluetoothError> {
+        let characteristic = self.get_characteristic_proxy(id, characteristic_path);
+        characteristic.stop_notify().await?;
+        Ok(())
+    }
+
     fn get_characteristic_proxy(
         &self,
         id: &DeviceId,
