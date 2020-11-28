@@ -49,7 +49,7 @@ impl Display for ComfortLevel {
         write!(
             f,
             "Temperature: {:.2}–{:.2}ºC Humidity: {:?}–{:?}%",
-            self.temperature_min, self.humidity_max, self.humidity_min, self.humidity_max
+            self.temperature_min, self.temperature_max, self.humidity_min, self.humidity_max
         )
     }
 }
