@@ -1,4 +1,5 @@
 pub mod comfort_level;
+pub mod history;
 pub mod readings;
 pub mod temperature_unit;
 pub mod time;

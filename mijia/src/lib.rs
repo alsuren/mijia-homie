@@ -5,6 +5,7 @@ use core::future::Future;
 use dbus::nonblock::MsgMatch;
 use dbus::Message;
 use futures::{Stream, StreamExt};
+use std::ops::Range;
 use std::time::{Duration, SystemTime};
 use thiserror::Error;
 
@@ -14,6 +15,7 @@ mod decode;
 pub use bluetooth::{BluetoothError, BluetoothSession, DeviceId, MacAddress, SpawnError};
 use bluetooth_event::BluetoothEvent;
 pub use decode::comfort_level::ComfortLevel;
+use decode::history::decode_range;
 pub use decode::readings::Readings;
 pub use decode::temperature_unit::TemperatureUnit;
 use decode::time::{decode_time, encode_time};
@@ -25,6 +27,7 @@ const CONNECTION_INTERVAL_CHARACTERISTIC_PATH: &str = "/service0021/char0045";
 const CLOCK_CHARACTERISTIC_PATH: &str = "/service0021/char0022";
 const TEMPERATURE_UNIT_CHARACTERISTIC_PATH: &str = "/service0021/char0032";
 const COMFORT_LEVEL_CHARACTERISTIC_PATH: &str = "/service0021/char0042";
+const HISTORY_RANGE_CHARACTERISTIC_PATH: &str = "/service0021/char0025";
 /// 500 in little-endian
 const CONNECTION_INTERVAL_500_MS: [u8; 3] = [0xF4, 0x01, 0x00];
 const DBUS_METHOD_CALL_TIMEOUT: Duration = Duration::from_secs(30);
@@ -190,6 +193,15 @@ impl MijiaSession {
                 comfort_level.encode()?,
             )
             .await?)
+    }
+
+    /// Get the range of indices for historical data stored on the sensor.
+    pub async fn get_history_range(&self, id: &DeviceId) -> Result<Range<u32>, MijiaError> {
+        let value = self
+            .bt_session
+            .read_characteristic_value(id, HISTORY_RANGE_CHARACTERISTIC_PATH)
+            .await?;
+        Ok(decode_range(&value)?)
     }
 
     /// Assuming that the given device ID refers to a Mijia sensor device and that it has already
