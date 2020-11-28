@@ -1,6 +1,5 @@
 //! A library for connecting to Xiaomi Mijia 2 Bluetooth temperature/humidity sensors.
 
-use bluez_generated::OrgBluezGattCharacteristic1;
 use core::future::Future;
 use dbus::nonblock::MsgMatch;
 use dbus::Message;
@@ -234,15 +233,9 @@ impl MijiaSession {
     ///
     /// Notifications will be delivered as events by `MijiaSession::event_stream()`.
     pub async fn start_notify_sensor(&self, id: &DeviceId) -> Result<(), BluetoothError> {
-        let temp_humidity_path = id.object_path.to_string() + SENSOR_READING_CHARACTERISTIC_PATH;
-        let temp_humidity = dbus::nonblock::Proxy::new(
-            "org.bluez",
-            temp_humidity_path,
-            DBUS_METHOD_CALL_TIMEOUT,
-            self.bt_session.connection.clone(),
-        );
-        temp_humidity.start_notify().await?;
-
+        self.bt_session
+            .start_notify(id, SENSOR_READING_CHARACTERISTIC_PATH)
+            .await?;
         self.bt_session
             .write_characteristic_value(
                 id,
