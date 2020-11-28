@@ -207,16 +207,12 @@ impl MijiaSession {
         );
         temp_humidity.start_notify().await?;
 
-        let connection_interval_path =
-            id.object_path.to_string() + CONNECTION_INTERVAL_CHARACTERISTIC_PATH;
-        let connection_interval = dbus::nonblock::Proxy::new(
-            "org.bluez",
-            connection_interval_path,
-            DBUS_METHOD_CALL_TIMEOUT,
-            self.bt_session.connection.clone(),
-        );
-        connection_interval
-            .write_value(CONNECTION_INTERVAL_500_MS.to_vec(), Default::default())
+        self.bt_session
+            .write_characteristic_value(
+                id,
+                CONNECTION_INTERVAL_CHARACTERISTIC_PATH,
+                CONNECTION_INTERVAL_500_MS,
+            )
             .await?;
         Ok(())
     }
