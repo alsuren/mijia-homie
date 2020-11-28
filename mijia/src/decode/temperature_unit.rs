@@ -30,6 +30,7 @@ impl TemperatureUnit {
         }
     }
 
+    /// Returns the string representing this unit, either `"ºC"` or `"ºF"`.
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Celcius => "ºC",
