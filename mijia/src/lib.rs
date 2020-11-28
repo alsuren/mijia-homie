@@ -28,8 +28,10 @@ const CLOCK_CHARACTERISTIC_PATH: &str = "/service0021/char0022";
 const TEMPERATURE_UNIT_CHARACTERISTIC_PATH: &str = "/service0021/char0032";
 const COMFORT_LEVEL_CHARACTERISTIC_PATH: &str = "/service0021/char0042";
 const HISTORY_RANGE_CHARACTERISTIC_PATH: &str = "/service0021/char0025";
+const HISTORY_DELETE_CHARACTERISTIC_PATH: &str = "/service0021/char003f";
 /// 500 in little-endian
 const CONNECTION_INTERVAL_500_MS: [u8; 3] = [0xF4, 0x01, 0x00];
+const HISTORY_DELETE_VALUE: [u8; 1] = [0x01];
 const DBUS_METHOD_CALL_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// An error interacting with a Mijia sensor.
@@ -202,6 +204,17 @@ impl MijiaSession {
             .read_characteristic_value(id, HISTORY_RANGE_CHARACTERISTIC_PATH)
             .await?;
         Ok(decode_range(&value)?)
+    }
+
+    /// Delete all historical data stored on the sensor.
+    pub async fn delete_history(&self, id: &DeviceId) -> Result<(), BluetoothError> {
+        self.bt_session
+            .write_characteristic_value(
+                id,
+                HISTORY_DELETE_CHARACTERISTIC_PATH,
+                HISTORY_DELETE_VALUE,
+            )
+            .await
     }
 
     /// Assuming that the given device ID refers to a Mijia sensor device and that it has already
