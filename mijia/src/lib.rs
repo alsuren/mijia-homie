@@ -9,11 +9,13 @@ use std::time::{Duration, SystemTime};
 
 pub mod bluetooth;
 mod bluetooth_event;
-pub mod decode;
+mod decode;
 pub use bluetooth::{BluetoothSession, DeviceId, MacAddress};
 use bluetooth_event::BluetoothEvent;
-use decode::{decode_time, encode_time};
-pub use decode::{ComfortLevel, Readings, TemperatureUnit};
+pub use decode::comfort_level::ComfortLevel;
+pub use decode::readings::Readings;
+pub use decode::temperature_unit::TemperatureUnit;
+use decode::time::{decode_time, encode_time};
 
 const MIJIA_NAME: &str = "LYWSD03MMC";
 const SENSOR_READING_CHARACTERISTIC_PATH: &str = "/service0021/char0035";
