@@ -30,6 +30,7 @@ const COMFORT_LEVEL_CHARACTERISTIC_PATH: &str = "/service0021/char0042";
 const HISTORY_RANGE_CHARACTERISTIC_PATH: &str = "/service0021/char0025";
 const HISTORY_DELETE_CHARACTERISTIC_PATH: &str = "/service0021/char003f";
 const HISTORY_LAST_RECORD_CHARACTERISTIC_PATH: &str = "/service0021/char002b";
+const HISTORY_INDEX_CHARACTERISTIC_PATH: &str = "/service0021/char0028";
 const HISTORY_RECORDS_CHARACTERISTIC_PATH: &str = "/service0021/char002e";
 /// 500 in little-endian
 const CONNECTION_INTERVAL_500_MS: [u8; 3] = [0xF4, 0x01, 0x00];
@@ -258,7 +259,25 @@ impl MijiaSession {
     }
 
     /// Start receiving historical records from the sensor.
-    pub async fn start_notify_history(&self, id: &DeviceId) -> Result<(), BluetoothError> {
+    ///
+    /// # Arguments
+    /// * `id`: The ID of the sensor to request records from.
+    /// * `start_index`: The record index to start at. If this is not specified then all records
+    ///   which have not yet been received from the sensor since it was connected will be requested.
+    pub async fn start_notify_history(
+        &self,
+        id: &DeviceId,
+        start_index: Option<u32>,
+    ) -> Result<(), BluetoothError> {
+        if let Some(start_index) = start_index {
+            self.bt_session
+                .write_characteristic_value(
+                    id,
+                    HISTORY_INDEX_CHARACTERISTIC_PATH,
+                    start_index.to_le_bytes(),
+                )
+                .await?
+        }
         self.bt_session
             .start_notify(id, HISTORY_RECORDS_CHARACTERISTIC_PATH)
             .await

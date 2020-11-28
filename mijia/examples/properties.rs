@@ -58,7 +58,7 @@ async fn main() -> Result<(), eyre::Report> {
                 "Time: {}, Unit: {}, Comfort level: {}, Range: {:?} Last value: {}",
                 sensor_time, temperature_unit, comfort_level, history_range, last_record
             );
-            session.start_notify_history(&sensor.id).await?;
+            session.start_notify_history(&sensor.id, Some(0)).await?;
         }
     }
 
