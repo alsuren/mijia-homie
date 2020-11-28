@@ -16,6 +16,7 @@ pub use bluetooth::{BluetoothError, BluetoothSession, DeviceId, MacAddress, Spaw
 use bluetooth_event::BluetoothEvent;
 pub use decode::comfort_level::ComfortLevel;
 use decode::history::decode_range;
+pub use decode::history::Record;
 pub use decode::readings::Readings;
 pub use decode::temperature_unit::TemperatureUnit;
 use decode::time::{decode_time, encode_time};
@@ -29,6 +30,7 @@ const TEMPERATURE_UNIT_CHARACTERISTIC_PATH: &str = "/service0021/char0032";
 const COMFORT_LEVEL_CHARACTERISTIC_PATH: &str = "/service0021/char0042";
 const HISTORY_RANGE_CHARACTERISTIC_PATH: &str = "/service0021/char0025";
 const HISTORY_DELETE_CHARACTERISTIC_PATH: &str = "/service0021/char003f";
+const HISTORY_LAST_RECORD_CHARACTERISTIC_PATH: &str = "/service0021/char002b";
 /// 500 in little-endian
 const CONNECTION_INTERVAL_500_MS: [u8; 3] = [0xF4, 0x01, 0x00];
 const HISTORY_DELETE_VALUE: [u8; 1] = [0x01];
@@ -215,6 +217,15 @@ impl MijiaSession {
                 HISTORY_DELETE_VALUE,
             )
             .await
+    }
+
+    /// Get the last historical record stored on the sensor.
+    pub async fn get_last_history_record(&self, id: &DeviceId) -> Result<Record, MijiaError> {
+        let value = self
+            .bt_session
+            .read_characteristic_value(id, HISTORY_LAST_RECORD_CHARACTERISTIC_PATH)
+            .await?;
+        Ok(Record::decode(&value)?)
     }
 
     /// Assuming that the given device ID refers to a Mijia sensor device and that it has already

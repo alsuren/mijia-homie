@@ -50,9 +50,10 @@ async fn main() -> Result<(), eyre::Report> {
             let temperature_unit = session.get_temperature_unit(&sensor.id).await?;
             let comfort_level = session.get_comfort_level(&sensor.id).await?;
             let history_range = session.get_history_range(&sensor.id).await?;
+            let last_record = session.get_last_history_record(&sensor.id).await?;
             println!(
-                "Time: {}, Unit: {}, Comfort level: {}, Range: {:?}",
-                sensor_time, temperature_unit, comfort_level, history_range
+                "Time: {}, Unit: {}, Comfort level: {}, Range: {:?} Last value: {}",
+                sensor_time, temperature_unit, comfort_level, history_range, last_record
             );
         }
     }
