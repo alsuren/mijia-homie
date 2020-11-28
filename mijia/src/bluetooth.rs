@@ -1,5 +1,5 @@
 use crate::DBUS_METHOD_CALL_TIMEOUT;
-use bluez_generated::{OrgBluezAdapter1, OrgBluezDevice1};
+use bluez_generated::{OrgBluezAdapter1, OrgBluezDevice1, OrgBluezGattCharacteristic1};
 use core::fmt::Debug;
 use core::future::Future;
 use dbus::arg::{RefArg, Variant};
@@ -225,6 +225,45 @@ impl BluetoothSession {
             .disconnect()
             .await
             .wrap_err_with(|| format!("disconnecting from {:?}", id))
+    }
+
+    // TODO: Change this to lookup the path from the UUIDs instead.
+    /// Read the value of the characteristic of the given device with the given path. The path
+    /// should be of the form "/service0001/char0002".
+    pub(crate) async fn read_characteristic_value(
+        &self,
+        id: &DeviceId,
+        characteristic_path: &str,
+    ) -> Result<Vec<u8>, eyre::Error> {
+        let full_path = id.object_path.to_string() + characteristic_path;
+        let characteristic = dbus::nonblock::Proxy::new(
+            "org.bluez",
+            full_path,
+            DBUS_METHOD_CALL_TIMEOUT,
+            self.connection.clone(),
+        );
+        Ok(characteristic.read_value(HashMap::new()).await?)
+    }
+
+    // TODO: Change this to lookup the path from the UUIDs instead.
+    /// Write the given value to the characteristic of the given device with the given path. The
+    /// path should be of the form "/service0001/char0002".
+    pub(crate) async fn write_characteristic_value(
+        &self,
+        id: &DeviceId,
+        characteristic_path: &str,
+        value: impl Into<Vec<u8>>,
+    ) -> Result<(), eyre::Error> {
+        let full_path = id.object_path.to_string() + characteristic_path;
+        let characteristic = dbus::nonblock::Proxy::new(
+            "org.bluez",
+            full_path,
+            DBUS_METHOD_CALL_TIMEOUT,
+            self.connection.clone(),
+        );
+        Ok(characteristic
+            .write_value(value.into(), HashMap::new())
+            .await?)
     }
 }
 

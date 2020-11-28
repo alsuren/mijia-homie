@@ -5,18 +5,24 @@ use core::future::Future;
 use dbus::nonblock::MsgMatch;
 use dbus::Message;
 use futures::{Stream, StreamExt};
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 
 pub mod bluetooth;
 mod bluetooth_event;
-pub mod decode;
+mod decode;
 pub use bluetooth::{BluetoothSession, DeviceId, MacAddress};
 use bluetooth_event::BluetoothEvent;
-pub use decode::Readings;
+pub use decode::comfort_level::ComfortLevel;
+pub use decode::readings::Readings;
+pub use decode::temperature_unit::TemperatureUnit;
+use decode::time::{decode_time, encode_time};
 
 const MIJIA_NAME: &str = "LYWSD03MMC";
 const SENSOR_READING_CHARACTERISTIC_PATH: &str = "/service0021/char0035";
 const CONNECTION_INTERVAL_CHARACTERISTIC_PATH: &str = "/service0021/char0045";
+const CLOCK_CHARACTERISTIC_PATH: &str = "/service0021/char0022";
+const TEMPERATURE_UNIT_CHARACTERISTIC_PATH: &str = "/service0021/char0032";
+const COMFORT_LEVEL_CHARACTERISTIC_PATH: &str = "/service0021/char0042";
 /// 500 in little-endian
 const CONNECTION_INTERVAL_500_MS: [u8; 3] = [0xF4, 0x01, 0x00];
 const DBUS_METHOD_CALL_TIMEOUT: Duration = Duration::from_secs(30);
@@ -104,6 +110,70 @@ impl MijiaSession {
             })
             .collect();
         Ok(sensors)
+    }
+
+    /// Get the current time of the sensor.
+    pub async fn get_time(&self, id: &DeviceId) -> Result<SystemTime, eyre::Error> {
+        let value = self
+            .bt_session
+            .read_characteristic_value(id, CLOCK_CHARACTERISTIC_PATH)
+            .await?;
+        decode_time(&value)
+    }
+
+    /// Set the current time of the sensor.
+    pub async fn set_time(&self, id: &DeviceId, time: SystemTime) -> Result<(), eyre::Error> {
+        let time_bytes = encode_time(time)?;
+        self.bt_session
+            .write_characteristic_value(id, CLOCK_CHARACTERISTIC_PATH, time_bytes)
+            .await
+    }
+
+    /// Get the temperature unit which the sensor uses for its display.
+    pub async fn get_temperature_unit(
+        &self,
+        id: &DeviceId,
+    ) -> Result<TemperatureUnit, eyre::Error> {
+        let value = self
+            .bt_session
+            .read_characteristic_value(id, TEMPERATURE_UNIT_CHARACTERISTIC_PATH)
+            .await?;
+        TemperatureUnit::decode(&value)
+    }
+
+    /// Set the temperature unit which the sensor uses for its display.
+    pub async fn set_temperature_unit(
+        &self,
+        id: &DeviceId,
+        unit: TemperatureUnit,
+    ) -> Result<(), eyre::Error> {
+        self.bt_session
+            .write_characteristic_value(id, TEMPERATURE_UNIT_CHARACTERISTIC_PATH, unit.encode())
+            .await
+    }
+
+    /// Get the comfort level configuration which determines when the sensor displays a happy face.
+    pub async fn get_comfort_level(&self, id: &DeviceId) -> Result<ComfortLevel, eyre::Error> {
+        let value = self
+            .bt_session
+            .read_characteristic_value(id, COMFORT_LEVEL_CHARACTERISTIC_PATH)
+            .await?;
+        ComfortLevel::decode(&value)
+    }
+
+    /// Set the comfort level configuration which determines when the sensor displays a happy face.
+    pub async fn set_comfort_level(
+        &self,
+        id: &DeviceId,
+        comfort_level: &ComfortLevel,
+    ) -> Result<(), eyre::Error> {
+        self.bt_session
+            .write_characteristic_value(
+                id,
+                COMFORT_LEVEL_CHARACTERISTIC_PATH,
+                comfort_level.encode()?,
+            )
+            .await
     }
 
     /// Assuming that the given device ID refers to a Mijia sensor device and that it has already

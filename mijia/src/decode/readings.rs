@@ -1,6 +1,7 @@
+use crate::decode::decode_temperature;
 use std::cmp::max;
 use std::convert::TryInto;
-use std::fmt::{Display, Formatter};
+use std::fmt::{self, Display, Formatter};
 
 /// A set of readings from a Mijia sensor.
 #[derive(Clone, Debug, PartialEq)]
@@ -16,7 +17,7 @@ pub struct Readings {
 }
 
 impl Display for Readings {
-    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write!(
             f,
             "Temperature: {:.2}ºC Humidity: {:?}% Battery: {:?} mV ({:?}%)",
@@ -36,7 +37,7 @@ impl Readings {
 
         let mut temperature_array = [0; 2];
         temperature_array.clone_from_slice(&value[..2]);
-        let temperature = i16::from_le_bytes(temperature_array) as f32 * 0.01;
+        let temperature = decode_temperature(temperature_array);
         let humidity = value[2];
         let battery_voltage = u16::from_le_bytes(value[3..5].try_into().unwrap());
         let battery_percent = (max(battery_voltage, 2100) - 2100) / 10;
