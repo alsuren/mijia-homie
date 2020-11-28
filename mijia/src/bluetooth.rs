@@ -227,9 +227,10 @@ impl BluetoothSession {
             .wrap_err_with(|| format!("disconnecting from {:?}", id))
     }
 
+    // TODO: Change this to lookup the path from the UUIDs instead.
     /// Read the value of the characteristic of the given device with the given path. The path
     /// should be of the form "/service0001/char0002".
-    pub async fn read_characteristic_value(
+    pub(crate) async fn read_characteristic_value(
         &self,
         id: &DeviceId,
         characteristic_path: &str,
@@ -244,9 +245,10 @@ impl BluetoothSession {
         Ok(characteristic.read_value(HashMap::new()).await?)
     }
 
+    // TODO: Change this to lookup the path from the UUIDs instead.
     /// Write the given value to the characteristic of the given device with the given path. The
     /// path should be of the form "/service0001/char0002".
-    pub async fn write_characteristic_value(
+    pub(crate) async fn write_characteristic_value(
         &self,
         id: &DeviceId,
         characteristic_path: &str,

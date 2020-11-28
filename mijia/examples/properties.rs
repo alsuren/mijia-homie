@@ -1,6 +1,5 @@
 use chrono::{DateTime, Utc};
 use mijia::{MijiaSession, SensorProps};
-use std::env;
 use std::time::Duration;
 use tokio::time;
 
@@ -12,7 +11,7 @@ async fn main() -> Result<(), eyre::Error> {
 
     // If at least one command-line argument is given, we will only try to connect to sensors whose
     // MAC address containts one of them as a sub-string.
-    let filters: Vec<_> = env::args().collect();
+    let filters: Vec<_> = std::env::args().collect();
 
     let (_, session) = MijiaSession::new().await?;
 
@@ -24,7 +23,7 @@ async fn main() -> Result<(), eyre::Error> {
     let sensors = session.get_sensors().await?;
     println!("Sensors:");
     for sensor in sensors {
-        if !include_sensor(&sensor, &filters) {
+        if !should_include_sensor(&sensor, &filters) {
             println!("Skipping {}", sensor.mac_address);
             continue;
         }
@@ -45,7 +44,7 @@ async fn main() -> Result<(), eyre::Error> {
     Ok(())
 }
 
-fn include_sensor(sensor: &SensorProps, filters: &Vec<String>) -> bool {
+fn should_include_sensor(sensor: &SensorProps, filters: &Vec<String>) -> bool {
     let mac = sensor.mac_address.to_string();
     filters.is_empty() || filters.iter().any(|filter| mac.contains(filter))
 }
