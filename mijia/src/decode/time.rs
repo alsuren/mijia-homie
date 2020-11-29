@@ -1,21 +1,21 @@
-use eyre::bail;
+use crate::decode::{check_length, DecodeError, EncodeError};
 use std::convert::TryInto;
 use std::time::{Duration, SystemTime};
 
-pub(crate) fn decode_time(value: &[u8]) -> Result<SystemTime, eyre::Report> {
-    if value.len() != 4 {
-        bail!("Wrong length {} for time", value.len());
-    }
+pub(crate) fn decode_time(value: &[u8]) -> Result<SystemTime, DecodeError> {
+    check_length(value.len(), 4)?;
 
     let timestamp = u32::from_le_bytes(value.try_into().unwrap());
     Ok(SystemTime::UNIX_EPOCH + Duration::from_secs(timestamp as u64))
 }
 
-pub(crate) fn encode_time(time: SystemTime) -> Result<[u8; 4], eyre::Report> {
+pub(crate) fn encode_time(time: SystemTime) -> Result<[u8; 4], EncodeError> {
     let timestamp = time
-        .duration_since(SystemTime::UNIX_EPOCH)?
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .map_err(|_| EncodeError::TimeOutOfRange(time))?
         .as_secs()
-        .try_into()?;
+        .try_into()
+        .map_err(|_| EncodeError::TimeOutOfRange(time))?;
     let encoded = u32::to_le_bytes(timestamp);
     Ok(encoded)
 }
@@ -34,12 +34,24 @@ mod tests {
 
     #[test]
     fn decode_too_short() {
-        assert!(decode_time(&[0x01, 0x02, 0x03]).is_err());
+        assert_eq!(
+            decode_time(&[0x01, 0x02, 0x03]),
+            Err(DecodeError::WrongLength {
+                length: 3,
+                expected_length: 4
+            })
+        );
     }
 
     #[test]
     fn decode_too_long() {
-        assert!(decode_time(&[0x01, 0x02, 0x03, 0x04, 0x05]).is_err());
+        assert_eq!(
+            decode_time(&[0x01, 0x02, 0x03, 0x04, 0x05]),
+            Err(DecodeError::WrongLength {
+                length: 5,
+                expected_length: 4
+            })
+        );
     }
 
     #[test]

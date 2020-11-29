@@ -6,16 +6,18 @@ use dbus::nonblock::MsgMatch;
 use dbus::Message;
 use futures::{Stream, StreamExt};
 use std::time::{Duration, SystemTime};
+use thiserror::Error;
 
 pub mod bluetooth;
 mod bluetooth_event;
 mod decode;
-pub use bluetooth::{BluetoothSession, DeviceId, MacAddress};
+pub use bluetooth::{BluetoothError, BluetoothSession, DeviceId, MacAddress, SpawnError};
 use bluetooth_event::BluetoothEvent;
 pub use decode::comfort_level::ComfortLevel;
 pub use decode::readings::Readings;
 pub use decode::temperature_unit::TemperatureUnit;
 use decode::time::{decode_time, encode_time};
+pub use decode::{DecodeError, EncodeError};
 
 const MIJIA_NAME: &str = "LYWSD03MMC";
 const SENSOR_READING_CHARACTERISTIC_PATH: &str = "/service0021/char0035";
@@ -26,6 +28,20 @@ const COMFORT_LEVEL_CHARACTERISTIC_PATH: &str = "/service0021/char0042";
 /// 500 in little-endian
 const CONNECTION_INTERVAL_500_MS: [u8; 3] = [0xF4, 0x01, 0x00];
 const DBUS_METHOD_CALL_TIMEOUT: Duration = Duration::from_secs(30);
+
+/// An error interacting with a Mijia sensor.
+#[derive(Debug, Error)]
+pub enum MijiaError {
+    /// The error was with the Bluetooth connection.
+    #[error(transparent)]
+    Bluetooth(#[from] BluetoothError),
+    /// The error was with decoding a value from a sensor.
+    #[error(transparent)]
+    Decoding(#[from] DecodeError),
+    /// The error was with encoding a value to send to a sensor.
+    #[error(transparent)]
+    Encoding(#[from] EncodeError),
+}
 
 /// The MAC address and opaque connection ID of a Mijia sensor which was discovered.
 #[derive(Clone, Debug)]
@@ -53,7 +69,7 @@ impl MijiaEvent {
             Some(BluetoothEvent::Value { object_path, value }) => {
                 // TODO: Make this less hacky.
                 let object_path = object_path.strip_suffix(SENSOR_READING_CHARACTERISTIC_PATH)?;
-                let readings = Readings::decode(&value)?;
+                let readings = Readings::decode(&value).ok()?;
                 Some(MijiaEvent::Readings {
                     id: DeviceId::new(object_path),
                     readings,
@@ -80,14 +96,14 @@ impl MijiaSession {
     /// Returns a tuple of (join handle, Self).
     /// If the join handle ever completes then you're in trouble and should
     /// probably restart the process.
-    pub async fn new() -> Result<(impl Future<Output = Result<(), eyre::Error>>, Self), eyre::Error>
-    {
+    pub async fn new(
+    ) -> Result<(impl Future<Output = Result<(), SpawnError>>, Self), BluetoothError> {
         let (handle, bt_session) = BluetoothSession::new().await?;
         Ok((handle, MijiaSession { bt_session }))
     }
 
     /// Get a list of all Mijia sensors which have currently been discovered.
-    pub async fn get_sensors(&self) -> Result<Vec<SensorProps>, eyre::Error> {
+    pub async fn get_sensors(&self) -> Result<Vec<SensorProps>, BluetoothError> {
         let devices = self.bt_session.get_devices().await?;
 
         let sensors = devices
@@ -113,32 +129,30 @@ impl MijiaSession {
     }
 
     /// Get the current time of the sensor.
-    pub async fn get_time(&self, id: &DeviceId) -> Result<SystemTime, eyre::Error> {
+    pub async fn get_time(&self, id: &DeviceId) -> Result<SystemTime, MijiaError> {
         let value = self
             .bt_session
             .read_characteristic_value(id, CLOCK_CHARACTERISTIC_PATH)
             .await?;
-        decode_time(&value)
+        Ok(decode_time(&value)?)
     }
 
     /// Set the current time of the sensor.
-    pub async fn set_time(&self, id: &DeviceId, time: SystemTime) -> Result<(), eyre::Error> {
+    pub async fn set_time(&self, id: &DeviceId, time: SystemTime) -> Result<(), MijiaError> {
         let time_bytes = encode_time(time)?;
-        self.bt_session
+        Ok(self
+            .bt_session
             .write_characteristic_value(id, CLOCK_CHARACTERISTIC_PATH, time_bytes)
-            .await
+            .await?)
     }
 
     /// Get the temperature unit which the sensor uses for its display.
-    pub async fn get_temperature_unit(
-        &self,
-        id: &DeviceId,
-    ) -> Result<TemperatureUnit, eyre::Error> {
+    pub async fn get_temperature_unit(&self, id: &DeviceId) -> Result<TemperatureUnit, MijiaError> {
         let value = self
             .bt_session
             .read_characteristic_value(id, TEMPERATURE_UNIT_CHARACTERISTIC_PATH)
             .await?;
-        TemperatureUnit::decode(&value)
+        Ok(TemperatureUnit::decode(&value)?)
     }
 
     /// Set the temperature unit which the sensor uses for its display.
@@ -146,19 +160,20 @@ impl MijiaSession {
         &self,
         id: &DeviceId,
         unit: TemperatureUnit,
-    ) -> Result<(), eyre::Error> {
-        self.bt_session
+    ) -> Result<(), BluetoothError> {
+        Ok(self
+            .bt_session
             .write_characteristic_value(id, TEMPERATURE_UNIT_CHARACTERISTIC_PATH, unit.encode())
-            .await
+            .await?)
     }
 
     /// Get the comfort level configuration which determines when the sensor displays a happy face.
-    pub async fn get_comfort_level(&self, id: &DeviceId) -> Result<ComfortLevel, eyre::Error> {
+    pub async fn get_comfort_level(&self, id: &DeviceId) -> Result<ComfortLevel, MijiaError> {
         let value = self
             .bt_session
             .read_characteristic_value(id, COMFORT_LEVEL_CHARACTERISTIC_PATH)
             .await?;
-        ComfortLevel::decode(&value)
+        Ok(ComfortLevel::decode(&value)?)
     }
 
     /// Set the comfort level configuration which determines when the sensor displays a happy face.
@@ -166,14 +181,15 @@ impl MijiaSession {
         &self,
         id: &DeviceId,
         comfort_level: &ComfortLevel,
-    ) -> Result<(), eyre::Error> {
-        self.bt_session
+    ) -> Result<(), MijiaError> {
+        Ok(self
+            .bt_session
             .write_characteristic_value(
                 id,
                 COMFORT_LEVEL_CHARACTERISTIC_PATH,
                 comfort_level.encode()?,
             )
-            .await
+            .await?)
     }
 
     /// Assuming that the given device ID refers to a Mijia sensor device and that it has already
@@ -181,7 +197,7 @@ impl MijiaSession {
     /// connection interval to save power.
     ///
     /// Notifications will be delivered as events by `MijiaSession::event_stream()`.
-    pub async fn start_notify_sensor(&self, id: &DeviceId) -> Result<(), eyre::Error> {
+    pub async fn start_notify_sensor(&self, id: &DeviceId) -> Result<(), BluetoothError> {
         let temp_humidity_path = id.object_path.to_string() + SENSOR_READING_CHARACTERISTIC_PATH;
         let temp_humidity = dbus::nonblock::Proxy::new(
             "org.bluez",
@@ -210,10 +226,12 @@ impl MijiaSession {
     /// If the MsgMatch is dropped then the Stream will close.
     pub async fn event_stream(
         &self,
-    ) -> Result<(MsgMatch, impl Stream<Item = MijiaEvent>), eyre::Error> {
+    ) -> Result<(MsgMatch, impl Stream<Item = MijiaEvent>), BluetoothError> {
         let mut rule = dbus::message::MatchRule::new();
         rule.msg_type = Some(dbus::message::MessageType::Signal);
-        rule.sender = Some(dbus::strings::BusName::new("org.bluez").map_err(|s| eyre::eyre!(s))?);
+        // BusName validation just checks that the length and format is valid, so it should never
+        // fail for a constant that we know is valid.
+        rule.sender = Some(dbus::strings::BusName::new("org.bluez").unwrap());
 
         let (msg_match, events) = self
             .bt_session

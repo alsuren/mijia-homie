@@ -5,7 +5,6 @@ use core::future::Future;
 use dbus::arg::{RefArg, Variant};
 use dbus::nonblock::stdintf::org_freedesktop_dbus::ObjectManager;
 use dbus::nonblock::SyncConnection;
-use eyre::{bail, WrapErr};
 use futures::FutureExt;
 use itertools::Itertools;
 use std::collections::HashMap;
@@ -13,6 +12,28 @@ use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 use std::str::FromStr;
 use std::sync::Arc;
+use thiserror::Error;
+use tokio::task::JoinError;
+
+/// An error carrying out a Bluetooth operation.
+#[derive(Debug, Error)]
+pub enum BluetoothError {
+    /// No Bluetooth adapters were found on the system.
+    #[error("No Bluetooth adapters found.")]
+    NoBluetoothAdapters,
+    /// There was an error talking to the BlueZ daemon over D-Bus.
+    #[error(transparent)]
+    DbusError(#[from] dbus::Error),
+}
+
+/// Error type for futures representing tasks spawned by this crate.
+#[derive(Error, Debug)]
+pub enum SpawnError {
+    #[error("D-Bus connection lost: {0}")]
+    DbusConnectionLost(#[source] Box<dyn Error + Send + Sync>),
+    #[error("Task failed: {0}")]
+    Join(#[from] JoinError),
+}
 
 /// Opaque identifier for a Bluetooth device which the system knows about. This includes a reference
 /// to which Bluetooth adapter it was discovered on, which means that any attempt to connect to it
@@ -104,16 +125,15 @@ impl BluetoothSession {
     /// Returns a tuple of (join handle, Self).
     /// If the join handle ever completes then you're in trouble and should
     /// probably restart the process.
-    pub async fn new() -> Result<(impl Future<Output = Result<(), eyre::Error>>, Self), eyre::Error>
-    {
+    pub async fn new(
+    ) -> Result<(impl Future<Output = Result<(), SpawnError>>, Self), BluetoothError> {
         // Connect to the D-Bus system bus (this is blocking, unfortunately).
         let (dbus_resource, connection) = dbus_tokio::connection::new_system_sync()?;
         // The resource is a task that should be spawned onto a tokio compatible
         // reactor ASAP. If the resource ever finishes, you lost connection to D-Bus.
         let dbus_handle = tokio::spawn(async {
             let err = dbus_resource.await;
-            // TODO: work out why this err isn't 'static and use eyre::Error::new instead
-            Err(eyre::eyre!(err))
+            Err(SpawnError::DbusConnectionLost(err))
         });
         Ok((
             dbus_handle.map(|res| Ok(res??)),
@@ -122,7 +142,7 @@ impl BluetoothSession {
     }
 
     /// Power on all Bluetooth adapters and start scanning for devices.
-    pub async fn start_discovery(&self) -> Result<(), eyre::Error> {
+    pub async fn start_discovery(&self) -> Result<(), BluetoothError> {
         let bluez_root = dbus::nonblock::Proxy::new(
             "org.bluez",
             "/",
@@ -136,7 +156,7 @@ impl BluetoothSession {
             .collect();
 
         if adapters.is_empty() {
-            bail!("No Bluetooth adapters found.");
+            return Err(BluetoothError::NoBluetoothAdapters);
         }
 
         for path in adapters {
@@ -157,7 +177,7 @@ impl BluetoothSession {
     }
 
     /// Get a list of all Bluetooth devices which have been discovered so far.
-    pub async fn get_devices(&self) -> Result<Vec<DeviceInfo>, eyre::Error> {
+    pub async fn get_devices(&self) -> Result<Vec<DeviceInfo>, BluetoothError> {
         let bluez_root = dbus::nonblock::Proxy::new(
             "org.bluez",
             "/",
@@ -212,19 +232,13 @@ impl BluetoothSession {
     }
 
     /// Connect to the Bluetooth device with the given D-Bus object path.
-    pub async fn connect(&self, id: &DeviceId) -> Result<(), eyre::Error> {
-        self.device(id)
-            .connect()
-            .await
-            .wrap_err_with(|| format!("connecting to {:?}", id))
+    pub async fn connect(&self, id: &DeviceId) -> Result<(), BluetoothError> {
+        Ok(self.device(id).connect().await?)
     }
 
     /// Disconnect from the Bluetooth device with the given D-Bus object path.
-    pub async fn disconnect(&self, id: &DeviceId) -> Result<(), eyre::Error> {
-        self.device(id)
-            .disconnect()
-            .await
-            .wrap_err_with(|| format!("disconnecting from {:?}", id))
+    pub async fn disconnect(&self, id: &DeviceId) -> Result<(), BluetoothError> {
+        Ok(self.device(id).disconnect().await?)
     }
 
     // TODO: Change this to lookup the path from the UUIDs instead.
@@ -234,7 +248,7 @@ impl BluetoothSession {
         &self,
         id: &DeviceId,
         characteristic_path: &str,
-    ) -> Result<Vec<u8>, eyre::Error> {
+    ) -> Result<Vec<u8>, BluetoothError> {
         let full_path = id.object_path.to_string() + characteristic_path;
         let characteristic = dbus::nonblock::Proxy::new(
             "org.bluez",
@@ -253,7 +267,7 @@ impl BluetoothSession {
         id: &DeviceId,
         characteristic_path: &str,
         value: impl Into<Vec<u8>>,
-    ) -> Result<(), eyre::Error> {
+    ) -> Result<(), BluetoothError> {
         let full_path = id.object_path.to_string() + characteristic_path;
         let characteristic = dbus::nonblock::Proxy::new(
             "org.bluez",

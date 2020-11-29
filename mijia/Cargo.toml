@@ -13,12 +13,13 @@ categories = ["hardware-support"]
 bluez-generated = { version = "0.2.0", path = "../bluez-generated" }
 dbus = { version = "0.9.0", features = ["futures"] }
 dbus-tokio = "0.6.0"
-eyre = "0.6.2"
 futures = "0.3.7"
 itertools = "0.9.0"
 log = "0.4.11"
+thiserror = "1.0.22"
 tokio = "0.2.22"
 
 [dev-dependencies]
 chrono = "0.4.19"
+eyre = "0.6.3"
 pretty_env_logger = "0.4.0"

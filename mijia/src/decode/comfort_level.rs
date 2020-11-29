@@ -1,5 +1,6 @@
-use crate::decode::{decode_temperature, encode_temperature};
-use eyre::bail;
+use crate::decode::{
+    check_length, decode_temperature, encode_temperature, DecodeError, EncodeError,
+};
 use std::convert::TryInto;
 use std::fmt::{self, Display, Formatter};
 
@@ -17,10 +18,8 @@ pub struct ComfortLevel {
 }
 
 impl ComfortLevel {
-    pub(crate) fn decode(value: &[u8]) -> Result<ComfortLevel, eyre::Report> {
-        if value.len() != 6 {
-            bail!("Wrong length {} for comfort level", value.len());
-        }
+    pub(crate) fn decode(value: &[u8]) -> Result<ComfortLevel, DecodeError> {
+        check_length(value.len(), 6)?;
 
         let temperature_max = decode_temperature(value[0..2].try_into().unwrap());
         let temperature_min = decode_temperature(value[2..4].try_into().unwrap());
@@ -35,7 +34,7 @@ impl ComfortLevel {
         })
     }
 
-    pub(crate) fn encode(&self) -> Result<[u8; 6], eyre::Report> {
+    pub(crate) fn encode(&self) -> Result<[u8; 6], EncodeError> {
         let mut bytes = [0; 6];
         bytes[0..2].copy_from_slice(&encode_temperature(self.temperature_max)?);
         bytes[2..4].copy_from_slice(&encode_temperature(self.temperature_min)?);
@@ -61,12 +60,24 @@ mod tests {
 
     #[test]
     fn decode_too_short() {
-        assert!(ComfortLevel::decode(&[0x04, 0x02, 0x03, 0x01, 0x06]).is_err());
+        assert_eq!(
+            ComfortLevel::decode(&[0x04, 0x02, 0x03, 0x01, 0x06]),
+            Err(DecodeError::WrongLength {
+                length: 5,
+                expected_length: 6
+            })
+        );
     }
 
     #[test]
     fn decode_too_long() {
-        assert!(ComfortLevel::decode(&[0x04, 0x02, 0x03, 0x01, 0x06, 0x05, 0x07]).is_err());
+        assert_eq!(
+            ComfortLevel::decode(&[0x04, 0x02, 0x03, 0x01, 0x06, 0x05, 0x07]),
+            Err(DecodeError::WrongLength {
+                length: 7,
+                expected_length: 6
+            })
+        );
     }
 
     #[test]

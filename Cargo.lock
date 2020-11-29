@@ -261,9 +261,9 @@ checksum = "f7531096570974c3a9dcf9e4b8e1cede1ec26cf5046219fb3b9d897503b9be59"
 
 [[package]]
 name = "eyre"
-version = "0.6.2"
+version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "534ce924bff9118be8b28b24ede6bf7e96a00b53e4ded25050aa7b526e051e1a"
+checksum = "5f29abf4740a4778632fe27a4f681ef5b7a6f659aeba3330ac66f48e20cfa3b7"
 dependencies = [
  "indenter",
  "once_cell",
@@ -749,6 +749,7 @@ dependencies = [
  "itertools",
  "log",
  "pretty_env_logger",
+ "thiserror",
  "tokio",
 ]
 
@@ -1479,18 +1480,18 @@ dependencies = [
 
 [[package]]
 name = "thiserror"
-version = "1.0.21"
+version = "1.0.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "318234ffa22e0920fe9a40d7b8369b5f649d490980cf7aadcf1eb91594869b42"
+checksum = "0e9ae34b84616eedaaf1e9dd6026dbe00dcafa92aa0c8077cb69df1fcfe5e53e"
 dependencies = [
  "thiserror-impl",
 ]
 
 [[package]]
 name = "thiserror-impl"
-version = "1.0.21"
+version = "1.0.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cae2447b6282786c3493999f40a9be2a6ad20cb8bd268b0a0dbf5a065535c0ab"
+checksum = "9ba20f23e85b10754cd195504aebf6a27e2e6cbe28c17778a0c930724628dd56"
 dependencies = [
  "proc-macro2",
  "quote",
