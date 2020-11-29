@@ -62,16 +62,9 @@ impl Display for MacAddress {
 }
 
 /// An error parsing a MAC address from a string.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Error, Eq, PartialEq)]
+#[error("Invalid MAC address")]
 pub struct ParseMacAddressError();
-
-impl Display for ParseMacAddressError {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "Invalid MAC address")
-    }
-}
-
-impl Error for ParseMacAddressError {}
 
 impl FromStr for MacAddress {
     type Err = ParseMacAddressError;
