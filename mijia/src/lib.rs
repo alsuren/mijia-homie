@@ -160,7 +160,7 @@ impl MijiaSession {
         &self,
         id: &DeviceId,
         unit: TemperatureUnit,
-    ) -> Result<(), MijiaError> {
+    ) -> Result<(), BluetoothError> {
         Ok(self
             .bt_session
             .write_characteristic_value(id, TEMPERATURE_UNIT_CHARACTERISTIC_PATH, unit.encode())
