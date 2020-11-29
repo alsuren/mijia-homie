@@ -30,7 +30,7 @@ pub enum BluetoothError {
 #[derive(Error, Debug)]
 pub enum SpawnError {
     #[error("D-Bus connection lost: {0}")]
-    DbusConnectionLost(String),
+    DbusConnectionLost(#[source] Box<dyn Error + Send + Sync>),
     #[error("Task failed: {0}")]
     Join(#[from] JoinError),
 }
@@ -133,7 +133,7 @@ impl BluetoothSession {
         // reactor ASAP. If the resource ever finishes, you lost connection to D-Bus.
         let dbus_handle = tokio::spawn(async {
             let err = dbus_resource.await;
-            Err(SpawnError::DbusConnectionLost(err.to_string()))
+            Err(SpawnError::DbusConnectionLost(err))
         });
         Ok((
             dbus_handle.map(|res| Ok(res??)),
