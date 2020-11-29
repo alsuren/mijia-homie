@@ -1,13 +1,11 @@
 use chrono::{DateTime, Utc};
 use eyre::Report;
-use mijia::{DeviceId, MijiaEvent, MijiaSession, Record, SensorProps};
+use mijia::{MijiaSession, SensorProps};
 use std::process::exit;
 use std::time::Duration;
-use tokio::stream::StreamExt;
 use tokio::time;
 
 const SCAN_DURATION: Duration = Duration::from_secs(5);
-const HISTORY_RECORD_TIMEOUT: Duration = Duration::from_secs(2);
 
 #[tokio::main]
 async fn main() -> Result<(), Report> {
@@ -58,7 +56,7 @@ async fn main() -> Result<(), Report> {
                 "Time: {}, Unit: {}, Comfort level: {}, Range: {:?} Last value: {}",
                 sensor_time, temperature_unit, comfort_level, history_range, last_record
             );
-            let history = get_history(&session, &sensor.id).await?;
+            let history = session.get_all_history(&sensor.id).await?;
             println!("History: {:?}", history);
         }
     }
@@ -69,39 +67,4 @@ async fn main() -> Result<(), Report> {
 fn should_include_sensor(sensor: &SensorProps, filters: &Vec<String>) -> bool {
     let mac = sensor.mac_address.to_string();
     filters.is_empty() || filters.iter().any(|filter| mac.contains(filter))
-}
-
-async fn get_history(session: &MijiaSession, id: &DeviceId) -> Result<Vec<Option<Record>>, Report> {
-    let history_range = session.get_history_range(&id).await?;
-    let (msg_match, events) = session.event_stream().await?;
-    let mut events = events.timeout(HISTORY_RECORD_TIMEOUT);
-    session.start_notify_history(&id, Some(0)).await?;
-
-    let mut history = vec![None; history_range.len()];
-    while let Some(Ok(event)) = events.next().await {
-        match event {
-            MijiaEvent::HistoryRecord {
-                id: record_id,
-                record,
-            } => {
-                log::trace!("{:?}: {}", record_id, record);
-                if record_id == *id {
-                    let offset = record.index - history_range.start;
-                    history[offset as usize] = Some(record);
-                } else {
-                    log::warn!("Got record for wrong sensor {:?}", record_id);
-                }
-            }
-            _ => log::info!("Event: {:?}", event),
-        }
-    }
-
-    session.stop_notify_history(&id).await?;
-    session
-        .bt_session
-        .connection
-        .remove_match(msg_match.token())
-        .await?;
-
-    Ok(history)
 }

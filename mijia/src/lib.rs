@@ -3,10 +3,11 @@
 use core::future::Future;
 use dbus::nonblock::MsgMatch;
 use dbus::Message;
-use futures::{Stream, StreamExt};
+use futures::Stream;
 use std::ops::Range;
 use std::time::{Duration, SystemTime};
 use thiserror::Error;
+use tokio::stream::StreamExt;
 
 pub mod bluetooth;
 mod bluetooth_event;
@@ -36,6 +37,7 @@ const HISTORY_RECORDS_CHARACTERISTIC_PATH: &str = "/service0021/char002e";
 const CONNECTION_INTERVAL_500_MS: [u8; 3] = [0xF4, 0x01, 0x00];
 const HISTORY_DELETE_VALUE: [u8; 1] = [0x01];
 const DBUS_METHOD_CALL_TIMEOUT: Duration = Duration::from_secs(30);
+const HISTORY_RECORD_TIMEOUT: Duration = Duration::from_secs(2);
 
 /// An error interacting with a Mijia sensor.
 #[derive(Debug, Error)]
@@ -290,6 +292,52 @@ impl MijiaSession {
             .await
     }
 
+    /// Try to get all historical records for the sensor.
+    pub async fn get_all_history(&self, id: &DeviceId) -> Result<Vec<Option<Record>>, MijiaError> {
+        let history_range = self.get_history_range(&id).await?;
+        // TODO: Get event stream that is filtered by D-Bus.
+        let (msg_match, events) = self.event_stream().await?;
+        let mut events = events.timeout(HISTORY_RECORD_TIMEOUT);
+        self.start_notify_history(&id, Some(0)).await?;
+
+        let mut history = vec![None; history_range.len()];
+        while let Some(Ok(event)) = events.next().await {
+            match event {
+                MijiaEvent::HistoryRecord {
+                    id: record_id,
+                    record,
+                } => {
+                    log::trace!("{:?}: {}", record_id, record);
+                    if record_id == *id {
+                        if history_range.contains(&record.index) {
+                            let offset = record.index - history_range.start;
+                            history[offset as usize] = Some(record);
+                        } else {
+                            log::error!(
+                                "Got record {:?} for sensor {:?} out of bounds {:?}",
+                                record,
+                                id,
+                                history_range
+                            );
+                        }
+                    } else {
+                        log::warn!("Got record for wrong sensor {:?}", record_id);
+                    }
+                }
+                _ => log::info!("Event: {:?}", event),
+            }
+        }
+
+        self.stop_notify_history(&id).await?;
+        self.bt_session
+            .connection
+            .remove_match(msg_match.token())
+            .await
+            .map_err(BluetoothError::DbusError)?;
+
+        Ok(history)
+    }
+
     /// Assuming that the given device ID refers to a Mijia sensor device and that it has already
     /// been connected, subscribe to notifications of temperature/humidity readings, and adjust the
     /// connection interval to save power.
@@ -328,9 +376,6 @@ impl MijiaSession {
             .await?
             .msg_stream();
 
-        Ok((
-            msg_match,
-            Box::pin(events.filter_map(|event| async move { MijiaEvent::from(event) })),
-        ))
+        Ok((msg_match, Box::pin(events.filter_map(MijiaEvent::from))))
     }
 }
