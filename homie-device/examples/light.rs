@@ -1,4 +1,4 @@
-use homie_device::{Datatype, HomieDevice, Node, Property, SpawnError};
+use homie_device::{ColorFormat, HomieDevice, Node, Property, SpawnError};
 use rumqttc::MqttOptions;
 
 #[tokio::main]
@@ -20,8 +20,8 @@ async fn main() -> Result<(), SpawnError> {
         "Light",
         "light",
         vec![
-            Property::new("power", "On", Datatype::Boolean, true, None, None),
-            Property::new("colour", "Colour", Datatype::Color, true, None, Some("rgb")),
+            Property::boolean("power", "On", true, None),
+            Property::color("colour", "Colour", true, None, ColorFormat::RGB),
         ],
     );
     homie.add_node(node).await?;
