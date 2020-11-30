@@ -1,6 +1,7 @@
 # Mijia sensor to Homie bridge
 
 [![crates.io page](https://img.shields.io/crates/v/mijia-homie.svg)](https://crates.io/crates/mijia-homie)
+[![Download](https://api.bintray.com/packages/homie-rs/homie-rs/mijia-homie/images/download.svg) ](https://bintray.com/homie-rs/homie-rs/mijia-homie/_latestVersion)
 
 `mijia-homie` is a service for connecting to Xiaomi Mijia 2 Bluetooth temperature/humidity sensors and publishing their readings to an MQTT broker following the [Homie convention](https://homieiot.github.io/).
 

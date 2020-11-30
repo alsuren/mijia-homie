@@ -1,6 +1,7 @@
 # Homie device InfluxDB logger
 
 [![crates.io page](https://img.shields.io/crates/v/homie-influx.svg)](https://crates.io/crates/homie-influx)
+[![Download](https://api.bintray.com/packages/homie-rs/homie-rs/homie-influx/images/download.svg) ](https://bintray.com/homie-rs/homie-rs/homie-influx/_latestVersion)
 
 `homie-influx` is a service to connect to an MQTT broker, discover devices following the [Homie convention](https://homieiot.github.io/), and record their property value changes to an InfluxDB database.
 
