@@ -23,16 +23,16 @@ use decode::time::{decode_time, encode_time};
 pub use decode::{DecodeError, EncodeError};
 
 const MIJIA_NAME: &str = "LYWSD03MMC";
-const SENSOR_READING_CHARACTERISTIC_PATH: &str = "/service0021/char0035";
-const CONNECTION_INTERVAL_CHARACTERISTIC_PATH: &str = "/service0021/char0045";
 const CLOCK_CHARACTERISTIC_PATH: &str = "/service0021/char0022";
-const TEMPERATURE_UNIT_CHARACTERISTIC_PATH: &str = "/service0021/char0032";
-const COMFORT_LEVEL_CHARACTERISTIC_PATH: &str = "/service0021/char0042";
 const HISTORY_RANGE_CHARACTERISTIC_PATH: &str = "/service0021/char0025";
-const HISTORY_DELETE_CHARACTERISTIC_PATH: &str = "/service0021/char003f";
-const HISTORY_LAST_RECORD_CHARACTERISTIC_PATH: &str = "/service0021/char002b";
 const HISTORY_INDEX_CHARACTERISTIC_PATH: &str = "/service0021/char0028";
+const HISTORY_LAST_RECORD_CHARACTERISTIC_PATH: &str = "/service0021/char002b";
 const HISTORY_RECORDS_CHARACTERISTIC_PATH: &str = "/service0021/char002e";
+const TEMPERATURE_UNIT_CHARACTERISTIC_PATH: &str = "/service0021/char0032";
+const SENSOR_READING_CHARACTERISTIC_PATH: &str = "/service0021/char0035";
+const HISTORY_DELETE_CHARACTERISTIC_PATH: &str = "/service0021/char003f";
+const COMFORT_LEVEL_CHARACTERISTIC_PATH: &str = "/service0021/char0042";
+const CONNECTION_INTERVAL_CHARACTERISTIC_PATH: &str = "/service0021/char0045";
 /// 500 in little-endian
 const CONNECTION_INTERVAL_500_MS: [u8; 3] = [0xF4, 0x01, 0x00];
 const HISTORY_DELETE_VALUE: [u8; 1] = [0x01];
