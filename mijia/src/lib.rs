@@ -1,12 +1,13 @@
 //! A library for connecting to Xiaomi Mijia 2 Bluetooth temperature/humidity sensors.
 
-use bluez_generated::OrgBluezGattCharacteristic1;
 use core::future::Future;
 use dbus::nonblock::MsgMatch;
 use dbus::Message;
-use futures::{Stream, StreamExt};
+use futures::Stream;
+use std::ops::Range;
 use std::time::{Duration, SystemTime};
 use thiserror::Error;
+use tokio::stream::StreamExt;
 
 pub mod bluetooth;
 mod bluetooth_event;
@@ -14,20 +15,29 @@ mod decode;
 pub use bluetooth::{BluetoothError, BluetoothSession, DeviceId, MacAddress, SpawnError};
 use bluetooth_event::BluetoothEvent;
 pub use decode::comfort_level::ComfortLevel;
+use decode::history::decode_range;
+pub use decode::history::HistoryRecord;
 pub use decode::readings::Readings;
 pub use decode::temperature_unit::TemperatureUnit;
 use decode::time::{decode_time, encode_time};
 pub use decode::{DecodeError, EncodeError};
 
 const MIJIA_NAME: &str = "LYWSD03MMC";
-const SENSOR_READING_CHARACTERISTIC_PATH: &str = "/service0021/char0035";
-const CONNECTION_INTERVAL_CHARACTERISTIC_PATH: &str = "/service0021/char0045";
 const CLOCK_CHARACTERISTIC_PATH: &str = "/service0021/char0022";
+const HISTORY_RANGE_CHARACTERISTIC_PATH: &str = "/service0021/char0025";
+const HISTORY_INDEX_CHARACTERISTIC_PATH: &str = "/service0021/char0028";
+const HISTORY_LAST_RECORD_CHARACTERISTIC_PATH: &str = "/service0021/char002b";
+const HISTORY_RECORDS_CHARACTERISTIC_PATH: &str = "/service0021/char002e";
 const TEMPERATURE_UNIT_CHARACTERISTIC_PATH: &str = "/service0021/char0032";
+const SENSOR_READING_CHARACTERISTIC_PATH: &str = "/service0021/char0035";
+const HISTORY_DELETE_CHARACTERISTIC_PATH: &str = "/service0021/char003f";
 const COMFORT_LEVEL_CHARACTERISTIC_PATH: &str = "/service0021/char0042";
+const CONNECTION_INTERVAL_CHARACTERISTIC_PATH: &str = "/service0021/char0045";
 /// 500 in little-endian
 const CONNECTION_INTERVAL_500_MS: [u8; 3] = [0xF4, 0x01, 0x00];
+const HISTORY_DELETE_VALUE: [u8; 1] = [0x01];
 const DBUS_METHOD_CALL_TIMEOUT: Duration = Duration::from_secs(30);
+const HISTORY_RECORD_TIMEOUT: Duration = Duration::from_secs(2);
 
 /// An error interacting with a Mijia sensor.
 #[derive(Debug, Error)]
@@ -53,12 +63,14 @@ pub struct SensorProps {
     pub mac_address: MacAddress,
 }
 
-// TODO before publishing to crates.io: annotate this enum as non-exhaustive.
 /// An event from a Mijia sensor.
-#[derive(Clone)]
+#[non_exhaustive]
+#[derive(Clone, Debug)]
 pub enum MijiaEvent {
     /// A sensor has sent a new set of readings.
     Readings { id: DeviceId, readings: Readings },
+    /// A sensor has sent a new historical record.
+    HistoryRecord { id: DeviceId, record: HistoryRecord },
     /// The Bluetooth connection to a sensor has been lost.
     Disconnected { id: DeviceId },
 }
@@ -67,13 +79,40 @@ impl MijiaEvent {
     fn from(conn_msg: Message) -> Option<Self> {
         match BluetoothEvent::from(conn_msg) {
             Some(BluetoothEvent::Value { object_path, value }) => {
-                // TODO: Make this less hacky.
-                let object_path = object_path.strip_suffix(SENSOR_READING_CHARACTERISTIC_PATH)?;
-                let readings = Readings::decode(&value).ok()?;
-                Some(MijiaEvent::Readings {
-                    id: DeviceId::new(object_path),
-                    readings,
-                })
+                if let Some(object_path) =
+                    object_path.strip_suffix(SENSOR_READING_CHARACTERISTIC_PATH)
+                {
+                    match Readings::decode(&value) {
+                        Ok(readings) => Some(MijiaEvent::Readings {
+                            id: DeviceId::new(object_path),
+                            readings,
+                        }),
+                        Err(e) => {
+                            log::error!("Error decoding readings: {:?}", e);
+                            None
+                        }
+                    }
+                } else if let Some(object_path) =
+                    object_path.strip_suffix(HISTORY_RECORDS_CHARACTERISTIC_PATH)
+                {
+                    match HistoryRecord::decode(&value) {
+                        Ok(record) => Some(MijiaEvent::HistoryRecord {
+                            id: DeviceId::new(object_path),
+                            record,
+                        }),
+                        Err(e) => {
+                            log::error!("Error decoding historical record: {:?}", e);
+                            None
+                        }
+                    }
+                } else {
+                    log::trace!(
+                        "Got BluetoothEvent::Value for object path {} with value {:?}",
+                        object_path,
+                        value
+                    );
+                    None
+                }
             }
             Some(BluetoothEvent::Connected {
                 object_path,
@@ -192,36 +231,139 @@ impl MijiaSession {
             .await?)
     }
 
+    /// Get the range of indices for historical data stored on the sensor.
+    pub async fn get_history_range(&self, id: &DeviceId) -> Result<Range<u32>, MijiaError> {
+        let value = self
+            .bt_session
+            .read_characteristic_value(id, HISTORY_RANGE_CHARACTERISTIC_PATH)
+            .await?;
+        Ok(decode_range(&value)?)
+    }
+
+    /// Delete all historical data stored on the sensor.
+    pub async fn delete_history(&self, id: &DeviceId) -> Result<(), BluetoothError> {
+        self.bt_session
+            .write_characteristic_value(
+                id,
+                HISTORY_DELETE_CHARACTERISTIC_PATH,
+                HISTORY_DELETE_VALUE,
+            )
+            .await
+    }
+
+    /// Get the last historical record stored on the sensor.
+    pub async fn get_last_history_record(
+        &self,
+        id: &DeviceId,
+    ) -> Result<HistoryRecord, MijiaError> {
+        let value = self
+            .bt_session
+            .read_characteristic_value(id, HISTORY_LAST_RECORD_CHARACTERISTIC_PATH)
+            .await?;
+        Ok(HistoryRecord::decode(&value)?)
+    }
+
+    /// Start receiving historical records from the sensor.
+    ///
+    /// # Arguments
+    /// * `id`: The ID of the sensor to request records from.
+    /// * `start_index`: The record index to start at. If this is not specified then all records
+    ///   which have not yet been received from the sensor since it was connected will be requested.
+    pub async fn start_notify_history(
+        &self,
+        id: &DeviceId,
+        start_index: Option<u32>,
+    ) -> Result<(), BluetoothError> {
+        if let Some(start_index) = start_index {
+            self.bt_session
+                .write_characteristic_value(
+                    id,
+                    HISTORY_INDEX_CHARACTERISTIC_PATH,
+                    start_index.to_le_bytes(),
+                )
+                .await?
+        }
+        self.bt_session
+            .start_notify(id, HISTORY_RECORDS_CHARACTERISTIC_PATH)
+            .await
+    }
+
+    /// Stop receiving historical records from the sensor.
+    pub async fn stop_notify_history(&self, id: &DeviceId) -> Result<(), BluetoothError> {
+        self.bt_session
+            .stop_notify(id, HISTORY_RECORDS_CHARACTERISTIC_PATH)
+            .await
+    }
+
+    /// Try to get all historical records for the sensor.
+    pub async fn get_all_history(
+        &self,
+        id: &DeviceId,
+    ) -> Result<Vec<Option<HistoryRecord>>, MijiaError> {
+        let history_range = self.get_history_range(&id).await?;
+        // TODO: Get event stream that is filtered by D-Bus.
+        let (msg_match, events) = self.event_stream().await?;
+        let mut events = events.timeout(HISTORY_RECORD_TIMEOUT);
+        self.start_notify_history(&id, Some(0)).await?;
+
+        let mut history = vec![None; history_range.len()];
+        while let Some(Ok(event)) = events.next().await {
+            match event {
+                MijiaEvent::HistoryRecord {
+                    id: record_id,
+                    record,
+                } => {
+                    log::trace!("{:?}: {}", record_id, record);
+                    if record_id == *id {
+                        if history_range.contains(&record.index) {
+                            let offset = record.index - history_range.start;
+                            history[offset as usize] = Some(record);
+                        } else {
+                            log::error!(
+                                "Got record {:?} for sensor {:?} out of bounds {:?}",
+                                record,
+                                id,
+                                history_range
+                            );
+                        }
+                    } else {
+                        log::warn!("Got record for wrong sensor {:?}", record_id);
+                    }
+                }
+                _ => log::info!("Event: {:?}", event),
+            }
+        }
+
+        self.stop_notify_history(&id).await?;
+        self.bt_session
+            .connection
+            .remove_match(msg_match.token())
+            .await
+            .map_err(BluetoothError::DbusError)?;
+
+        Ok(history)
+    }
+
     /// Assuming that the given device ID refers to a Mijia sensor device and that it has already
     /// been connected, subscribe to notifications of temperature/humidity readings, and adjust the
     /// connection interval to save power.
     ///
     /// Notifications will be delivered as events by `MijiaSession::event_stream()`.
     pub async fn start_notify_sensor(&self, id: &DeviceId) -> Result<(), BluetoothError> {
-        let temp_humidity_path = id.object_path.to_string() + SENSOR_READING_CHARACTERISTIC_PATH;
-        let temp_humidity = dbus::nonblock::Proxy::new(
-            "org.bluez",
-            temp_humidity_path,
-            DBUS_METHOD_CALL_TIMEOUT,
-            self.bt_session.connection.clone(),
-        );
-        temp_humidity.start_notify().await?;
-
-        let connection_interval_path =
-            id.object_path.to_string() + CONNECTION_INTERVAL_CHARACTERISTIC_PATH;
-        let connection_interval = dbus::nonblock::Proxy::new(
-            "org.bluez",
-            connection_interval_path,
-            DBUS_METHOD_CALL_TIMEOUT,
-            self.bt_session.connection.clone(),
-        );
-        connection_interval
-            .write_value(CONNECTION_INTERVAL_500_MS.to_vec(), Default::default())
+        self.bt_session
+            .start_notify(id, SENSOR_READING_CHARACTERISTIC_PATH)
+            .await?;
+        self.bt_session
+            .write_characteristic_value(
+                id,
+                CONNECTION_INTERVAL_CHARACTERISTIC_PATH,
+                CONNECTION_INTERVAL_500_MS,
+            )
             .await?;
         Ok(())
     }
 
-    /// Get a stream of reading/disconnected events for all sensors.
+    /// Get a stream of reading/history/disconnected events for all sensors.
     ///
     /// If the MsgMatch is dropped then the Stream will close.
     pub async fn event_stream(
@@ -240,9 +382,6 @@ impl MijiaSession {
             .await?
             .msg_stream();
 
-        Ok((
-            msg_match,
-            Box::pin(events.filter_map(|event| async move { MijiaEvent::from(event) })),
-        ))
+        Ok((msg_match, Box::pin(events.filter_map(MijiaEvent::from))))
     }
 }

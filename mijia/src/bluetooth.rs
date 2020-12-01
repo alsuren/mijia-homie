@@ -4,7 +4,7 @@ use core::fmt::Debug;
 use core::future::Future;
 use dbus::arg::{RefArg, Variant};
 use dbus::nonblock::stdintf::org_freedesktop_dbus::ObjectManager;
-use dbus::nonblock::SyncConnection;
+use dbus::nonblock::{Proxy, SyncConnection};
 use futures::FutureExt;
 use itertools::Itertools;
 use std::collections::HashMap;
@@ -62,16 +62,9 @@ impl Display for MacAddress {
 }
 
 /// An error parsing a MAC address from a string.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Error, Eq, PartialEq)]
+#[error("Invalid MAC address")]
 pub struct ParseMacAddressError();
-
-impl Display for ParseMacAddressError {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "Invalid MAC address")
-    }
-}
-
-impl Error for ParseMacAddressError {}
 
 impl FromStr for MacAddress {
     type Err = ParseMacAddressError;
@@ -143,7 +136,7 @@ impl BluetoothSession {
 
     /// Power on all Bluetooth adapters and start scanning for devices.
     pub async fn start_discovery(&self) -> Result<(), BluetoothError> {
-        let bluez_root = dbus::nonblock::Proxy::new(
+        let bluez_root = Proxy::new(
             "org.bluez",
             "/",
             DBUS_METHOD_CALL_TIMEOUT,
@@ -161,7 +154,7 @@ impl BluetoothSession {
 
         for path in adapters {
             log::trace!("Starting discovery on adapter {}", path);
-            let adapter = dbus::nonblock::Proxy::new(
+            let adapter = Proxy::new(
                 "org.bluez",
                 path,
                 DBUS_METHOD_CALL_TIMEOUT,
@@ -178,7 +171,7 @@ impl BluetoothSession {
 
     /// Get a list of all Bluetooth devices which have been discovered so far.
     pub async fn get_devices(&self) -> Result<Vec<DeviceInfo>, BluetoothError> {
-        let bluez_root = dbus::nonblock::Proxy::new(
+        let bluez_root = Proxy::new(
             "org.bluez",
             "/",
             DBUS_METHOD_CALL_TIMEOUT,
@@ -223,7 +216,7 @@ impl BluetoothSession {
     }
 
     fn device(&self, id: &DeviceId) -> impl OrgBluezDevice1 {
-        dbus::nonblock::Proxy::new(
+        Proxy::new(
             "org.bluez",
             id.object_path.to_owned(),
             DBUS_METHOD_CALL_TIMEOUT,
@@ -249,13 +242,7 @@ impl BluetoothSession {
         id: &DeviceId,
         characteristic_path: &str,
     ) -> Result<Vec<u8>, BluetoothError> {
-        let full_path = id.object_path.to_string() + characteristic_path;
-        let characteristic = dbus::nonblock::Proxy::new(
-            "org.bluez",
-            full_path,
-            DBUS_METHOD_CALL_TIMEOUT,
-            self.connection.clone(),
-        );
+        let characteristic = self.get_characteristic_proxy(id, characteristic_path);
         Ok(characteristic.read_value(HashMap::new()).await?)
     }
 
@@ -268,16 +255,48 @@ impl BluetoothSession {
         characteristic_path: &str,
         value: impl Into<Vec<u8>>,
     ) -> Result<(), BluetoothError> {
+        let characteristic = self.get_characteristic_proxy(id, characteristic_path);
+        Ok(characteristic
+            .write_value(value.into(), HashMap::new())
+            .await?)
+    }
+
+    /// Start notifications on the characteristic of the given device with the given path. The path
+    /// should be of the form "/service0001/char0002".
+    pub(crate) async fn start_notify(
+        &self,
+        id: &DeviceId,
+        characteristic_path: &str,
+    ) -> Result<(), BluetoothError> {
+        let characteristic = self.get_characteristic_proxy(id, characteristic_path);
+        characteristic.start_notify().await?;
+        Ok(())
+    }
+
+    /// Stop notifications on the characteristic of the given device with the given path. The path
+    /// should be of the form "/service0001/char0002".
+    pub(crate) async fn stop_notify(
+        &self,
+        id: &DeviceId,
+        characteristic_path: &str,
+    ) -> Result<(), BluetoothError> {
+        let characteristic = self.get_characteristic_proxy(id, characteristic_path);
+        characteristic.stop_notify().await?;
+        Ok(())
+    }
+
+    fn get_characteristic_proxy(
+        &self,
+        id: &DeviceId,
+        characteristic_path: &str,
+    ) -> Proxy<Arc<SyncConnection>> {
         let full_path = id.object_path.to_string() + characteristic_path;
-        let characteristic = dbus::nonblock::Proxy::new(
+        Proxy::new(
             "org.bluez",
             full_path,
             DBUS_METHOD_CALL_TIMEOUT,
             self.connection.clone(),
-        );
-        Ok(characteristic
-            .write_value(value.into(), HashMap::new())
-            .await?)
+        )
     }
 }
 

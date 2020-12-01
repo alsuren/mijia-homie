@@ -1,4 +1,5 @@
 pub mod comfort_level;
+pub mod history;
 pub mod readings;
 pub mod temperature_unit;
 pub mod time;
@@ -35,7 +36,7 @@ pub enum EncodeError {
 }
 
 fn decode_temperature(bytes: [u8; 2]) -> f32 {
-    i16::from_le_bytes(bytes) as f32 * 0.01
+    i16::from_le_bytes(bytes) as f32 / 100.0
 }
 
 fn encode_temperature(temperature: f32) -> Result<[u8; 2], EncodeError> {

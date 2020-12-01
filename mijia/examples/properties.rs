@@ -1,4 +1,5 @@
 use chrono::{DateTime, Utc};
+use eyre::Report;
 use mijia::{MijiaSession, SensorProps};
 use std::process::exit;
 use std::time::Duration;
@@ -7,7 +8,7 @@ use tokio::time;
 const SCAN_DURATION: Duration = Duration::from_secs(5);
 
 #[tokio::main]
-async fn main() -> Result<(), eyre::Report> {
+async fn main() -> Result<(), Report> {
     pretty_env_logger::init();
 
     // If at least one command-line argument is given, we will only try to connect to sensors whose
@@ -49,10 +50,14 @@ async fn main() -> Result<(), eyre::Report> {
             let sensor_time: DateTime<Utc> = session.get_time(&sensor.id).await?.into();
             let temperature_unit = session.get_temperature_unit(&sensor.id).await?;
             let comfort_level = session.get_comfort_level(&sensor.id).await?;
+            let history_range = session.get_history_range(&sensor.id).await?;
+            let last_record = session.get_last_history_record(&sensor.id).await?;
             println!(
-                "Time: {}, Unit: {}, Comfort level: {}",
-                sensor_time, temperature_unit, comfort_level
+                "Time: {}, Unit: {}, Comfort level: {}, Range: {:?} Last value: {}",
+                sensor_time, temperature_unit, comfort_level, history_range, last_record
             );
+            let history = session.get_all_history(&sensor.id).await?;
+            println!("History: {:?}", history);
         }
     }
 
