@@ -1,6 +1,8 @@
 use std::fmt::{self, Debug, Display, Formatter};
 use std::ops::Range;
 
+use crate::values::ColorFormat;
+
 /// The data type for a Homie property.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Datatype {
@@ -20,8 +22,8 @@ pub enum Datatype {
     Color,
 }
 
-impl Into<Vec<u8>> for Datatype {
-    fn into(self) -> Vec<u8> {
+impl Datatype {
+    fn as_str(&self) -> &'static str {
         match self {
             Self::Integer => "integer",
             Self::Float => "float",
@@ -30,32 +32,18 @@ impl Into<Vec<u8>> for Datatype {
             Self::Enum => "enum",
             Self::Color => "color",
         }
-        .into()
     }
 }
 
-/// The format of a [colour](https://homieiot.github.io/specification/#color) property, either RGB
-/// or HSV.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum ColorFormat {
-    /// The colour is in red-green-blue format.
-    RGB,
-    /// The colour is in hue-saturation-value format.
-    HSV,
-}
-
-impl ColorFormat {
-    fn as_str(&self) -> &'static str {
-        match self {
-            Self::RGB => "rgb",
-            Self::HSV => "hsv",
-        }
-    }
-}
-
-impl Display for ColorFormat {
+impl Display for Datatype {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         f.write_str(self.as_str())
+    }
+}
+
+impl Into<Vec<u8>> for Datatype {
+    fn into(self) -> Vec<u8> {
+        self.as_str().into()
     }
 }
 

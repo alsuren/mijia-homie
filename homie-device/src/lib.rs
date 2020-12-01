@@ -21,7 +21,9 @@ use tokio::task::{self, JoinError, JoinHandle};
 use tokio::time::delay_for;
 
 mod types;
-pub use crate::types::{ColorFormat, Datatype, Node, Property};
+pub use crate::types::{Datatype, Node, Property};
+mod values;
+pub use crate::values::{Color, ColorFormat, ColorHSV, ColorRGB};
 
 const HOMIE_VERSION: &str = "4.0";
 const HOMIE_IMPLEMENTATION: &str = "homie-rs";
