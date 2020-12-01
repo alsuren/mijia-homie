@@ -16,7 +16,7 @@ pub use bluetooth::{BluetoothError, BluetoothSession, DeviceId, MacAddress, Spaw
 use bluetooth_event::BluetoothEvent;
 pub use decode::comfort_level::ComfortLevel;
 use decode::history::decode_range;
-pub use decode::history::Record;
+pub use decode::history::HistoryRecord;
 pub use decode::readings::Readings;
 pub use decode::temperature_unit::TemperatureUnit;
 use decode::time::{decode_time, encode_time};
@@ -70,7 +70,7 @@ pub enum MijiaEvent {
     /// A sensor has sent a new set of readings.
     Readings { id: DeviceId, readings: Readings },
     /// A sensor has sent a new historical record.
-    HistoryRecord { id: DeviceId, record: Record },
+    HistoryRecord { id: DeviceId, record: HistoryRecord },
     /// The Bluetooth connection to a sensor has been lost.
     Disconnected { id: DeviceId },
 }
@@ -95,7 +95,7 @@ impl MijiaEvent {
                 } else if let Some(object_path) =
                     object_path.strip_suffix(HISTORY_RECORDS_CHARACTERISTIC_PATH)
                 {
-                    match Record::decode(&value) {
+                    match HistoryRecord::decode(&value) {
                         Ok(record) => Some(MijiaEvent::HistoryRecord {
                             id: DeviceId::new(object_path),
                             record,
@@ -252,12 +252,15 @@ impl MijiaSession {
     }
 
     /// Get the last historical record stored on the sensor.
-    pub async fn get_last_history_record(&self, id: &DeviceId) -> Result<Record, MijiaError> {
+    pub async fn get_last_history_record(
+        &self,
+        id: &DeviceId,
+    ) -> Result<HistoryRecord, MijiaError> {
         let value = self
             .bt_session
             .read_characteristic_value(id, HISTORY_LAST_RECORD_CHARACTERISTIC_PATH)
             .await?;
-        Ok(Record::decode(&value)?)
+        Ok(HistoryRecord::decode(&value)?)
     }
 
     /// Start receiving historical records from the sensor.
@@ -293,7 +296,10 @@ impl MijiaSession {
     }
 
     /// Try to get all historical records for the sensor.
-    pub async fn get_all_history(&self, id: &DeviceId) -> Result<Vec<Option<Record>>, MijiaError> {
+    pub async fn get_all_history(
+        &self,
+        id: &DeviceId,
+    ) -> Result<Vec<Option<HistoryRecord>>, MijiaError> {
         let history_range = self.get_history_range(&id).await?;
         // TODO: Get event stream that is filtered by D-Bus.
         let (msg_match, events) = self.event_stream().await?;

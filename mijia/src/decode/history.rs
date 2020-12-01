@@ -20,7 +20,7 @@ pub(crate) fn decode_range(value: &[u8]) -> Result<Range<u32>, DecodeError> {
 
 /// A historical temperature/humidity record stored by a sensor.
 #[derive(Clone, Debug, PartialEq)]
-pub struct Record {
+pub struct HistoryRecord {
     /// The index of the record.
     pub index: u32,
     /// The time at which the record was created.
@@ -35,8 +35,8 @@ pub struct Record {
     pub humidity_max: u8,
 }
 
-impl Record {
-    pub(crate) fn decode(value: &[u8]) -> Result<Record, DecodeError> {
+impl HistoryRecord {
+    pub(crate) fn decode(value: &[u8]) -> Result<HistoryRecord, DecodeError> {
         check_length(value.len(), 14)?;
 
         let index = u32::from_le_bytes(value[0..4].try_into().unwrap());
@@ -46,7 +46,7 @@ impl Record {
         let humidity_max = value[10];
         let humidity_min = value[13];
 
-        Ok(Record {
+        Ok(HistoryRecord {
             index,
             time,
             temperature_min,
@@ -57,7 +57,7 @@ impl Record {
     }
 }
 
-impl Display for Record {
+impl Display for HistoryRecord {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write!(
             f,
@@ -88,7 +88,7 @@ mod tests {
     #[test]
     fn decode_too_short() {
         assert_eq!(
-            Record::decode(&[
+            HistoryRecord::decode(&[
                 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d,
             ]),
             Err(DecodeError::WrongLength {
@@ -101,7 +101,7 @@ mod tests {
     #[test]
     fn decode_too_long() {
         assert_eq!(
-            Record::decode(&[
+            HistoryRecord::decode(&[
                 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e,
                 0x0f,
             ]),
@@ -115,11 +115,11 @@ mod tests {
     #[test]
     fn decode_valid() {
         assert_eq!(
-            Record::decode(&[
+            HistoryRecord::decode(&[
                 0x49, 0x01, 0x00, 0x00, 0x40, 0x0c, 0x55, 0x5e, 0xdd, 0x00, 0x43, 0xd5, 0x00, 0x3c
             ])
             .unwrap(),
-            Record {
+            HistoryRecord {
                 index: 329,
                 time: SystemTime::UNIX_EPOCH + Duration::from_secs(1582632000),
                 temperature_min: 21.3,
