@@ -1,4 +1,4 @@
-use homie_device::{Datatype, HomieDevice, Node, Property, SpawnError};
+use homie_device::{ColorFormat, ColorRGB, HomieDevice, Node, Property, SpawnError};
 use rumqttc::MqttOptions;
 
 #[tokio::main]
@@ -9,10 +9,7 @@ async fn main() -> Result<(), SpawnError> {
 
     let mut builder =
         HomieDevice::builder("homie/example_light", "Homie light example", mqttoptions);
-    builder.set_update_callback(|node_id, property_id, value| async move {
-        println!("{}/{} is now {}", node_id, property_id, value);
-        Some(value)
-    });
+    builder.set_update_callback(update_callback);
     let (mut homie, homie_handle) = builder.spawn().await?;
 
     let node = Node::new(
@@ -20,8 +17,8 @@ async fn main() -> Result<(), SpawnError> {
         "Light",
         "light",
         vec![
-            Property::new("power", "On", Datatype::Boolean, true, None, None),
-            Property::new("colour", "Colour", Datatype::Color, true, None, Some("rgb")),
+            Property::boolean("power", "On", true, None),
+            Property::color("colour", "Colour", true, None, ColorFormat::RGB),
         ],
     );
     homie.add_node(node).await?;
@@ -31,4 +28,30 @@ async fn main() -> Result<(), SpawnError> {
 
     // This will only resolve (with an error) if we lose connection to the MQTT broker.
     homie_handle.await
+}
+
+async fn update_callback(node_id: String, property_id: String, value: String) -> Option<String> {
+    match (node_id.as_ref(), property_id.as_ref()) {
+        ("light", "power") => {
+            set_power(value.parse().unwrap());
+        }
+        ("light", "colour") => {
+            set_colour(value.parse().unwrap());
+        }
+        _ => {
+            println!(
+                "Unexpected property {}/{} is now {}",
+                node_id, property_id, value
+            );
+        }
+    }
+    Some(value)
+}
+
+fn set_power(power: bool) {
+    println!("Power {}", power)
+}
+
+fn set_colour(colour: ColorRGB) {
+    println!("Colour {}", colour);
 }

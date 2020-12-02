@@ -22,6 +22,8 @@ use tokio::time::delay_for;
 
 mod types;
 pub use crate::types::{Datatype, Node, Property};
+mod values;
+pub use crate::values::{Color, ColorFormat, ColorHSV, ColorRGB};
 
 const HOMIE_VERSION: &str = "4.0";
 const HOMIE_IMPLEMENTATION: &str = "homie-rs";
@@ -43,11 +45,19 @@ pub enum SpawnError {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum State {
+    /// The device is connected to the MQTT broker but is not yet ready to operate.
     Init,
+    /// The device is connected and operational.
     Ready,
+    /// The device has cleanly disconnected from the MQTT broker.
     Disconnected,
+    /// The device is currently sleeping.
     Sleeping,
+    /// The device was uncleanly disconnected from the MQTT broker. This could happen due to a
+    /// network issue, power failure or some other unexpected failure.
     Lost,
+    /// The device is connected to the MQTT broker but something is wrong and it may require human
+    /// intervention.
     Alert,
 }
 

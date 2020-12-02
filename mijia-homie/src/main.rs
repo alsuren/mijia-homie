@@ -3,7 +3,7 @@
 use backoff::{future::FutureOperation, ExponentialBackoff};
 use futures::stream::StreamExt;
 use futures::TryFutureExt;
-use homie_device::{Datatype, HomieDevice, Node, Property};
+use homie_device::{HomieDevice, Node, Property};
 use itertools::Itertools;
 use mijia::{DeviceId, MacAddress, MijiaEvent, MijiaSession, Readings, SensorProps};
 use rumqttc::MqttOptions;
@@ -160,26 +160,23 @@ impl Sensor {
             &self.name,
             "Mijia sensor",
             vec![
-                Property::new(
+                Property::float(
                     Self::PROPERTY_ID_TEMPERATURE,
                     "Temperature",
-                    Datatype::Float,
                     false,
                     Some("ºC"),
                     None,
                 ),
-                Property::new(
+                Property::integer(
                     Self::PROPERTY_ID_HUMIDITY,
                     "Humidity",
-                    Datatype::Integer,
                     false,
                     Some("%"),
                     None,
                 ),
-                Property::new(
+                Property::integer(
                     Self::PROPERTY_ID_BATTERY,
                     "Battery level",
-                    Datatype::Integer,
                     false,
                     Some("%"),
                     None,

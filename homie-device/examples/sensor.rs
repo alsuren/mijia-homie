@@ -1,5 +1,5 @@
 use futures::{FutureExt, TryFutureExt};
-use homie_device::{Datatype, HomieDevice, Node, Property};
+use homie_device::{HomieDevice, Node, Property};
 use rand::random;
 use rumqttc::MqttOptions;
 use std::error::Error;
@@ -24,22 +24,8 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
             "Sensor",
             "Environment sensor",
             vec![
-                Property::new(
-                    "temperature",
-                    "Temperature",
-                    Datatype::Float,
-                    false,
-                    Some("ºC"),
-                    None,
-                ),
-                Property::new(
-                    "humidity",
-                    "Humidity",
-                    Datatype::Integer,
-                    false,
-                    Some("%"),
-                    None,
-                ),
+                Property::float("temperature", "Temperature", false, Some("ºC"), None),
+                Property::integer("humidity", "Humidity", false, Some("%"), None),
             ],
         ))
         .await?;
