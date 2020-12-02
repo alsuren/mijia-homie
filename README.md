@@ -3,7 +3,8 @@
 This is a project for capturing BLE data from a Xiaomi Mijia 2
 hygrometer-thermometer and publishing it. The repository includes:
 
-- [A tool](./mijia-homie) to publish readings to an MQTT broker following the [Homie convention](https://homieiot.github.io/).
+- [A service](./mijia-homie) to connect to a number of Mijia sensors over BLE and publish their readings to an MQTT broker following the [Homie convention](https://homieiot.github.io/).
+- [A service](./homie-influx) to discover devices on an MQTT broker following the [Homie convention](https://homieiot.github.io/) and record their property value changes to an InfluxDB database.
 - [A library](./homie-device) for implementing Homie devices.
 - [A library](./homie-controller) for implementing Homie controllers.
 - [A library](./mijia) for reading Mijia sensors.
