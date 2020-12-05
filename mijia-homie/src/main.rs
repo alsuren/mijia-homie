@@ -219,6 +219,10 @@ impl Sensor {
         self.connection_status = ConnectionStatus::Connected;
         Ok(())
     }
+
+    fn name_with_adapter(&self) -> String {
+        format!("{}/{}", self.name, self.id.adapter())
+    }
 }
 
 async fn run_sensor_system(
@@ -273,7 +277,7 @@ async fn bluetooth_connection_loop(
                 .await
                 .sensors
                 .values()
-                .map(|sensor| (sensor.connection_status, sensor.name.clone()))
+                .map(|sensor| (sensor.connection_status, sensor.name_with_adapter()))
                 .into_group_map();
             for (state, names) in counts.iter().sorted() {
                 println!("{:?}: {} {:?}", state, names.len(), names);
@@ -297,7 +301,11 @@ async fn bluetooth_connection_loop(
                     .sensors
                     .get(&id)
                     .map(|sensor| {
-                        log::trace!("State of {} is {:?}", sensor.name, sensor.connection_status);
+                        log::trace!(
+                            "State of {} is {:?}",
+                            sensor.name_with_adapter(),
+                            sensor.connection_status
+                        );
                         sensor.connection_status
                     })
                     .expect("sensors cannot be deleted");
@@ -372,7 +380,8 @@ async fn connect_sensor_with_id(
         let sensor = state.sensors.get_mut(&id).unwrap();
         println!(
             "Trying to connect to {} from status: {:?}",
-            sensor.name, sensor.connection_status
+            sensor.name_with_adapter(),
+            sensor.connection_status
         );
         sensor.connection_status = ConnectionStatus::Connecting {
             reserved_until: Instant::now() + SENSOR_CONNECT_RESERVATION_TIMEOUT,
@@ -384,12 +393,19 @@ async fn connect_sensor_with_id(
     let sensor = state.sensors.get_mut(&id).unwrap();
     match result {
         Ok(()) => {
-            println!("Connected to {} and started notifications", sensor.name);
+            println!(
+                "Connected to {} and started notifications",
+                sensor.name_with_adapter()
+            );
             sensor.mark_connected(&mut state.homie).await?;
             sensor.last_update_timestamp = Instant::now();
         }
         Err(e) => {
-            println!("Failed to connect to {}: {:?}", sensor.name, e);
+            println!(
+                "Failed to connect to {}: {:?}",
+                sensor.name_with_adapter(),
+                e
+            );
             sensor.connection_status = ConnectionStatus::Disconnected;
         }
     }
@@ -436,7 +452,7 @@ async fn check_for_stale_sensor(
     if now - sensor.last_update_timestamp > UPDATE_TIMEOUT {
         println!(
             "No update from {} for {:?}, reconnecting",
-            sensor.name,
+            sensor.name_with_adapter(),
             now - sensor.last_update_timestamp
         );
         sensor.connection_status = ConnectionStatus::Disconnected;
@@ -501,7 +517,7 @@ async fn handle_bluetooth_event(
         MijiaEvent::Disconnected { id } => {
             if let Some(sensor) = sensors.get_mut(&id) {
                 if sensor.connection_status == ConnectionStatus::Connected {
-                    println!("{} disconnected", sensor.name);
+                    println!("{} disconnected", sensor.name_with_adapter());
                     sensor.connection_status = ConnectionStatus::MarkedDisconnected;
                     homie.remove_node(&sensor.node_id()).await?;
                 } else {
