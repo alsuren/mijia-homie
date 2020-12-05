@@ -120,6 +120,8 @@ enum ConnectionStatus {
     MarkedDisconnected,
     /// Connected and subscribed to updates
     Connected,
+    /// Connected on a different Bluetooth adapter, on a system which has more than one.
+    ConnectedOnOtherAdapter,
 }
 
 #[derive(Debug, Clone)]
@@ -332,6 +334,10 @@ async fn action_sensor(
         ConnectionStatus::Connecting { reserved_until } if reserved_until > Instant::now() => {
             Ok(())
         }
+        ConnectionStatus::ConnectedOnOtherAdapter => {
+            check_disconnected_on_other_adapter(state, id).await;
+            Ok(())
+        }
         ConnectionStatus::Unknown
         | ConnectionStatus::Connecting { .. }
         | ConnectionStatus::Disconnected
@@ -356,12 +362,7 @@ async fn check_for_sensors(
     let sensors = session.get_sensors().await?;
     let state = &mut *state.lock().await;
     for props in sensors {
-        if sensor_names.contains_key(&props.mac_address)
-            && !state
-                .sensors
-                .values()
-                .any(|s| s.mac_address == props.mac_address)
-        {
+        if sensor_names.contains_key(&props.mac_address) && !state.sensors.contains_key(&props.id) {
             let sensor = Sensor::new(props, &sensor_names);
             state.sensors.insert(sensor.id.clone(), sensor);
         }
@@ -369,15 +370,41 @@ async fn check_for_sensors(
     Ok(())
 }
 
+/// If the other connection has been lost, then put this one in a state ready to try connecting
+/// again.
+async fn check_disconnected_on_other_adapter(state: Arc<Mutex<SensorState>>, id: &DeviceId) {
+    let mut state = state.lock().await;
+    let sensor = state.sensors.get(id).unwrap();
+    if !state.sensors.values().any(|other_sensor| {
+        other_sensor.mac_address == sensor.mac_address
+            && other_sensor.connection_status == ConnectionStatus::Connected
+    }) {
+        log::trace!(
+            "{} no longer connected on another Bluetooth adapter.",
+            sensor.name_with_adapter()
+        );
+        let sensor = state.sensors.get_mut(id).unwrap();
+        sensor.connection_status = ConnectionStatus::Disconnected;
+    }
+}
+
 async fn connect_sensor_with_id(
     state: Arc<Mutex<SensorState>>,
     session: &MijiaSession,
     id: &DeviceId,
 ) -> Result<(), eyre::Report> {
-    // Update the state of the sensor to `Connecting`.
     {
         let mut state = state.lock().await;
+
+        // Check whether we are already connected to the same sensor on a different Bluetooth
+        // adapter.
+        if sensor_already_connected_on_other_adapter(&mut state, id) {
+            return Ok(());
+        }
+
         let sensor = state.sensors.get_mut(id).unwrap();
+
+        // Update the state of the sensor to `Connecting`.
         println!(
             "Trying to connect to {} from status: {:?}",
             sensor.name_with_adapter(),
@@ -410,6 +437,28 @@ async fn connect_sensor_with_id(
         }
     }
     Ok(())
+}
+
+/// Check whether we are already connected to the given sensor on a different Bluetooth adapter.
+/// If so, mark it as `ConnectedOnOtherAdapter` and return true.
+fn sensor_already_connected_on_other_adapter(state: &mut SensorState, id: &DeviceId) -> bool {
+    let sensor = state.sensors.get(id).unwrap();
+    if state.sensors.values().any(|other_sensor| {
+        other_sensor.mac_address == sensor.mac_address
+            && other_sensor.id != sensor.id
+            && other_sensor.connection_status == ConnectionStatus::Connected
+    }) {
+        log::trace!(
+            "{} already connected on another Bluetooth adapter (status was {:?}).",
+            sensor.name_with_adapter(),
+            sensor.connection_status
+        );
+        let sensor = state.sensors.get_mut(id).unwrap();
+        sensor.connection_status = ConnectionStatus::ConnectedOnOtherAdapter;
+        true
+    } else {
+        false
+    }
 }
 
 async fn connect_and_subscribe_sensor_or_disconnect<'a>(
