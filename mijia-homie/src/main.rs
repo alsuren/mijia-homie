@@ -309,7 +309,7 @@ async fn bluetooth_connection_loop(
                         sensor.connection_status
                     })
                     .expect("sensors cannot be deleted");
-                action_sensor(state.clone(), session, id, connection_status).await?;
+                action_sensor(state.clone(), session, &id, connection_status).await?;
             }
         }
         time::delay_for(CONNECT_INTERVAL).await;
@@ -325,7 +325,7 @@ struct SensorState {
 async fn action_sensor(
     state: Arc<Mutex<SensorState>>,
     session: &MijiaSession,
-    id: DeviceId,
+    id: &DeviceId,
     status: ConnectionStatus,
 ) -> Result<(), eyre::Report> {
     match status {
@@ -372,12 +372,12 @@ async fn check_for_sensors(
 async fn connect_sensor_with_id(
     state: Arc<Mutex<SensorState>>,
     session: &MijiaSession,
-    id: DeviceId,
+    id: &DeviceId,
 ) -> Result<(), eyre::Report> {
     // Update the state of the sensor to `Connecting`.
     {
         let mut state = state.lock().await;
-        let sensor = state.sensors.get_mut(&id).unwrap();
+        let sensor = state.sensors.get_mut(id).unwrap();
         println!(
             "Trying to connect to {} from status: {:?}",
             sensor.name_with_adapter(),
@@ -387,10 +387,10 @@ async fn connect_sensor_with_id(
             reserved_until: Instant::now() + SENSOR_CONNECT_RESERVATION_TIMEOUT,
         };
     };
-    let result = connect_and_subscribe_sensor_or_disconnect(session, &id).await;
+    let result = connect_and_subscribe_sensor_or_disconnect(session, id).await;
 
     let state = &mut *state.lock().await;
-    let sensor = state.sensors.get_mut(&id).unwrap();
+    let sensor = state.sensors.get_mut(id).unwrap();
     match result {
         Ok(()) => {
             println!(
@@ -444,10 +444,10 @@ async fn connect_and_subscribe_sensor_or_disconnect<'a>(
 async fn check_for_stale_sensor(
     state: Arc<Mutex<SensorState>>,
     session: &MijiaSession,
-    id: DeviceId,
+    id: &DeviceId,
 ) -> Result<(), eyre::Report> {
     let state = &mut *state.lock().await;
-    let sensor = state.sensors.get_mut(&id).unwrap();
+    let sensor = state.sensors.get_mut(id).unwrap();
     let now = Instant::now();
     if now - sensor.last_update_timestamp > UPDATE_TIMEOUT {
         println!(
@@ -462,7 +462,7 @@ async fn check_for_stale_sensor(
         // while we're in the middle of disconnecting.
         session
             .bt_session
-            .disconnect(&id)
+            .disconnect(id)
             .await
             .wrap_err_with(|| format!("disconnecting from {:?}", id))?;
     }
