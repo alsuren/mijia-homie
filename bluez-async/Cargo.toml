@@ -11,6 +11,7 @@ categories = ["api-bindings", "hardware-support", "os::linux-apis"]
 
 [dependencies]
 async-trait = "0.1.42"
+backoff = { version = "0.3.0", features = ["tokio"] }
 bitflags = "1.2.1"
 bluez-generated = { version = "0.2.1", path = "../bluez-generated" }
 dbus = { version = "0.9.1", features = ["futures"] }

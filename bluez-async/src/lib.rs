@@ -26,6 +26,8 @@ pub use self::events::{AdapterEvent, BluetoothEvent, CharacteristicEvent, Device
 use self::introspect::IntrospectParse;
 use self::messagestream::MessageStream;
 pub use self::service::{ServiceId, ServiceInfo};
+use backoff::future::retry;
+use backoff::ExponentialBackoff;
 use bluez_generated::{
     OrgBluezAdapter1, OrgBluezDevice1, OrgBluezDevice1Properties, OrgBluezGattCharacteristic1,
     OrgBluezGattDescriptor1, OrgBluezGattService1, ORG_BLUEZ_ADAPTER1_NAME, ORG_BLUEZ_DEVICE1_NAME,
@@ -36,7 +38,7 @@ use dbus::nonblock::{Proxy, SyncConnection};
 use dbus::Path;
 use dbus_tokio::connection::IOResourceError;
 use futures::stream::{self, select_all, StreamExt};
-use futures::{FutureExt, Stream};
+use futures::{FutureExt, Stream, TryFutureExt};
 use std::collections::HashMap;
 use std::convert::TryInto;
 use std::fmt::{self, Debug, Display, Formatter};
@@ -51,6 +53,7 @@ use uuid::Uuid;
 
 const DBUS_METHOD_CALL_TIMEOUT: Duration = Duration::from_secs(30);
 const SERVICE_DISCOVERY_TIMEOUT: Duration = Duration::from_secs(5);
+const READ_WRITE_RETRY_TIMEOUT: Duration = Duration::from_secs(2);
 
 /// An error carrying out a Bluetooth operation.
 #[derive(Debug, Error)]
@@ -742,7 +745,18 @@ impl BluetoothSession {
         offset: usize,
     ) -> Result<Vec<u8>, BluetoothError> {
         let characteristic = self.characteristic(id);
-        Ok(characteristic.read_value(offset_to_propmap(offset)).await?)
+        Ok(retry(
+            ExponentialBackoff {
+                max_elapsed_time: Some(READ_WRITE_RETRY_TIMEOUT),
+                ..Default::default()
+            },
+            || {
+                characteristic
+                    .read_value(offset_to_propmap(offset))
+                    .map_err(Into::into)
+            },
+        )
+        .await?)
     }
 
     /// Write the given value to the given GATT characteristic, with default options.
@@ -765,9 +779,20 @@ impl BluetoothSession {
         options: WriteOptions,
     ) -> Result<(), BluetoothError> {
         let characteristic = self.characteristic(id);
-        Ok(characteristic
-            .write_value(value.into(), options.into())
-            .await?)
+        let value: Vec<u8> = value.into();
+        let value = &value;
+        Ok(retry(
+            ExponentialBackoff {
+                max_elapsed_time: Some(READ_WRITE_RETRY_TIMEOUT),
+                ..Default::default()
+            },
+            || {
+                characteristic
+                    .write_value(value.to_owned(), options.into())
+                    .map_err(Into::into)
+            },
+        )
+        .await?)
     }
 
     /// Read the value of the given GATT descriptor.
@@ -817,14 +842,28 @@ impl BluetoothSession {
     /// Start notifications on the given GATT characteristic.
     pub async fn start_notify(&self, id: &CharacteristicId) -> Result<(), BluetoothError> {
         let characteristic = self.characteristic(id);
-        characteristic.start_notify().await?;
+        retry(
+            ExponentialBackoff {
+                max_elapsed_time: Some(READ_WRITE_RETRY_TIMEOUT),
+                ..Default::default()
+            },
+            || characteristic.start_notify().map_err(Into::into),
+        )
+        .await?;
         Ok(())
     }
 
     /// Stop notifications on the given GATT characteristic.
     pub async fn stop_notify(&self, id: &CharacteristicId) -> Result<(), BluetoothError> {
         let characteristic = self.characteristic(id);
-        characteristic.stop_notify().await?;
+        retry(
+            ExponentialBackoff {
+                max_elapsed_time: Some(READ_WRITE_RETRY_TIMEOUT),
+                ..Default::default()
+            },
+            || characteristic.stop_notify().map_err(Into::into),
+        )
+        .await?;
         Ok(())
     }
 

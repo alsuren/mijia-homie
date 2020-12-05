@@ -259,6 +259,7 @@ name = "bluez-async"
 version = "0.2.1"
 dependencies = [
  "async-trait",
+ "backoff",
  "bitflags",
  "bluez-generated",
  "dbus",
