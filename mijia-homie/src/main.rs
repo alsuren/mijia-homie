@@ -254,7 +254,7 @@ fn hashmap_from_file(filename: &str) -> Result<HashMap<MacAddress, String>, eyre
     if let Ok(file) = File::open(filename) {
         for line in BufReader::new(file).lines() {
             let line = line?;
-            if !line.starts_with('#') {
+            if !line.is_empty() && !line.starts_with('#') {
                 let parts: Vec<&str> = line.splitn(2, '=').collect();
                 if parts.len() != 2 {
                     eyre::bail!("Invalid line '{}'", line);
