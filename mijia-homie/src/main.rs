@@ -7,7 +7,10 @@ use futures::Stream;
 use futures::TryFutureExt;
 use homie_device::{HomieDevice, Node, Property};
 use itertools::Itertools;
-use mijia::{DeviceId, MacAddress, MijiaEvent, MijiaSession, Readings, SensorProps};
+use mijia::{
+    BluetoothError, BluetoothSession, DeviceId, MacAddress, MijiaEvent, MijiaSession, Readings,
+    SensorProps,
+};
 use rumqttc::MqttOptions;
 use rustls::ClientConfig;
 use stable_eyre::eyre;
@@ -417,15 +420,18 @@ async fn connect_sensor_with_id(
     Ok(())
 }
 
-// TODO: Does this already exist somewhere?
-/// Return the first Ok element of the stream, or a vector of all errors if they all fail.
-async fn first_ok<V, E>(stream: impl Stream<Item = Result<V, E>>) -> Result<V, Vec<E>> {
-    let mut stream = Box::pin(stream);
+/// Try to connect to the ids in turn, and get the first one that succeeds. If they all fail then
+/// return an error.
+async fn try_connect_all(
+    session: &BluetoothSession,
+    ids: Vec<DeviceId>,
+) -> Result<DeviceId, Vec<BluetoothError>> {
     let mut errors = vec![];
-    while let Some(res) = stream.next().await {
-        match res {
-            Ok(v) => return Ok(v),
-            Err(e) => errors.push(e),
+    for id in ids {
+        if let Err(e) = session.connect(&id).await {
+            errors.push(e);
+        } else {
+            return Ok(id);
         }
     }
     Err(errors)
@@ -436,14 +442,9 @@ async fn connect_and_subscribe_sensor_or_disconnect(
     name: &str,
     ids: Vec<DeviceId>,
 ) -> Result<DeviceId, eyre::Report> {
-    // Try to connect to the ids in turn, and get the first one that succeeds. If they all fail then
-    // return an error.
-    let id = first_ok(
-        stream::iter(ids)
-            .then(|id| async move { session.bt_session.connect(&id).await.map(|()| id) }),
-    )
-    .await
-    .map_err(|e| eyre!("Error connecting to {}: {:?}", name, e))?;
+    let id = try_connect_all(&session.bt_session, ids)
+        .await
+        .map_err(|e| eyre!("Error connecting to {}: {:?}", name, e))?;
 
     // We managed to connect to the sensor via some id, now try to start notifications for readings.
     let mut backoff = ExponentialBackoff::default();
