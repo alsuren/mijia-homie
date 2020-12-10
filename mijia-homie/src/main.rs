@@ -39,27 +39,53 @@ const SENSOR_CONNECT_RETRY_TIMEOUT: Duration = Duration::from_secs(60);
 const CONFIG_FILENAME: &str = "mijia_homie.toml";
 const SENSOR_NAMES_FILENAME: &str = "sensor_names.conf";
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Default, Deserialize)]
+#[serde(default)]
 struct Config {
     mqtt: MqttConfig,
     homie: HomieConfig,
 }
 
 #[derive(Clone, Debug, Deserialize)]
+#[serde(default)]
 struct MqttConfig {
-    host: Option<String>,
-    port: Option<u16>,
-    use_tls: Option<bool>,
+    host: String,
+    port: u16,
+    use_tls: bool,
     username: Option<String>,
     password: Option<String>,
     client_name: Option<String>,
 }
 
+impl Default for MqttConfig {
+    fn default() -> MqttConfig {
+        MqttConfig {
+            host: DEFAULT_HOST.to_owned(),
+            port: DEFAULT_PORT,
+            use_tls: false,
+            username: None,
+            password: None,
+            client_name: None,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Deserialize)]
+#[serde(default)]
 struct HomieConfig {
-    device_id: Option<String>,
-    device_name: Option<String>,
-    prefix: Option<String>,
+    device_id: String,
+    device_name: String,
+    prefix: String,
+}
+
+impl Default for HomieConfig {
+    fn default() -> HomieConfig {
+        HomieConfig {
+            device_id: DEFAULT_DEVICE_ID.to_owned(),
+            device_name: DEFAULT_DEVICE_NAME.to_owned(),
+            prefix: DEFAULT_MQTT_PREFIX.to_owned(),
+        }
+    }
 }
 
 #[tokio::main]
@@ -71,22 +97,11 @@ async fn main() -> Result<(), eyre::Report> {
     let config_file =
         read_to_string(CONFIG_FILENAME).wrap_err_with(|| format!("Reading {}", CONFIG_FILENAME))?;
     let config: Config = toml::from_str(&config_file)?;
-    let device_id = config
-        .homie
-        .device_id
-        .unwrap_or_else(|| DEFAULT_DEVICE_ID.to_string());
-    let device_name = config
-        .homie
-        .device_name
-        .unwrap_or_else(|| DEFAULT_DEVICE_NAME.to_string());
 
-    let mqtt_options = get_mqtt_options(config.mqtt, &device_id);
-    let mqtt_prefix = config
-        .homie
-        .prefix
-        .unwrap_or_else(|| DEFAULT_MQTT_PREFIX.to_string());
-    let device_base = format!("{}/{}", mqtt_prefix, device_id);
-    let mut homie_builder = HomieDevice::builder(&device_base, &device_name, mqtt_options);
+    let mqtt_options = get_mqtt_options(config.mqtt, &config.homie.device_id);
+    let device_base = format!("{}/{}", config.homie.prefix, config.homie.device_id);
+    let mut homie_builder =
+        HomieDevice::builder(&device_base, &config.homie.device_name, mqtt_options);
     homie_builder.set_firmware(env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
     let (homie, homie_handle) = homie_builder.spawn().await?;
 
@@ -114,17 +129,15 @@ async fn main() -> Result<(), eyre::Report> {
 /// defaults.
 fn get_mqtt_options(config: MqttConfig, device_id: &str) -> MqttOptions {
     let client_name = config.client_name.unwrap_or_else(|| device_id.to_owned());
-    let host = config.host.unwrap_or_else(|| DEFAULT_HOST.to_string());
-    let port = config.port.unwrap_or(DEFAULT_PORT);
 
-    let mut mqtt_options = MqttOptions::new(client_name, host, port);
+    let mut mqtt_options = MqttOptions::new(client_name, config.host, config.port);
 
     mqtt_options.set_keep_alive(5);
     if let (Some(u), Some(p)) = (config.username, config.password) {
         mqtt_options.set_credentials(u, p);
     }
 
-    if config.use_tls.unwrap_or(false) {
+    if config.use_tls {
         let mut client_config = ClientConfig::new();
         client_config.root_store =
             rustls_native_certs::load_native_certs().expect("could not load platform certs");
