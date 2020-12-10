@@ -1,11 +1,16 @@
 #![type_length_limit = "1138969"]
 
 use backoff::{future::FutureOperation, ExponentialBackoff};
-use futures::stream::StreamExt;
+use eyre::{eyre, Report};
+use futures::stream::{self, StreamExt};
+use futures::Stream;
 use futures::TryFutureExt;
 use homie_device::{HomieDevice, Node, Property};
 use itertools::Itertools;
-use mijia::{DeviceId, MacAddress, MijiaEvent, MijiaSession, Readings, SensorProps};
+use mijia::{
+    BluetoothError, BluetoothSession, DeviceId, MacAddress, MijiaEvent, MijiaSession, Readings,
+    SensorProps,
+};
 use rumqttc::MqttOptions;
 use rustls::ClientConfig;
 use stable_eyre::eyre;
@@ -103,7 +108,7 @@ fn get_mqtt_options(device_id: &str) -> MqttOptions {
     mqtt_options
 }
 
-#[derive(Debug, Copy, Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
 enum ConnectionStatus {
     /// Not yet attempted to connect. Might already be connected from a previous
     /// run of this program.
@@ -119,16 +124,16 @@ enum ConnectionStatus {
     /// events might be received racily. The sensor might actually be Connected.
     MarkedDisconnected,
     /// Connected and subscribed to updates
-    Connected,
+    Connected { id: DeviceId },
 }
 
 #[derive(Debug, Clone)]
 struct Sensor {
-    id: DeviceId,
     mac_address: MacAddress,
     name: String,
     last_update_timestamp: Instant,
     connection_status: ConnectionStatus,
+    ids: Vec<DeviceId>,
 }
 
 impl Sensor {
@@ -142,11 +147,11 @@ impl Sensor {
             .cloned()
             .unwrap_or_else(|| props.mac_address.to_string());
         Self {
-            id: props.id,
             mac_address: props.mac_address,
             name,
             last_update_timestamp: Instant::now(),
             connection_status: ConnectionStatus::Unknown,
+            ids: vec![props.id],
         }
     }
 
@@ -214,9 +219,14 @@ impl Sensor {
         Ok(())
     }
 
-    async fn mark_connected(&mut self, homie: &mut HomieDevice) -> Result<(), eyre::Report> {
+    async fn mark_connected(
+        &mut self,
+        homie: &mut HomieDevice,
+        id: DeviceId,
+    ) -> Result<(), eyre::Report> {
+        assert!(self.ids.contains(&id));
         homie.add_node(self.as_node()).await?;
-        self.connection_status = ConnectionStatus::Connected;
+        self.connection_status = ConnectionStatus::Connected { id };
         Ok(())
     }
 }
@@ -247,7 +257,7 @@ fn hashmap_from_file(filename: &str) -> Result<HashMap<MacAddress, String>, eyre
     if let Ok(file) = File::open(filename) {
         for line in BufReader::new(file).lines() {
             let line = line?;
-            if !line.starts_with('#') {
+            if !line.is_empty() && !line.starts_with('#') {
                 let parts: Vec<&str> = line.splitn(2, '=').collect();
                 if parts.len() != 2 {
                     eyre::bail!("Invalid line '{}'", line);
@@ -268,12 +278,11 @@ async fn bluetooth_connection_loop(
     loop {
         // Print count and list of sensors in each state.
         {
+            let state = state.lock().await;
             let counts = state
-                .lock()
-                .await
                 .sensors
                 .values()
-                .map(|sensor| (sensor.connection_status, sensor.name.clone()))
+                .map(|sensor| (&sensor.connection_status, sensor.name.to_owned()))
                 .into_group_map();
             for (state, names) in counts.iter().sorted() {
                 println!("{:?}: {} {:?}", state, names.len(), names);
@@ -289,19 +298,20 @@ async fn bluetooth_connection_loop(
 
         // Check the state of each sensor and act on it if appropriate.
         {
-            let ids: Vec<DeviceId> = state.lock().await.sensors.keys().cloned().collect();
-            for id in ids {
+            let mac_addresses: Vec<MacAddress> =
+                state.lock().await.sensors.keys().cloned().collect();
+            for mac_address in mac_addresses {
                 let connection_status = state
                     .lock()
                     .await
                     .sensors
-                    .get(&id)
+                    .get(&mac_address)
                     .map(|sensor| {
                         log::trace!("State of {} is {:?}", sensor.name, sensor.connection_status);
-                        sensor.connection_status
+                        sensor.connection_status.to_owned()
                     })
                     .expect("sensors cannot be deleted");
-                action_sensor(state.clone(), session, id, connection_status).await?;
+                action_sensor(state.clone(), session, &mac_address, connection_status).await?;
             }
         }
         time::delay_for(CONNECT_INTERVAL).await;
@@ -310,14 +320,22 @@ async fn bluetooth_connection_loop(
 
 #[derive(Debug)]
 struct SensorState {
-    sensors: HashMap<DeviceId, Sensor>,
+    sensors: HashMap<MacAddress, Sensor>,
     homie: HomieDevice,
+}
+
+/// Get the sensor entry for the given id, if any.
+fn get_mut_sensor_by_id<'a>(
+    sensors: &'a mut HashMap<MacAddress, Sensor>,
+    id: &DeviceId,
+) -> Option<&'a mut Sensor> {
+    sensors.values_mut().find(|sensor| sensor.ids.contains(id))
 }
 
 async fn action_sensor(
     state: Arc<Mutex<SensorState>>,
     session: &MijiaSession,
-    id: DeviceId,
+    mac_address: &MacAddress,
     status: ConnectionStatus,
 ) -> Result<(), eyre::Report> {
     match status {
@@ -328,11 +346,11 @@ async fn action_sensor(
         | ConnectionStatus::Connecting { .. }
         | ConnectionStatus::Disconnected
         | ConnectionStatus::MarkedDisconnected => {
-            connect_sensor_with_id(state, session, id).await?;
+            connect_sensor_with_id(state, session, mac_address).await?;
             Ok(())
         }
-        ConnectionStatus::Connected => {
-            check_for_stale_sensor(state, session, id).await?;
+        ConnectionStatus::Connected { id } => {
+            check_for_stale_sensor(state, session, mac_address, &id).await?;
             Ok(())
         }
     }
@@ -348,14 +366,18 @@ async fn check_for_sensors(
     let sensors = session.get_sensors().await?;
     let state = &mut *state.lock().await;
     for props in sensors {
-        if sensor_names.contains_key(&props.mac_address)
-            && !state
-                .sensors
-                .values()
-                .any(|s| s.mac_address == props.mac_address)
-        {
-            let sensor = Sensor::new(props, &sensor_names);
-            state.sensors.insert(sensor.id.clone(), sensor);
+        if sensor_names.contains_key(&props.mac_address) {
+            if let Some(sensor) = state.sensors.get_mut(&props.mac_address) {
+                if !sensor.ids.contains(&props.id) {
+                    // If we already know about the sensor but on a different Bluetooth adapter, add
+                    // this one too.
+                    sensor.ids.push(props.id);
+                }
+            } else {
+                // If we don't know about the sensor on any adapter, add it.
+                let sensor = Sensor::new(props, &sensor_names);
+                state.sensors.insert(sensor.mac_address.clone(), sensor);
+            }
         }
     }
     Ok(())
@@ -364,12 +386,13 @@ async fn check_for_sensors(
 async fn connect_sensor_with_id(
     state: Arc<Mutex<SensorState>>,
     session: &MijiaSession,
-    id: DeviceId,
+    mac_address: &MacAddress,
 ) -> Result<(), eyre::Report> {
-    // Update the state of the sensor to `Connecting`.
-    {
+    let (name, ids) = {
         let mut state = state.lock().await;
-        let sensor = state.sensors.get_mut(&id).unwrap();
+        let sensor = state.sensors.get_mut(mac_address).unwrap();
+
+        // Update the state of the sensor to `Connecting`.
         println!(
             "Trying to connect to {} from status: {:?}",
             sensor.name, sensor.connection_status
@@ -377,15 +400,16 @@ async fn connect_sensor_with_id(
         sensor.connection_status = ConnectionStatus::Connecting {
             reserved_until: Instant::now() + SENSOR_CONNECT_RESERVATION_TIMEOUT,
         };
+        (sensor.name.clone(), sensor.ids.clone())
     };
-    let result = connect_and_subscribe_sensor_or_disconnect(session, &id).await;
+    let result = connect_and_subscribe_sensor_or_disconnect(session, &name, ids).await;
 
     let state = &mut *state.lock().await;
-    let sensor = state.sensors.get_mut(&id).unwrap();
+    let sensor = state.sensors.get_mut(mac_address).unwrap();
     match result {
-        Ok(()) => {
+        Ok(id) => {
             println!("Connected to {} and started notifications", sensor.name);
-            sensor.mark_connected(&mut state.homie).await?;
+            sensor.mark_connected(&mut state.homie, id).await?;
             sensor.last_update_timestamp = Instant::now();
         }
         Err(e) => {
@@ -396,42 +420,62 @@ async fn connect_sensor_with_id(
     Ok(())
 }
 
-async fn connect_and_subscribe_sensor_or_disconnect<'a>(
-    session: &MijiaSession,
-    id: &DeviceId,
-) -> Result<(), eyre::Report> {
-    session
-        .bt_session
-        .connect(id)
-        .await
-        .wrap_err_with(|| format!("connecting to {:?}", id))?;
+/// Try to connect to the ids in turn, and get the first one that succeeds. If they all fail then
+/// return an error.
+async fn try_connect_all(
+    session: &BluetoothSession,
+    ids: Vec<DeviceId>,
+) -> Result<DeviceId, Vec<BluetoothError>> {
+    let mut errors = vec![];
+    for id in ids {
+        if let Err(e) = session.connect(&id).await {
+            errors.push(e);
+        } else {
+            return Ok(id);
+        }
+    }
+    Err(errors)
+}
 
+async fn connect_and_subscribe_sensor_or_disconnect(
+    session: &MijiaSession,
+    name: &str,
+    ids: Vec<DeviceId>,
+) -> Result<DeviceId, eyre::Report> {
+    let id = try_connect_all(&session.bt_session, ids)
+        .await
+        .map_err(|e| eyre!("Error connecting to {}: {:?}", name, e))?;
+
+    // We managed to connect to the sensor via some id, now try to start notifications for readings.
     let mut backoff = ExponentialBackoff::default();
     backoff.max_elapsed_time = Some(SENSOR_CONNECT_RETRY_TIMEOUT);
 
     FutureOperation::retry(
-        || session.start_notify_sensor(id).map_err(Into::into),
+        || session.start_notify_sensor(&id).map_err(Into::into),
         backoff,
     )
     .or_else(|e| async {
         session
             .bt_session
-            .disconnect(id)
+            .disconnect(&id)
             .await
-            .wrap_err_with(|| format!("disconnecting from {:?}", id))?;
-        Err(e.into())
+            .wrap_err_with(|| format!("Disconnecting from {} ({:?})", name, id))?;
+        Err(Report::new(e).wrap_err(format!("Starting notifications on {} ({:?})", name, id)))
     })
-    .await
+    .await?;
+
+    Ok(id)
 }
 
 /// If the sensor hasn't sent any updates in a while, disconnect it so we will try to reconnect.
 async fn check_for_stale_sensor(
     state: Arc<Mutex<SensorState>>,
     session: &MijiaSession,
-    id: DeviceId,
+    mac_address: &MacAddress,
+    id: &DeviceId,
 ) -> Result<(), eyre::Report> {
     let state = &mut *state.lock().await;
-    let sensor = state.sensors.get_mut(&id).unwrap();
+    let sensor = state.sensors.get_mut(mac_address).unwrap();
     let now = Instant::now();
     if now - sensor.last_update_timestamp > UPDATE_TIMEOUT {
         println!(
@@ -446,7 +490,7 @@ async fn check_for_stale_sensor(
         // while we're in the middle of disconnecting.
         session
             .bt_session
-            .disconnect(&id)
+            .disconnect(id)
             .await
             .wrap_err_with(|| format!("disconnecting from {:?}", id))?;
     }
@@ -484,13 +528,20 @@ async fn handle_bluetooth_event(
     let sensors = &mut state.sensors;
     match event {
         MijiaEvent::Readings { id, readings } => {
-            if let Some(sensor) = sensors.get_mut(&id) {
+            if let Some(sensor) = get_mut_sensor_by_id(sensors, &id) {
                 sensor.publish_readings(homie, &readings).await?;
-                match sensor.connection_status {
-                    ConnectionStatus::Connected | ConnectionStatus::Connecting { .. } => {}
+                match &sensor.connection_status {
+                    ConnectionStatus::Connected { id: connected_id } => {
+                        log::info!(
+                            "Got update from device on unexpected id {:?} (expected {:?})",
+                            id,
+                            connected_id,
+                        );
+                    }
+                    ConnectionStatus::Connecting { .. } => {}
                     _ => {
                         println!("Got update from disconnected device {:?}. Connecting.", id);
-                        sensor.mark_connected(homie).await?;
+                        sensor.mark_connected(homie, id).await?;
                         // TODO: Make sure the connection interval is set.
                     }
                 }
@@ -499,13 +550,24 @@ async fn handle_bluetooth_event(
             }
         }
         MijiaEvent::Disconnected { id } => {
-            if let Some(sensor) = sensors.get_mut(&id) {
-                if sensor.connection_status == ConnectionStatus::Connected {
-                    println!("{} disconnected", sensor.name);
-                    sensor.connection_status = ConnectionStatus::MarkedDisconnected;
-                    homie.remove_node(&sensor.node_id()).await?;
+            if let Some(sensor) = get_mut_sensor_by_id(sensors, &id) {
+                if let ConnectionStatus::Connected { id: connected_id } = &sensor.connection_status
+                {
+                    if id == *connected_id {
+                        println!("{} disconnected", sensor.name);
+                        sensor.connection_status = ConnectionStatus::MarkedDisconnected;
+                        homie.remove_node(&sensor.node_id()).await?;
+                    } else {
+                        println!(
+                            "{} ({:?}) disconnected but was connected as {:?}.",
+                            sensor.name, id, connected_id
+                        );
+                    }
                 } else {
-                    println!("{:?} disconnected but wasn't known to be connected.", id);
+                    println!(
+                        "{} ({:?}) disconnected but wasn't known to be connected.",
+                        sensor.name, id
+                    );
                 }
             } else {
                 println!("Unknown device {:?} disconnected.", id);

@@ -49,6 +49,11 @@ impl DeviceId {
             object_path: object_path.to_owned(),
         }
     }
+
+    /// Get the ID of the Bluetooth adapter on which this device was discovered, e.g. `"hci0"`.
+    pub fn adapter(&self) -> &str {
+        self.object_path.split('/').nth(3).unwrap()
+    }
 }
 
 /// MAC address of a Bluetooth device.
