@@ -11,23 +11,7 @@ const SCAN_DURATION: Duration = Duration::from_secs(5);
 async fn main() -> Result<(), Report> {
     pretty_env_logger::init();
 
-    // If at least one command-line argument is given, we will only try to connect to sensors whose
-    // MAC address containts one of them as a sub-string.
-    let mut args = std::env::args();
-    let binary_name = args
-        .next()
-        .ok_or_else(|| eyre::eyre!("Binary name missing"))?;
-    let filters: Vec<_> = args.collect();
-
-    if filters
-        .iter()
-        .any(|f| f.contains(|c: char| !(c.is_ascii_hexdigit() || c == ':')))
-    {
-        eprintln!("Invalid MAC addresses {:?}", filters);
-        eprintln!("Usage:");
-        eprintln!("  {} [MAC address]...", binary_name);
-        exit(1);
-    }
+    let filters = parse_args()?;
 
     let (_, session) = MijiaSession::new().await?;
 
@@ -62,6 +46,28 @@ async fn main() -> Result<(), Report> {
     }
 
     Ok(())
+}
+
+fn parse_args() -> Result<Vec<String>, Report> {
+    // If at least one command-line argument is given, we will only try to connect to sensors whose
+    // MAC address containts one of them as a sub-string.
+    let mut args = std::env::args();
+    let binary_name = args
+        .next()
+        .ok_or_else(|| eyre::eyre!("Binary name missing"))?;
+    let filters: Vec<_> = args.collect();
+
+    if filters
+        .iter()
+        .any(|f| f.contains(|c: char| !(c.is_ascii_hexdigit() || c == ':')))
+    {
+        eprintln!("Invalid MAC addresses {:?}", filters);
+        eprintln!("Usage:");
+        eprintln!("  {} [MAC address]...", binary_name);
+        exit(1);
+    }
+
+    Ok(filters)
 }
 
 fn should_include_sensor(sensor: &SensorProps, filters: &Vec<String>) -> bool {
