@@ -2,8 +2,7 @@
 
 use backoff::{future::FutureOperation, ExponentialBackoff};
 use eyre::{eyre, Report};
-use futures::stream::{self, StreamExt};
-use futures::Stream;
+use futures::stream::StreamExt;
 use futures::TryFutureExt;
 use homie_device::{HomieDevice, Node, Property};
 use itertools::Itertools;
