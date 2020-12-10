@@ -13,7 +13,6 @@ categories = ["network-programming"]
 backoff = { version = "0.2.1", features = ["tokio"] }
 color-backtrace = "0.4.2"
 eyre = "0.6.2"
-dotenv = "0.15.0"
 futures = "0.3.7"
 futures-channel = "0.3.7"
 homie-device = { version = "0.3.0", path = "../homie-device" }
@@ -24,8 +23,11 @@ pretty_env_logger = "0.4.0"
 rumqttc = "0.2.0"
 rustls = "0.18.1"
 rustls-native-certs = "0.4.0"
+serde_derive = "1.0.118"
+serde = "1.0.118"
 stable-eyre = "0.2.1"
 tokio = "0.2.22"
+toml = "0.5.7"
 
 [package.metadata.deb]
 depends = "$auto, adduser, bluez"

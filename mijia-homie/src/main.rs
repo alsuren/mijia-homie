@@ -12,10 +12,11 @@ use mijia::{
 };
 use rumqttc::MqttOptions;
 use rustls::ClientConfig;
+use serde_derive::Deserialize;
 use stable_eyre::eyre;
 use stable_eyre::eyre::WrapErr;
 use std::collections::HashMap;
-use std::fs::File;
+use std::fs::{read_to_string, File};
 use std::io::{BufRead, BufReader};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -35,22 +36,55 @@ const UPDATE_TIMEOUT: Duration = Duration::from_secs(60);
 // order to avoid races.
 const SENSOR_CONNECT_RESERVATION_TIMEOUT: Duration = Duration::from_secs(5 * 60);
 const SENSOR_CONNECT_RETRY_TIMEOUT: Duration = Duration::from_secs(60);
+const CONFIG_FILENAME: &str = "mijia_homie.toml";
 const SENSOR_NAMES_FILENAME: &str = "sensor_names.conf";
+
+#[derive(Clone, Debug, Deserialize)]
+struct Config {
+    mqtt: MqttConfig,
+    homie: HomieConfig,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct MqttConfig {
+    host: Option<String>,
+    port: Option<u16>,
+    use_tls: Option<bool>,
+    username: Option<String>,
+    password: Option<String>,
+    client_name: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct HomieConfig {
+    device_id: Option<String>,
+    device_name: Option<String>,
+    prefix: Option<String>,
+}
 
 #[tokio::main]
 async fn main() -> Result<(), eyre::Report> {
     stable_eyre::install()?;
-    dotenv::dotenv().wrap_err("reading .env")?;
     pretty_env_logger::init();
     color_backtrace::install();
 
-    let device_id = std::env::var("DEVICE_ID").unwrap_or_else(|_| DEFAULT_DEVICE_ID.to_string());
-    let device_name =
-        std::env::var("DEVICE_NAME").unwrap_or_else(|_| DEFAULT_DEVICE_NAME.to_string());
+    let config_file =
+        read_to_string(CONFIG_FILENAME).wrap_err_with(|| format!("Reading {}", CONFIG_FILENAME))?;
+    let config: Config = toml::from_str(&config_file)?;
+    let device_id = config
+        .homie
+        .device_id
+        .unwrap_or_else(|| DEFAULT_DEVICE_ID.to_string());
+    let device_name = config
+        .homie
+        .device_name
+        .unwrap_or_else(|| DEFAULT_DEVICE_NAME.to_string());
 
-    let mqtt_options = get_mqtt_options(&device_id);
-    let mqtt_prefix =
-        std::env::var("MQTT_PREFIX").unwrap_or_else(|_| DEFAULT_MQTT_PREFIX.to_string());
+    let mqtt_options = get_mqtt_options(config.mqtt, &device_id);
+    let mqtt_prefix = config
+        .homie
+        .prefix
+        .unwrap_or_else(|| DEFAULT_MQTT_PREFIX.to_string());
     let device_base = format!("{}/{}", mqtt_prefix, device_id);
     let mut homie_builder = HomieDevice::builder(&device_base, &device_name, mqtt_options);
     homie_builder.set_firmware(env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
@@ -78,27 +112,19 @@ async fn main() -> Result<(), eyre::Report> {
 
 /// Construct the `MqttOptions` for connecting to the MQTT broker based on configuration options or
 /// defaults.
-fn get_mqtt_options(device_id: &str) -> MqttOptions {
-    let client_name = std::env::var("CLIENT_NAME").unwrap_or_else(|_| device_id.to_owned());
-
-    let host = std::env::var("HOST").unwrap_or_else(|_| DEFAULT_HOST.to_string());
-    let port = std::env::var("PORT")
-        .ok()
-        .and_then(|val| val.parse::<u16>().ok())
-        .unwrap_or(DEFAULT_PORT);
+fn get_mqtt_options(config: MqttConfig, device_id: &str) -> MqttOptions {
+    let client_name = config.client_name.unwrap_or_else(|| device_id.to_owned());
+    let host = config.host.unwrap_or_else(|| DEFAULT_HOST.to_string());
+    let port = config.port.unwrap_or(DEFAULT_PORT);
 
     let mut mqtt_options = MqttOptions::new(client_name, host, port);
 
-    let username = std::env::var("USERNAME").ok();
-    let password = std::env::var("PASSWORD").ok();
-
     mqtt_options.set_keep_alive(5);
-    if let (Some(u), Some(p)) = (username, password) {
+    if let (Some(u), Some(p)) = (config.username, config.password) {
         mqtt_options.set_credentials(u, p);
     }
 
-    // Use `env -u USE_TLS` to unset this variable if you need to clear it.
-    if std::env::var("USE_TLS").is_ok() {
+    if config.use_tls.unwrap_or(false) {
         let mut client_config = ClientConfig::new();
         client_config.root_store =
             rustls_native_certs::load_native_certs().expect("could not load platform certs");
