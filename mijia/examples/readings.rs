@@ -1,8 +1,10 @@
-use chrono::{DateTime, Utc};
+//! Example of how to subscribe to readings from one or more sensors.
+
 use eyre::Report;
-use mijia::{MijiaSession, SensorProps};
+use mijia::{MijiaEvent, MijiaSession, SensorProps};
 use std::process::exit;
 use std::time::Duration;
+use tokio::stream::StreamExt;
 use tokio::time;
 
 const SCAN_DURATION: Duration = Duration::from_secs(5);
@@ -14,36 +16,42 @@ async fn main() -> Result<(), Report> {
     let filters = parse_args()?;
 
     let (_, session) = MijiaSession::new().await?;
+    let (msg_match, mut events) = session.event_stream().await?;
 
     // Start scanning for Bluetooth devices, and wait a while for some to be discovered.
     session.bt_session.start_discovery().await?;
     time::delay_for(SCAN_DURATION).await;
 
-    // Get the list of sensors which are currently known, connect to them and print their properties.
+    // Get the list of sensors which are currently known, connect those which match the filter and
+    // subscribe to readings.
     let sensors = session.get_sensors().await?;
     println!("Sensors:");
-    for sensor in sensors {
-        if !should_include_sensor(&sensor, &filters) {
-            println!("Skipping {}", sensor.mac_address);
-            continue;
-        }
+    for sensor in sensors
+        .iter()
+        .filter(|sensor| should_include_sensor(sensor, &filters))
+    {
         println!("Connecting to {} ({:?})", sensor.mac_address, sensor.id);
         if let Err(e) = session.bt_session.connect(&sensor.id).await {
             println!("Failed to connect to {}: {:?}", sensor.mac_address, e);
         } else {
-            let sensor_time: DateTime<Utc> = session.get_time(&sensor.id).await?.into();
-            let temperature_unit = session.get_temperature_unit(&sensor.id).await?;
-            let comfort_level = session.get_comfort_level(&sensor.id).await?;
-            let history_range = session.get_history_range(&sensor.id).await?;
-            let last_record = session.get_last_history_record(&sensor.id).await?;
-            println!(
-                "Time: {}, Unit: {}, Comfort level: {}, Range: {:?} Last value: {}",
-                sensor_time, temperature_unit, comfort_level, history_range, last_record
-            );
-            let history = session.get_all_history(&sensor.id).await?;
-            println!("History: {:?}", history);
+            session.start_notify_sensor(&sensor.id).await?;
         }
     }
+
+    println!("Readings:");
+    while let Some(event) = events.next().await {
+        match event {
+            MijiaEvent::Readings { id, readings } => {
+                println!("{:?}: {}", id, readings);
+            }
+            _ => println!("Event: {:?}", event),
+        }
+    }
+    session
+        .bt_session
+        .connection
+        .remove_match(msg_match.token())
+        .await?;
 
     Ok(())
 }
