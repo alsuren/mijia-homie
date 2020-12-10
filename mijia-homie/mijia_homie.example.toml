@@ -1,0 +1,12 @@
+[homie]
+device_id="mijia-bridge"
+device_name="Mijia bridge"
+prefix="homie"
+
+[mqtt]
+host="test.mosquitto.org"
+port=1883
+client_name="mijia-bridge"
+# username=""
+# password=""
+# use_tls=true

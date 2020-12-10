@@ -60,7 +60,7 @@ After following these steps, you should end up with something that looks like th
 
   If you don't know the sensor names yet, just make some names up for now.
 
-- You will also want to copy `mijia-homie/.env.example` to `/home/pi/.env` and edit it to suit your needs.
+- You will also want to copy `mijia-homie/mijia_homie.example.toml` to `/home/pi/mijia_homie.example.toml` and edit it to suit your needs.
 
 - You should then be able to run the publisher using `run.sh` with default arguments:
 

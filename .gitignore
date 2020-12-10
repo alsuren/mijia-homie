@@ -1,5 +1,6 @@
 /target
 .env
+mijia_homie.toml
 mappings.conf
 sensor_names.conf
 .DS_Store
