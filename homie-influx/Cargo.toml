@@ -30,7 +30,7 @@ toml = "0.5.7"
 depends = "$auto, adduser"
 section = "net"
 maintainer-scripts = "debian-scripts"
-conf-files = ["/etc/homie-influx/homie_influx.toml", "/ect/homie-influx/mappings.conf"]
+conf-files = ["/etc/homie-influx/homie_influx.toml", "/etc/homie-influx/mappings.conf"]
 assets = [
 	["target/release/homie-influx", "usr/bin/", "755"],
 	["homie_influx.example.toml", "etc/homie-influx/homie_influx.toml", "644"],
