@@ -1,0 +1,15 @@
+[homie]
+# mappings_filename="mappings.toml"
+
+[mqtt]
+host="test.mosquitto.org"
+port=1883
+client_prefix="homie-influx"
+# username=
+# password=
+# use_tls=true
+
+[influxdb]
+url="http://localhost:8086"
+# username=
+# password=

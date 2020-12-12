@@ -1,5 +1,5 @@
 /target
-.env
+homie_influx.toml
 mijia_homie.toml
 mappings.conf
 sensor_names.toml

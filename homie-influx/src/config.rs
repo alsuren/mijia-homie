@@ -1,18 +1,105 @@
+use eyre::Report;
 use influx_db_client::reqwest::Url;
 use influx_db_client::Client;
 use rumqttc::MqttOptions;
 use rustls::ClientConfig;
+use serde::{de, Deserialize, Deserializer};
 use stable_eyre::eyre;
 use stable_eyre::eyre::WrapErr;
-use std::fs::File;
+use std::fmt::Display;
+use std::fs::{read_to_string, File};
 use std::io::{BufRead, BufReader};
+use std::str::FromStr;
 use std::sync::Arc;
 
 const DEFAULT_MQTT_CLIENT_PREFIX: &str = "homie-influx";
 const DEFAULT_MQTT_HOST: &str = "test.mosquitto.org";
 const DEFAULT_MQTT_PORT: u16 = 1883;
 const DEFAULT_INFLUXDB_URL: &str = "http://localhost:8086";
+const CONFIG_FILENAME: &str = "homie_influx.toml";
 const DEFAULT_MAPPINGS_FILENAME: &str = "mappings.conf";
+
+#[derive(Clone, Debug, Default, Deserialize)]
+#[serde(default)]
+pub struct Config {
+    pub mqtt: MqttConfig,
+    pub homie: HomieConfig,
+    pub influxdb: InfluxDBConfig,
+}
+
+impl Config {
+    pub fn from_file() -> Result<Config, Report> {
+        let config_file = read_to_string(CONFIG_FILENAME)
+            .wrap_err_with(|| format!("Reading {}", CONFIG_FILENAME))?;
+        Ok(toml::from_str(&config_file)?)
+    }
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(default)]
+pub struct MqttConfig {
+    pub host: String,
+    pub port: u16,
+    pub use_tls: bool,
+    pub username: Option<String>,
+    pub password: Option<String>,
+    pub client_prefix: String,
+}
+
+impl Default for MqttConfig {
+    fn default() -> MqttConfig {
+        MqttConfig {
+            host: DEFAULT_MQTT_HOST.to_owned(),
+            port: DEFAULT_MQTT_PORT,
+            use_tls: false,
+            username: None,
+            password: None,
+            client_prefix: DEFAULT_MQTT_CLIENT_PREFIX.to_owned(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(default)]
+pub struct HomieConfig {
+    pub mappings_filename: String,
+}
+
+impl Default for HomieConfig {
+    fn default() -> HomieConfig {
+        HomieConfig {
+            mappings_filename: DEFAULT_MAPPINGS_FILENAME.to_owned(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(default)]
+pub struct InfluxDBConfig {
+    #[serde(deserialize_with = "de_from_str")]
+    pub url: Url,
+    pub username: Option<String>,
+    pub password: Option<String>,
+}
+
+/// Deserialize a FromStr by deserializing it as a string then parsing it.
+fn de_from_str<'de, D: Deserializer<'de>, T: FromStr>(d: D) -> Result<T, D::Error>
+where
+    T::Err: Display,
+{
+    let s = String::deserialize(d)?;
+    s.parse::<T>().map_err(de::Error::custom)
+}
+
+impl Default for InfluxDBConfig {
+    fn default() -> InfluxDBConfig {
+        InfluxDBConfig {
+            url: DEFAULT_INFLUXDB_URL.parse().unwrap(),
+            username: None,
+            password: None,
+        }
+    }
+}
 
 /// A mapping from a Homie prefix to monitor to an InfluxDB database where its data should be
 /// stored.
@@ -22,14 +109,12 @@ pub struct Mapping {
 }
 
 /// Read mappings from the configured file, and make sure there is at least one.
-pub fn read_mappings() -> Result<Vec<Mapping>, eyre::Report> {
-    let mappings_filename = std::env::var("MAPPINGS_FILENAME")
-        .unwrap_or_else(|_| DEFAULT_MAPPINGS_FILENAME.to_string());
-    let mappings = mappings_from_file(&mappings_filename)?;
+pub fn read_mappings(config: &HomieConfig) -> Result<Vec<Mapping>, Report> {
+    let mappings = mappings_from_file(&config.mappings_filename)?;
     if mappings.is_empty() {
         eyre::bail!(
             "At least one mapping must be configured in {}.",
-            mappings_filename
+            config.mappings_filename
         );
     }
     Ok(mappings)
@@ -37,7 +122,7 @@ pub fn read_mappings() -> Result<Vec<Mapping>, eyre::Report> {
 
 /// Read mappings of the form "homie_prefix:influxdb_database" from the given file, ignoring any
 /// lines starting with '#'.
-fn mappings_from_file(filename: &str) -> Result<Vec<Mapping>, eyre::Report> {
+fn mappings_from_file(filename: &str) -> Result<Vec<Mapping>, Report> {
     let mut mappings = Vec::new();
     let file = File::open(filename).wrap_err_with(|| format!("Failed to open {}", filename))?;
     for line in BufReader::new(file).lines() {
@@ -59,18 +144,11 @@ fn mappings_from_file(filename: &str) -> Result<Vec<Mapping>, eyre::Report> {
     Ok(mappings)
 }
 
-/// Construct a new InfluxDB `Client` based on configuration options or defaults.
-///
-/// The database name is not set; make sure to set it before using the client.
-pub fn get_influxdb_client(database: &str) -> Result<Client, eyre::Report> {
-    let influxdb_url: Url = std::env::var("INFLUXDB_URL")
-        .unwrap_or_else(|_| DEFAULT_INFLUXDB_URL.to_string())
-        .parse()?;
-    let influxdb_username = std::env::var("INFLUXDB_USERNAME").ok();
-    let influxdb_password = std::env::var("INFLUXDB_PASSWORD").ok();
-
-    let mut influxdb_client = Client::new(influxdb_url, database);
-    if let (Some(username), Some(password)) = (influxdb_username, influxdb_password) {
+/// Construct a new InfluxDB `Client` based on the given configuration options, for the given
+/// database.
+pub fn get_influxdb_client(config: &InfluxDBConfig, database: &str) -> Result<Client, Report> {
+    let mut influxdb_client = Client::new(config.url.to_owned(), database);
+    if let (Some(username), Some(password)) = (&config.username, &config.password) {
         influxdb_client = influxdb_client.set_authentication(username, password);
     }
     Ok(influxdb_client)
@@ -78,28 +156,16 @@ pub fn get_influxdb_client(database: &str) -> Result<Client, eyre::Report> {
 
 /// Construct the `MqttOptions` for connecting to the MQTT broker based on configuration options or
 /// defaults.
-pub fn get_mqtt_options(client_name_suffix: &str) -> MqttOptions {
-    let client_name_prefix = std::env::var("MQTT_CLIENT_PREFIX")
-        .unwrap_or_else(|_| DEFAULT_MQTT_CLIENT_PREFIX.to_string());
-    let client_name = format!("{}-{}", client_name_prefix, client_name_suffix);
-
-    let mqtt_host = std::env::var("MQTT_HOST").unwrap_or_else(|_| DEFAULT_MQTT_HOST.to_string());
-
-    let mqtt_port = std::env::var("MQTT_PORT")
-        .ok()
-        .and_then(|val| val.parse::<u16>().ok())
-        .unwrap_or(DEFAULT_MQTT_PORT);
-
-    let mut mqtt_options = MqttOptions::new(client_name, mqtt_host, mqtt_port);
+pub fn get_mqtt_options(config: &MqttConfig, client_name_suffix: &str) -> MqttOptions {
+    let client_name = format!("{}-{}", config.client_prefix, client_name_suffix);
+    let mut mqtt_options = MqttOptions::new(client_name, &config.host, config.port);
     mqtt_options.set_keep_alive(5);
 
-    let mqtt_username = std::env::var("MQTT_USERNAME").ok();
-    let mqtt_password = std::env::var("MQTT_PASSWORD").ok();
-    if let (Some(username), Some(password)) = (mqtt_username, mqtt_password) {
+    if let (Some(username), Some(password)) = (&config.username, &config.password) {
         mqtt_options.set_credentials(username, password);
     }
 
-    if std::env::var("MQTT_USE_TLS").is_ok() {
+    if config.use_tls {
         let mut client_config = ClientConfig::new();
         client_config.root_store = rustls_native_certs::load_native_certs()
             .expect("Failed to load platform certificates.");
