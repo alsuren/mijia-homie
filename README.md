@@ -54,9 +54,9 @@ After following these steps, you should end up with something that looks like th
 
       TARGET_SSH=pi@raspberrypi.local EXAMPLE=list-sensors ./run.sh
 
-- Add each of the sensors to `/home/pi/sensor_names.conf` on the Raspberry Pi. Each line should be of the form:
+- Add each of the sensors to `/home/pi/sensor_names.toml` on the Raspberry Pi. Each line should be of the form:
 
-      A4:C1:38:D7:21:17=Landing
+      "A4:C1:38:D7:21:17"="Landing"
 
   If you don't know the sensor names yet, just make some names up for now.
 

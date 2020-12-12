@@ -2,5 +2,5 @@
 .env
 mijia_homie.toml
 mappings.conf
-sensor_names.conf
+sensor_names.toml
 .DS_Store

@@ -30,7 +30,7 @@ If you have installed the Debian package, the service will be set up with system
 There should be two config files under `/etc/mijia-homie`:
 
 - `mijia_homie.toml` contains the main configuration for the service, such as which MQTT broker to connect to and the name and ID of the Homie device. See [mijia_homie.example.toml](mijia_homie.example.toml) for an example of the settings that are supported.
-- `sensor_names.conf` contains a map of sensor MAC addresses to human-readable names. Only the sensors listed in this file will be connected to, so you will need to fill it in before `mijia-homie` does anything useful.
+- `sensor_names.toml` contains a map of sensor MAC addresses to human-readable names. Only the sensors listed in this file will be connected to, so you will need to fill it in before `mijia-homie` does anything useful.
 
 After editing these config files you will need to restart the service:
 

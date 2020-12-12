@@ -1,12 +1,11 @@
 use eyre::Report;
-use mijia::MacAddress;
+use mijia::bluetooth::{MacAddress, ParseMacAddressError};
 use rumqttc::MqttOptions;
 use rustls::ClientConfig;
 use serde_derive::Deserialize;
 use stable_eyre::eyre::WrapErr;
 use std::collections::HashMap;
-use std::fs::{read_to_string, File};
-use std::io::{BufRead, BufReader};
+use std::fs::read_to_string;
 use std::sync::Arc;
 
 const DEFAULT_MQTT_PREFIX: &str = "homie";
@@ -15,7 +14,7 @@ const DEFAULT_DEVICE_NAME: &str = "Mijia bridge";
 const DEFAULT_HOST: &str = "test.mosquitto.org";
 const DEFAULT_PORT: u16 = 1883;
 const CONFIG_FILENAME: &str = "mijia_homie.toml";
-const SENSOR_NAMES_FILENAME: &str = "sensor_names.conf";
+const SENSOR_NAMES_FILENAME: &str = "sensor_names.toml";
 
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(default)]
@@ -95,26 +94,12 @@ pub fn get_mqtt_options(config: MqttConfig, device_id: &str) -> MqttOptions {
     mqtt_options
 }
 
-/// Read the given file of key-value pairs into a hashmap.
-/// Returns an empty hashmap if the file doesn't exist, or an error if it is malformed.
-fn hashmap_from_file(filename: &str) -> Result<HashMap<MacAddress, String>, Report> {
-    let mut map: HashMap<MacAddress, String> = HashMap::new();
-    if let Ok(file) = File::open(filename) {
-        for line in BufReader::new(file).lines() {
-            let line = line?;
-            if !line.is_empty() && !line.starts_with('#') {
-                let parts: Vec<&str> = line.splitn(2, '=').collect();
-                if parts.len() != 2 {
-                    eyre::bail!("Invalid line '{}'", line);
-                }
-                map.insert(parts[0].parse()?, parts[1].to_string());
-            }
-        }
-    }
-    Ok(map)
-}
-
 pub fn read_sensor_names() -> Result<HashMap<MacAddress, String>, Report> {
-    Ok(hashmap_from_file(SENSOR_NAMES_FILENAME)
-        .wrap_err(format!("reading {}", SENSOR_NAMES_FILENAME))?)
+    let sensor_names_file = read_to_string(SENSOR_NAMES_FILENAME)
+        .wrap_err_with(|| format!("Reading {}", SENSOR_NAMES_FILENAME))?;
+    let names = toml::from_str::<HashMap<String, String>>(&sensor_names_file)?
+        .into_iter()
+        .map(|(mac_address, name)| Ok::<_, ParseMacAddressError>((mac_address.parse()?, name)))
+        .collect::<Result<HashMap<_, _>, _>>()?;
+    Ok(names)
 }
