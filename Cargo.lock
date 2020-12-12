@@ -492,7 +492,7 @@ dependencies = [
 
 [[package]]
 name = "homie-device"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "async-channel",
  "futures",
@@ -508,7 +508,7 @@ dependencies = [
 
 [[package]]
 name = "homie-influx"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "color-backtrace",
  "eyre",
@@ -765,7 +765,7 @@ checksum = "0ee1c47aaa256ecabcaea351eae4a9b01ef39ed810004e298d2511ed284b1525"
 
 [[package]]
 name = "mijia"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "bluez-generated",
  "chrono",
@@ -782,7 +782,7 @@ dependencies = [
 
 [[package]]
 name = "mijia-homie"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "backoff",
  "color-backtrace",
