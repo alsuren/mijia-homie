@@ -11,10 +11,10 @@ categories = ["network-programming"]
 
 [dependencies]
 backoff = { version = "0.2.1", features = ["tokio"] }
-color-backtrace = "0.4.2"
-eyre = "0.6.2"
-futures = "0.3.7"
-futures-channel = "0.3.7"
+color-backtrace = "0.5.0"
+eyre = "0.6.3"
+futures = "0.3.8"
+futures-channel = "0.3.8"
 homie-device = { version = "0.3.0", path = "../homie-device" }
 itertools = "0.9.0"
 log = "0.4.11"
@@ -26,7 +26,7 @@ rustls-native-certs = "0.4.0"
 serde_derive = "1.0.118"
 serde = "1.0.118"
 stable-eyre = "0.2.1"
-tokio = "0.2.22"
+tokio = "0.2.24"
 toml = "0.5.7"
 
 [package.metadata.deb]
