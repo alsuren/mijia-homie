@@ -1,0 +1,3 @@
+[[mappings]]
+homie_prefix="homie"
+influxdb_database="test"

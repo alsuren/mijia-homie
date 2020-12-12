@@ -1,6 +1,6 @@
 /target
 homie_influx.toml
 mijia_homie.toml
-mappings.conf
+mappings.toml
 sensor_names.toml
 .DS_Store

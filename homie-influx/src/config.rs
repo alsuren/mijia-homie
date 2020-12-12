@@ -7,8 +7,7 @@ use serde::{de, Deserialize, Deserializer};
 use stable_eyre::eyre;
 use stable_eyre::eyre::WrapErr;
 use std::fmt::Display;
-use std::fs::{read_to_string, File};
-use std::io::{BufRead, BufReader};
+use std::fs::read_to_string;
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -17,7 +16,7 @@ const DEFAULT_MQTT_HOST: &str = "test.mosquitto.org";
 const DEFAULT_MQTT_PORT: u16 = 1883;
 const DEFAULT_INFLUXDB_URL: &str = "http://localhost:8086";
 const CONFIG_FILENAME: &str = "homie_influx.toml";
-const DEFAULT_MAPPINGS_FILENAME: &str = "mappings.conf";
+const DEFAULT_MAPPINGS_FILENAME: &str = "mappings.toml";
 
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(default)]
@@ -103,45 +102,32 @@ impl Default for InfluxDBConfig {
 
 /// A mapping from a Homie prefix to monitor to an InfluxDB database where its data should be
 /// stored.
+#[derive(Clone, Debug, Deserialize)]
 pub struct Mapping {
     pub homie_prefix: String,
     pub influxdb_database: String,
 }
 
+#[derive(Clone, Debug, Deserialize)]
+pub struct MappingsConfig {
+    pub mappings: Vec<Mapping>,
+}
+
 /// Read mappings from the configured file, and make sure there is at least one.
 pub fn read_mappings(config: &HomieConfig) -> Result<Vec<Mapping>, Report> {
-    let mappings = mappings_from_file(&config.mappings_filename)?;
-    if mappings.is_empty() {
-        eyre::bail!(
-            "At least one mapping must be configured in {}.",
-            config.mappings_filename
-        );
-    }
-    Ok(mappings)
+    mappings_from_file(&config.mappings_filename)
 }
 
 /// Read mappings of the form "homie_prefix:influxdb_database" from the given file, ignoring any
 /// lines starting with '#'.
 fn mappings_from_file(filename: &str) -> Result<Vec<Mapping>, Report> {
-    let mut mappings = Vec::new();
-    let file = File::open(filename).wrap_err_with(|| format!("Failed to open {}", filename))?;
-    for line in BufReader::new(file).lines() {
-        let line = line?;
-        if !line.is_empty() && !line.starts_with('#') {
-            let parts: Vec<&str> = line.split(':').collect();
-            if parts.len() != 2 {
-                eyre::bail!("Invalid line '{}'", line);
-            }
-            let homie_prefix = parts[0].to_owned();
-            let influxdb_database = parts[1].to_owned();
-            mappings.push(Mapping {
-                homie_prefix,
-                influxdb_database,
-            });
-        }
+    let mappings_file =
+        read_to_string(filename).wrap_err_with(|| format!("Reading {}", filename))?;
+    let mappings = toml::from_str::<MappingsConfig>(&mappings_file)?;
+    if mappings.mappings.is_empty() {
+        eyre::bail!("At least one mapping must be configured in {}.", filename);
     }
-
-    Ok(mappings)
+    Ok(mappings.mappings)
 }
 
 /// Construct a new InfluxDB `Client` based on the given configuration options, for the given
