@@ -1,5 +1,8 @@
 #![type_length_limit = "1138969"]
 
+mod config;
+
+use crate::config::{get_mqtt_options, read_sensor_names, Config};
 use backoff::{future::FutureOperation, ExponentialBackoff};
 use eyre::{eyre, Report};
 use futures::stream::StreamExt;
@@ -10,24 +13,14 @@ use mijia::{
     BluetoothError, BluetoothSession, DeviceId, MacAddress, MijiaEvent, MijiaSession, Readings,
     SensorProps,
 };
-use rumqttc::MqttOptions;
-use rustls::ClientConfig;
-use serde_derive::Deserialize;
 use stable_eyre::eyre;
 use stable_eyre::eyre::WrapErr;
 use std::collections::HashMap;
-use std::fs::{read_to_string, File};
-use std::io::{BufRead, BufReader};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::Mutex;
 use tokio::{task, time, try_join};
 
-const DEFAULT_MQTT_PREFIX: &str = "homie";
-const DEFAULT_DEVICE_ID: &str = "mijia-bridge";
-const DEFAULT_DEVICE_NAME: &str = "Mijia bridge";
-const DEFAULT_HOST: &str = "test.mosquitto.org";
-const DEFAULT_PORT: u16 = 1883;
 const SCAN_INTERVAL: Duration = Duration::from_secs(15);
 const CONNECT_INTERVAL: Duration = Duration::from_secs(1);
 const UPDATE_TIMEOUT: Duration = Duration::from_secs(60);
@@ -36,57 +29,6 @@ const UPDATE_TIMEOUT: Duration = Duration::from_secs(60);
 // order to avoid races.
 const SENSOR_CONNECT_RESERVATION_TIMEOUT: Duration = Duration::from_secs(5 * 60);
 const SENSOR_CONNECT_RETRY_TIMEOUT: Duration = Duration::from_secs(60);
-const CONFIG_FILENAME: &str = "mijia_homie.toml";
-const SENSOR_NAMES_FILENAME: &str = "sensor_names.conf";
-
-#[derive(Clone, Debug, Default, Deserialize)]
-#[serde(default)]
-struct Config {
-    mqtt: MqttConfig,
-    homie: HomieConfig,
-}
-
-#[derive(Clone, Debug, Deserialize)]
-#[serde(default)]
-struct MqttConfig {
-    host: String,
-    port: u16,
-    use_tls: bool,
-    username: Option<String>,
-    password: Option<String>,
-    client_name: Option<String>,
-}
-
-impl Default for MqttConfig {
-    fn default() -> MqttConfig {
-        MqttConfig {
-            host: DEFAULT_HOST.to_owned(),
-            port: DEFAULT_PORT,
-            use_tls: false,
-            username: None,
-            password: None,
-            client_name: None,
-        }
-    }
-}
-
-#[derive(Clone, Debug, Deserialize)]
-#[serde(default)]
-struct HomieConfig {
-    device_id: String,
-    device_name: String,
-    prefix: String,
-}
-
-impl Default for HomieConfig {
-    fn default() -> HomieConfig {
-        HomieConfig {
-            device_id: DEFAULT_DEVICE_ID.to_owned(),
-            device_name: DEFAULT_DEVICE_NAME.to_owned(),
-            prefix: DEFAULT_MQTT_PREFIX.to_owned(),
-        }
-    }
-}
 
 #[tokio::main]
 async fn main() -> Result<(), eyre::Report> {
@@ -94,9 +36,7 @@ async fn main() -> Result<(), eyre::Report> {
     pretty_env_logger::init();
     color_backtrace::install();
 
-    let config_file =
-        read_to_string(CONFIG_FILENAME).wrap_err_with(|| format!("Reading {}", CONFIG_FILENAME))?;
-    let config: Config = toml::from_str(&config_file)?;
+    let config = Config::from_file()?;
 
     let mqtt_options = get_mqtt_options(config.mqtt, &config.homie.device_id);
     let device_base = format!("{}/{}", config.homie.prefix, config.homie.device_id);
@@ -123,27 +63,6 @@ async fn main() -> Result<(), eyre::Report> {
     };
     res?;
     Ok(())
-}
-
-/// Construct the `MqttOptions` for connecting to the MQTT broker based on configuration options or
-/// defaults.
-fn get_mqtt_options(config: MqttConfig, device_id: &str) -> MqttOptions {
-    let client_name = config.client_name.unwrap_or_else(|| device_id.to_owned());
-
-    let mut mqtt_options = MqttOptions::new(client_name, config.host, config.port);
-
-    mqtt_options.set_keep_alive(5);
-    if let (Some(u), Some(p)) = (config.username, config.password) {
-        mqtt_options.set_credentials(u, p);
-    }
-
-    if config.use_tls {
-        let mut client_config = ClientConfig::new();
-        client_config.root_store =
-            rustls_native_certs::load_native_certs().expect("could not load platform certs");
-        mqtt_options.set_tls_client_config(Arc::new(client_config));
-    }
-    mqtt_options
 }
 
 #[derive(Debug, Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -273,8 +192,7 @@ async fn run_sensor_system(
     mut homie: HomieDevice,
     session: &MijiaSession,
 ) -> Result<(), eyre::Report> {
-    let sensor_names = hashmap_from_file(SENSOR_NAMES_FILENAME)
-        .wrap_err(format!("reading {}", SENSOR_NAMES_FILENAME))?;
+    let sensor_names = read_sensor_names()?;
 
     homie.ready().await?;
 
@@ -286,25 +204,6 @@ async fn run_sensor_system(
     let connection_loop_handle = bluetooth_connection_loop(state.clone(), session, &sensor_names);
     let event_loop_handle = service_bluetooth_event_queue(state.clone(), session);
     try_join!(connection_loop_handle, event_loop_handle).map(|((), ())| ())
-}
-
-/// Read the given file of key-value pairs into a hashmap.
-/// Returns an empty hashmap if the file doesn't exist, or an error if it is malformed.
-fn hashmap_from_file(filename: &str) -> Result<HashMap<MacAddress, String>, eyre::Report> {
-    let mut map: HashMap<MacAddress, String> = HashMap::new();
-    if let Ok(file) = File::open(filename) {
-        for line in BufReader::new(file).lines() {
-            let line = line?;
-            if !line.is_empty() && !line.starts_with('#') {
-                let parts: Vec<&str> = line.splitn(2, '=').collect();
-                if parts.len() != 2 {
-                    eyre::bail!("Invalid line '{}'", line);
-                }
-                map.insert(parts[0].parse()?, parts[1].to_string());
-            }
-        }
-    }
-    Ok(map)
 }
 
 async fn bluetooth_connection_loop(
