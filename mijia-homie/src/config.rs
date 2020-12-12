@@ -13,8 +13,8 @@ const DEFAULT_DEVICE_ID: &str = "mijia-bridge";
 const DEFAULT_DEVICE_NAME: &str = "Mijia bridge";
 const DEFAULT_HOST: &str = "test.mosquitto.org";
 const DEFAULT_PORT: u16 = 1883;
+const DEFAULT_SENSOR_NAMES_FILENAME: &str = "sensor_names.toml";
 const CONFIG_FILENAME: &str = "mijia_homie.toml";
-const SENSOR_NAMES_FILENAME: &str = "sensor_names.toml";
 
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(default)]
@@ -61,6 +61,7 @@ pub struct HomieConfig {
     pub device_id: String,
     pub device_name: String,
     pub prefix: String,
+    pub sensor_names_filename: String,
 }
 
 impl Default for HomieConfig {
@@ -69,6 +70,7 @@ impl Default for HomieConfig {
             device_id: DEFAULT_DEVICE_ID.to_owned(),
             device_name: DEFAULT_DEVICE_NAME.to_owned(),
             prefix: DEFAULT_MQTT_PREFIX.to_owned(),
+            sensor_names_filename: DEFAULT_SENSOR_NAMES_FILENAME.to_owned(),
         }
     }
 }
@@ -94,9 +96,9 @@ pub fn get_mqtt_options(config: MqttConfig, device_id: &str) -> MqttOptions {
     mqtt_options
 }
 
-pub fn read_sensor_names() -> Result<HashMap<MacAddress, String>, Report> {
-    let sensor_names_file = read_to_string(SENSOR_NAMES_FILENAME)
-        .wrap_err_with(|| format!("Reading {}", SENSOR_NAMES_FILENAME))?;
+pub fn read_sensor_names(filename: &str) -> Result<HashMap<MacAddress, String>, Report> {
+    let sensor_names_file =
+        read_to_string(filename).wrap_err_with(|| format!("Reading {}", filename))?;
     let names = toml::from_str::<HashMap<String, String>>(&sensor_names_file)?
         .into_iter()
         .map(|(mac_address, name)| Ok::<_, ParseMacAddressError>((mac_address.parse()?, name)))

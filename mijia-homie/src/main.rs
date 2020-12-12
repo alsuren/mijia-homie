@@ -37,6 +37,7 @@ async fn main() -> Result<(), eyre::Report> {
     color_backtrace::install();
 
     let config = Config::from_file()?;
+    let sensor_names = read_sensor_names(&config.homie.sensor_names_filename)?;
 
     let mqtt_options = get_mqtt_options(config.mqtt, &config.homie.device_id);
     let device_base = format!("{}/{}", config.homie.prefix, config.homie.device_id);
@@ -50,7 +51,8 @@ async fn main() -> Result<(), eyre::Report> {
     // Connect a Bluetooth session.
     let (dbus_handle, session) = MijiaSession::new().await?;
 
-    let sensor_handle = local.run_until(async move { run_sensor_system(homie, &session).await });
+    let sensor_handle =
+        local.run_until(async move { run_sensor_system(homie, &session, &sensor_names).await });
 
     // Poll everything to completion, until the first one bombs out.
     let res: Result<_, eyre::Report> = try_join! {
@@ -191,9 +193,8 @@ impl Sensor {
 async fn run_sensor_system(
     mut homie: HomieDevice,
     session: &MijiaSession,
+    sensor_names: &HashMap<MacAddress, String>,
 ) -> Result<(), eyre::Report> {
-    let sensor_names = read_sensor_names()?;
-
     homie.ready().await?;
 
     let state = Arc::new(Mutex::new(SensorState {
@@ -201,7 +202,7 @@ async fn run_sensor_system(
         homie,
     }));
 
-    let connection_loop_handle = bluetooth_connection_loop(state.clone(), session, &sensor_names);
+    let connection_loop_handle = bluetooth_connection_loop(state.clone(), session, sensor_names);
     let event_loop_handle = service_bluetooth_event_queue(state.clone(), session);
     try_join!(connection_loop_handle, event_loop_handle).map(|((), ())| ())
 }

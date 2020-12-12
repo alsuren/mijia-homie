@@ -2,6 +2,7 @@
 device_id="mijia-bridge"
 device_name="Mijia bridge"
 prefix="homie"
+sensor_names_filename="sensor-names.toml"
 
 [mqtt]
 host="test.mosquitto.org"
