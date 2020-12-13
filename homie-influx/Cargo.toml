@@ -1,6 +1,6 @@
 [package]
 name = "homie-influx"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Andrew Walbran <qwandor@google.com>"]
 edition = "2018"
 license = "MIT OR Apache-2.0"
@@ -10,9 +10,9 @@ keywords = ["homie", "mqtt"]
 categories = ["network-programming"]
 
 [dependencies]
-color-backtrace = "0.4.2"
-eyre = "0.6.2"
-futures = "0.3.7"
+color-backtrace = "0.5.0"
+eyre = "0.6.3"
+futures = "0.3.8"
 homie-controller = { version = "0.2.0", path = "../homie-controller" }
 influx_db_client = "0.4.5"
 log = "0.4.11"
@@ -23,7 +23,7 @@ rustls-native-certs = "0.4.0"
 serde_derive = "1.0.118"
 serde = "1.0.118"
 stable-eyre = "0.2.1"
-tokio = "0.2.22"
+tokio = "0.2.24"
 toml = "0.5.7"
 url = { version = "2.2.0", features = ["serde"] }
 

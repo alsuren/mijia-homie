@@ -1,6 +1,6 @@
 [package]
 name = "mijia"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Luis Félix <lcs.felix@gmail.com>", "Andrew Walbran <qwandor@google.com>", "David Laban <alsuren@gmail.com>"]
 edition = "2018"
 license = "MIT OR Apache-2.0"
@@ -13,11 +13,11 @@ categories = ["hardware-support"]
 bluez-generated = { version = "0.2.0", path = "../bluez-generated" }
 dbus = { version = "0.9.0", features = ["futures"] }
 dbus-tokio = "0.6.0"
-futures = "0.3.7"
+futures = "0.3.8"
 itertools = "0.9.0"
 log = "0.4.11"
 thiserror = "1.0.22"
-tokio = "0.2.22"
+tokio = "0.2.24"
 
 [dev-dependencies]
 chrono = "0.4.19"
