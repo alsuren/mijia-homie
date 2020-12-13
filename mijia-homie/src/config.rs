@@ -13,8 +13,8 @@ const DEFAULT_DEVICE_ID: &str = "mijia-bridge";
 const DEFAULT_DEVICE_NAME: &str = "Mijia bridge";
 const DEFAULT_HOST: &str = "test.mosquitto.org";
 const DEFAULT_PORT: u16 = 1883;
-const DEFAULT_SENSOR_NAMES_FILENAME: &str = "sensor_names.toml";
-const CONFIG_FILENAME: &str = "mijia_homie.toml";
+const DEFAULT_SENSOR_NAMES_FILENAME: &str = "sensor-names.toml";
+const CONFIG_FILENAME: &str = "mijia-homie.toml";
 
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(default, deny_unknown_fields)]
@@ -117,7 +117,7 @@ mod tests {
     /// Parsing the example config file should not give any errors.
     #[test]
     fn example_config() {
-        Config::read("mijia_homie.example.toml").unwrap();
+        Config::read("mijia-homie.example.toml").unwrap();
     }
 
     /// Parsing an empty config file should not give any errors.

@@ -13,7 +13,7 @@ const DEFAULT_MQTT_CLIENT_PREFIX: &str = "homie-influx";
 const DEFAULT_MQTT_HOST: &str = "test.mosquitto.org";
 const DEFAULT_MQTT_PORT: u16 = 1883;
 const DEFAULT_INFLUXDB_URL: &str = "http://localhost:8086";
-const CONFIG_FILENAME: &str = "homie_influx.toml";
+const CONFIG_FILENAME: &str = "homie-influx.toml";
 const DEFAULT_MAPPINGS_FILENAME: &str = "mappings.toml";
 
 #[derive(Clone, Debug, Default, Deserialize)]
@@ -162,7 +162,7 @@ mod tests {
     /// Parsing the example config file should not give any errors.
     #[test]
     fn example_config() {
-        Config::read("homie_influx.example.toml").unwrap();
+        Config::read("homie-influx.example.toml").unwrap();
     }
 
     /// Parsing an empty config file should not give any errors.
