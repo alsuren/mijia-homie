@@ -29,8 +29,8 @@ If you have installed the Debian package, the service will be set up with system
 
 There should be two config files under `/etc/homie-influx`:
 
-- `.env` contains the main configuration for the service, such as which MQTT broker and InfluxDB server to connect to. See [.env.example](.env.example) for an example of the settings that are supported.
-- `mappings.conf` contains a map of Homie base topics to InfluxDB databases. By default it will look for devices under the standard `homie` base topic and write to an InfluxDB database called `test`. You can add multiple base topics to handle multiple users.
+- `homie-influx.toml` contains the main configuration for the service, such as which MQTT broker and InfluxDB server to connect to. See [homie-influx.example.toml](homie-influx.example.toml) for an example of the settings that are supported.
+- `mappings.toml` contains a map of Homie base topics to InfluxDB databases. By default it will look for devices under the standard `homie` base topic and write to an InfluxDB database called `test`. You can add multiple base topics to handle multiple users.
 
 After editing these config files you will need to restart the service:
 

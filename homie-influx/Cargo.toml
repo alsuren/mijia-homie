@@ -11,7 +11,6 @@ categories = ["network-programming"]
 
 [dependencies]
 color-backtrace = "0.4.2"
-dotenv = "0.15.0"
 eyre = "0.6.2"
 futures = "0.3.7"
 homie-controller = { version = "0.2.0", path = "../homie-controller" }
@@ -21,18 +20,22 @@ pretty_env_logger = "0.4.0"
 rumqttc = "0.2.0"
 rustls = "0.18.1"
 rustls-native-certs = "0.4.0"
+serde_derive = "1.0.118"
+serde = "1.0.118"
 stable-eyre = "0.2.1"
 tokio = "0.2.22"
+toml = "0.5.7"
+url = { version = "2.2.0", features = ["serde"] }
 
 [package.metadata.deb]
 depends = "$auto, adduser"
 section = "net"
 maintainer-scripts = "debian-scripts"
-conf-files = ["/etc/homie-influx/.env", "/ect/homie-influx/mappings.conf"]
+conf-files = ["/etc/homie-influx/homie-influx.toml", "/etc/homie-influx/mappings.toml"]
 assets = [
 	["target/release/homie-influx", "usr/bin/", "755"],
-	[".env.example", "etc/homie-influx/.env", "644"],
-	["mappings.conf.example", "etc/homie-influx/mappings.conf", "644"],
+	["homie-influx.example.toml", "etc/homie-influx/homie-influx.toml", "644"],
+	["mappings.example.toml", "etc/homie-influx/mappings.toml", "644"],
 	["README.md", "usr/share/doc/homie-influx/", "644"],
 ]
 
