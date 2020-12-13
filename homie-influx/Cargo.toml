@@ -25,6 +25,7 @@ serde = "1.0.118"
 stable-eyre = "0.2.1"
 tokio = "0.2.22"
 toml = "0.5.7"
+url = { version = "2.2.0", features = ["serde"] }
 
 [package.metadata.deb]
 depends = "$auto, adduser"

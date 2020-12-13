@@ -3,12 +3,10 @@ use influx_db_client::reqwest::Url;
 use influx_db_client::Client;
 use rumqttc::MqttOptions;
 use rustls::ClientConfig;
-use serde::{de, Deserialize, Deserializer};
+use serde_derive::Deserialize;
 use stable_eyre::eyre;
 use stable_eyre::eyre::WrapErr;
-use std::fmt::Display;
 use std::fs::read_to_string;
-use std::str::FromStr;
 use std::sync::Arc;
 
 const DEFAULT_MQTT_CLIENT_PREFIX: &str = "homie-influx";
@@ -75,19 +73,9 @@ impl Default for HomieConfig {
 #[derive(Clone, Debug, Deserialize)]
 #[serde(default)]
 pub struct InfluxDBConfig {
-    #[serde(deserialize_with = "de_from_str")]
     pub url: Url,
     pub username: Option<String>,
     pub password: Option<String>,
-}
-
-/// Deserialize a FromStr by deserializing it as a string then parsing it.
-fn de_from_str<'de, D: Deserializer<'de>, T: FromStr>(d: D) -> Result<T, D::Error>
-where
-    T::Err: Display,
-{
-    let s = String::deserialize(d)?;
-    s.parse::<T>().map_err(de::Error::custom)
 }
 
 impl Default for InfluxDBConfig {
