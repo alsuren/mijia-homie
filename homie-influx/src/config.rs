@@ -26,8 +26,12 @@ pub struct Config {
 
 impl Config {
     pub fn from_file() -> Result<Config, Report> {
-        let config_file = read_to_string(CONFIG_FILENAME)
-            .wrap_err_with(|| format!("Reading {}", CONFIG_FILENAME))?;
+        Config::read(CONFIG_FILENAME)
+    }
+
+    fn read(filename: &str) -> Result<Config, Report> {
+        let config_file =
+            read_to_string(filename).wrap_err_with(|| format!("Reading {}", filename))?;
         Ok(toml::from_str(&config_file)?)
     }
 }
@@ -149,4 +153,28 @@ pub fn get_mqtt_options(config: &MqttConfig, client_name_suffix: &str) -> MqttOp
     }
 
     mqtt_options
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Parsing the example config file should not give any errors.
+    #[test]
+    fn example_config() {
+        Config::read("homie_influx.example.toml").unwrap();
+    }
+
+    /// Parsing an empty config file should not give any errors.
+    #[test]
+    fn empty_config() {
+        toml::from_str::<Config>("").unwrap();
+    }
+
+    /// Parsing the example mappings file should not give any errors.
+    #[test]
+    fn example_mappings() {
+        let mappings = mappings_from_file("mappings.example.toml").unwrap();
+        assert_eq!(mappings.len(), 1);
+    }
 }

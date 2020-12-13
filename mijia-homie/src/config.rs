@@ -25,8 +25,12 @@ pub struct Config {
 
 impl Config {
     pub fn from_file() -> Result<Config, Report> {
-        let config_file = read_to_string(CONFIG_FILENAME)
-            .wrap_err_with(|| format!("Reading {}", CONFIG_FILENAME))?;
+        Config::read(CONFIG_FILENAME)
+    }
+
+    fn read(filename: &str) -> Result<Config, Report> {
+        let config_file =
+            read_to_string(filename).wrap_err_with(|| format!("Reading {}", filename))?;
         Ok(toml::from_str(&config_file)?)
     }
 }
@@ -104,4 +108,21 @@ pub fn read_sensor_names(filename: &str) -> Result<HashMap<MacAddress, String>, 
         .map(|(mac_address, name)| Ok::<_, ParseMacAddressError>((mac_address.parse()?, name)))
         .collect::<Result<HashMap<_, _>, _>>()?;
     Ok(names)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Parsing the example config file should not give any errors.
+    #[test]
+    fn example_config() {
+        Config::read("mijia_homie.example.toml").unwrap();
+    }
+
+    /// Parsing an empty config file should not give any errors.
+    #[test]
+    fn empty_config() {
+        toml::from_str::<Config>("").unwrap();
+    }
 }
