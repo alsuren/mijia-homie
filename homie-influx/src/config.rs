@@ -17,7 +17,7 @@ const CONFIG_FILENAME: &str = "homie_influx.toml";
 const DEFAULT_MAPPINGS_FILENAME: &str = "mappings.toml";
 
 #[derive(Clone, Debug, Default, Deserialize)]
-#[serde(default)]
+#[serde(default, deny_unknown_fields)]
 pub struct Config {
     pub mqtt: MqttConfig,
     pub homie: HomieConfig,
@@ -33,7 +33,7 @@ impl Config {
 }
 
 #[derive(Clone, Debug, Deserialize)]
-#[serde(default)]
+#[serde(default, deny_unknown_fields)]
 pub struct MqttConfig {
     pub host: String,
     pub port: u16,
@@ -57,7 +57,7 @@ impl Default for MqttConfig {
 }
 
 #[derive(Clone, Debug, Deserialize)]
-#[serde(default)]
+#[serde(default, deny_unknown_fields)]
 pub struct HomieConfig {
     pub mappings_filename: String,
 }
@@ -71,7 +71,7 @@ impl Default for HomieConfig {
 }
 
 #[derive(Clone, Debug, Deserialize)]
-#[serde(default)]
+#[serde(default, deny_unknown_fields)]
 pub struct InfluxDBConfig {
     pub url: Url,
     pub username: Option<String>,
@@ -91,12 +91,14 @@ impl Default for InfluxDBConfig {
 /// A mapping from a Homie prefix to monitor to an InfluxDB database where its data should be
 /// stored.
 #[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Mapping {
     pub homie_prefix: String,
     pub influxdb_database: String,
 }
 
 #[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct MappingsConfig {
     pub mappings: Vec<Mapping>,
 }

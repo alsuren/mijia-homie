@@ -17,7 +17,7 @@ const DEFAULT_SENSOR_NAMES_FILENAME: &str = "sensor_names.toml";
 const CONFIG_FILENAME: &str = "mijia_homie.toml";
 
 #[derive(Clone, Debug, Default, Deserialize)]
-#[serde(default)]
+#[serde(default, deny_unknown_fields)]
 pub struct Config {
     pub mqtt: MqttConfig,
     pub homie: HomieConfig,
@@ -32,7 +32,7 @@ impl Config {
 }
 
 #[derive(Clone, Debug, Deserialize)]
-#[serde(default)]
+#[serde(default, deny_unknown_fields)]
 pub struct MqttConfig {
     pub host: String,
     pub port: u16,
@@ -56,7 +56,7 @@ impl Default for MqttConfig {
 }
 
 #[derive(Clone, Debug, Deserialize)]
-#[serde(default)]
+#[serde(default, deny_unknown_fields)]
 pub struct HomieConfig {
     pub device_id: String,
     pub device_name: String,
