@@ -3,6 +3,11 @@ device_id="mijia-bridge"
 device_name="Mijia bridge"
 prefix="homie"
 sensor_names_filename="sensor-names.toml"
+# The minimum time to wait between sending consecutive readings for the same sensor.
+# The sensors themselves send updates every 6 seconds or so, so setting this to just under a
+# multiple of 6 will give the most consistent results. 0 means that all sensor updates will be sent
+# to the MQTT broker.
+min_update_period_seconds=0
 
 [mqtt]
 host="test.mosquitto.org"

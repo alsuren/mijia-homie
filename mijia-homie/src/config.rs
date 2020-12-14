@@ -2,11 +2,13 @@ use eyre::Report;
 use mijia::bluetooth::{MacAddress, ParseMacAddressError};
 use rumqttc::MqttOptions;
 use rustls::ClientConfig;
+use serde::{Deserialize as _, Deserializer};
 use serde_derive::Deserialize;
 use stable_eyre::eyre::WrapErr;
 use std::collections::HashMap;
 use std::fs::read_to_string;
 use std::sync::Arc;
+use std::time::Duration;
 
 const DEFAULT_MQTT_PREFIX: &str = "homie";
 const DEFAULT_DEVICE_ID: &str = "mijia-bridge";
@@ -66,6 +68,17 @@ pub struct HomieConfig {
     pub device_name: String,
     pub prefix: String,
     pub sensor_names_filename: String,
+    /// The minimum time to wait between sending consecutive readings for the same sensor.
+    #[serde(
+        deserialize_with = "de_duration_seconds",
+        rename = "min_update_period_seconds"
+    )]
+    pub min_update_period: Duration,
+}
+
+fn de_duration_seconds<'de, D: Deserializer<'de>>(d: D) -> Result<Duration, D::Error> {
+    let seconds = u64::deserialize(d)?;
+    Ok(Duration::from_secs(seconds))
 }
 
 impl Default for HomieConfig {
@@ -75,6 +88,7 @@ impl Default for HomieConfig {
             device_name: DEFAULT_DEVICE_NAME.to_owned(),
             prefix: DEFAULT_MQTT_PREFIX.to_owned(),
             sensor_names_filename: DEFAULT_SENSOR_NAMES_FILENAME.to_owned(),
+            min_update_period: Duration::from_secs(0),
         }
     }
 }
