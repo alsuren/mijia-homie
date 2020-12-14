@@ -470,11 +470,13 @@ async fn handle_bluetooth_event(
                 sensor.publish_readings(homie, &readings).await?;
                 match &sensor.connection_status {
                     ConnectionStatus::Connected { id: connected_id } => {
-                        log::info!(
-                            "Got update from device on unexpected id {:?} (expected {:?})",
-                            id,
-                            connected_id,
-                        );
+                        if id != *connected_id {
+                            log::info!(
+                                "Got update from device on unexpected id {:?} (expected {:?})",
+                                id,
+                                connected_id,
+                            );
+                        }
                     }
                     ConnectionStatus::Connecting { .. } => {}
                     _ => {
