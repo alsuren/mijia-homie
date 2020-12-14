@@ -1,3 +1,8 @@
+# This file should contain as many [[mappings]] sections as you have Homie base topics. This allows
+# you to have multiple users on the same MQTT broker and log their data to different databases.
+
 [[mappings]]
+# The Homie base MQTT topic.
 homie_prefix="homie"
+# The InfluxDB database to which data from this Homie system should be logged.
 influxdb_database="test"
