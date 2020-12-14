@@ -4,6 +4,7 @@ set -e
 
 if [ "$1" = "configure" ] ; then
   adduser --system --home /etc/homie-influx homie-influx
+  chown homie-influx /etc/homie-influx/homie-influx.toml
 fi
 
 #DEBHELPER#
