@@ -34,7 +34,7 @@ maintainer-scripts = "debian-scripts"
 conf-files = ["/etc/homie-influx/homie-influx.toml", "/etc/homie-influx/mappings.toml"]
 assets = [
 	["target/release/homie-influx", "usr/bin/", "755"],
-	["homie-influx.example.toml", "etc/homie-influx/homie-influx.toml", "644"],
+	["homie-influx.example.toml", "etc/homie-influx/homie-influx.toml", "640"],
 	["mappings.example.toml", "etc/homie-influx/mappings.toml", "644"],
 	["README.md", "usr/share/doc/homie-influx/", "644"],
 ]

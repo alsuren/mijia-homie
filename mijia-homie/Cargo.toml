@@ -36,7 +36,7 @@ maintainer-scripts = "debian-scripts"
 conf-files = ["/etc/mijia-homie/mijia-homie.toml"]
 assets = [
 	["target/release/mijia-homie", "usr/bin/", "755"],
-	["mijia-homie.example.toml", "etc/mijia-homie/mijia-homie.toml", "644"],
+	["mijia-homie.example.toml", "etc/mijia-homie/mijia-homie.toml", "640"],
 	["README.md", "usr/share/doc/mijia-homie/", "644"],
 ]
 
