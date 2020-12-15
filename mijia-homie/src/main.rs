@@ -51,8 +51,10 @@ async fn main() -> Result<(), eyre::Report> {
     // Connect a Bluetooth session.
     let (dbus_handle, session) = MijiaSession::new().await?;
 
-    let sensor_handle =
-        local.run_until(async move { run_sensor_system(homie, &session, &sensor_names).await });
+    let min_update_period = config.homie.min_update_period;
+    let sensor_handle = local.run_until(async move {
+        run_sensor_system(homie, &session, &sensor_names, min_update_period).await
+    });
 
     // Poll everything to completion, until the first one bombs out.
     let res: Result<_, eyre::Report> = try_join! {
@@ -90,7 +92,11 @@ enum ConnectionStatus {
 struct Sensor {
     mac_address: MacAddress,
     name: String,
+    /// The last time an update was received from the sensor.
     last_update_timestamp: Instant,
+    /// The last time an update from the sensor was sent to the server. This may be earlier than
+    /// `last_update_timestamp` if the `min_update_time` config parameter is set.
+    last_sent_timestamp: Instant,
     connection_status: ConnectionStatus,
     ids: Vec<DeviceId>,
 }
@@ -109,6 +115,9 @@ impl Sensor {
             mac_address: props.mac_address,
             name,
             last_update_timestamp: Instant::now(),
+            // This should really be something like Instant::MIN, but there is no such constant so
+            // one hour in the past should be more than enough.
+            last_sent_timestamp: Instant::now() - Duration::from_secs(3600),
             connection_status: ConnectionStatus::Unknown,
             ids: vec![props.id],
         }
@@ -153,28 +162,39 @@ impl Sensor {
         &mut self,
         homie: &HomieDevice,
         readings: &Readings,
+        min_update_period: Duration,
     ) -> Result<(), eyre::Report> {
         println!("{} {} ({})", self.mac_address, readings, self.name);
+        let now = Instant::now();
+        self.last_update_timestamp = now;
 
-        let node_id = self.node_id();
-        self.last_update_timestamp = Instant::now();
-        homie
-            .publish_value(
-                &node_id,
-                Self::PROPERTY_ID_TEMPERATURE,
-                format!("{:.2}", readings.temperature),
-            )
-            .await?;
-        homie
-            .publish_value(&node_id, Self::PROPERTY_ID_HUMIDITY, readings.humidity)
-            .await?;
-        homie
-            .publish_value(
-                &node_id,
-                Self::PROPERTY_ID_BATTERY,
-                readings.battery_percent,
-            )
-            .await?;
+        if now > self.last_sent_timestamp + min_update_period {
+            let node_id = self.node_id();
+            homie
+                .publish_value(
+                    &node_id,
+                    Self::PROPERTY_ID_TEMPERATURE,
+                    format!("{:.2}", readings.temperature),
+                )
+                .await?;
+            homie
+                .publish_value(&node_id, Self::PROPERTY_ID_HUMIDITY, readings.humidity)
+                .await?;
+            homie
+                .publish_value(
+                    &node_id,
+                    Self::PROPERTY_ID_BATTERY,
+                    readings.battery_percent,
+                )
+                .await?;
+            self.last_sent_timestamp = now;
+        } else {
+            log::trace!(
+                "Not sending, as last update sent {} seconds ago.",
+                (now - self.last_sent_timestamp).as_secs()
+            );
+        }
+
         Ok(())
     }
 
@@ -194,12 +214,14 @@ async fn run_sensor_system(
     mut homie: HomieDevice,
     session: &MijiaSession,
     sensor_names: &HashMap<MacAddress, String>,
+    min_update_period: Duration,
 ) -> Result<(), eyre::Report> {
     homie.ready().await?;
 
     let state = Arc::new(Mutex::new(SensorState {
         sensors: HashMap::new(),
         homie,
+        min_update_period,
     }));
 
     let connection_loop_handle = bluetooth_connection_loop(state.clone(), session, sensor_names);
@@ -260,6 +282,7 @@ async fn bluetooth_connection_loop(
 struct SensorState {
     sensors: HashMap<MacAddress, Sensor>,
     homie: HomieDevice,
+    min_update_period: Duration,
 }
 
 /// Get the sensor entry for the given id, if any.
@@ -467,14 +490,18 @@ async fn handle_bluetooth_event(
     match event {
         MijiaEvent::Readings { id, readings } => {
             if let Some(sensor) = get_mut_sensor_by_id(sensors, &id) {
-                sensor.publish_readings(homie, &readings).await?;
+                sensor
+                    .publish_readings(homie, &readings, state.min_update_period)
+                    .await?;
                 match &sensor.connection_status {
                     ConnectionStatus::Connected { id: connected_id } => {
-                        log::info!(
-                            "Got update from device on unexpected id {:?} (expected {:?})",
-                            id,
-                            connected_id,
-                        );
+                        if id != *connected_id {
+                            log::info!(
+                                "Got update from device on unexpected id {:?} (expected {:?})",
+                                id,
+                                connected_id,
+                            );
+                        }
                     }
                     ConnectionStatus::Connecting { .. } => {}
                     _ => {

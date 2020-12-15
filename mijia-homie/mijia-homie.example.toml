@@ -1,13 +1,29 @@
 [homie]
+# The ID to use for the Homie device. This must be unique for a given prefix and server.
 device_id="mijia-bridge"
+# The human-readable name to use for the Homie device.
 device_name="Mijia bridge"
+# The Homie base MQTT topic.
 prefix="homie"
+# The name of the file containing sensor MAC address to name mappings.
 sensor_names_filename="sensor-names.toml"
+# The minimum time to wait between sending consecutive readings for the same sensor.
+# The sensors themselves send updates every 6 seconds or so, so setting this to just under a
+# multiple of 6 will give the most consistent results. 0 means that all sensor updates will be sent
+# to the MQTT broker.
+min_update_period_seconds=0
 
 [mqtt]
+# The hostname of the MQTT broker to use.
 host="test.mosquitto.org"
+# The port number of the MQTT broker to use.
 port=1883
+# The client name to use when connecting to the MQTT broker. If this is not set it will default to
+# homie.device_id.
 client_name="mijia-bridge"
-# username=""
-# password=""
-# use_tls=true
+# The username with which to authenticate to the MQTT broker, if any.
+#username=""
+# The password with which to authenticate to the MQTT broker, if any.
+#password=""
+# Whether to use TLS for the connection to the MQTT broker.
+use_tls=false

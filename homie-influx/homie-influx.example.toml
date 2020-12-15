@@ -1,15 +1,25 @@
 [homie]
-# mappings_filename="mappings.toml"
+# The name of the file containing mappings of Homie prefixes to InfluxDB databases.
+mappings_filename="mappings.toml"
 
 [mqtt]
+# The hostname of the MQTT broker to use.
 host="test.mosquitto.org"
+# The port number of the MQTT broker to use.
 port=1883
+# The prefix to use to generate client names for connecting to the MQTT broker.
 client_prefix="homie-influx"
-# username=
-# password=
-# use_tls=true
+# The username with which to authenticate to the MQTT broker, if any.
+#username=""
+# The password with which to authenticate to the MQTT broker, if any.
+#password=""
+# Whether to use TLS for the connection to the MQTT broker.
+use_tls=false
 
 [influxdb]
+# The URL of the InfluxDB to which to connect.
 url="http://localhost:8086"
-# username=
-# password=
+# The username with which to authenticate to InfluxDB, if any.
+#username=""
+# The password with which to authenticate to InfluxDB, if any.
+#password=""
