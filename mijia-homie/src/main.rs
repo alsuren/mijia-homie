@@ -221,11 +221,11 @@ async fn run_sensor_system(
     let state = Arc::new(Mutex::new(SensorState {
         sensors: HashMap::new(),
         homie,
+        min_update_period,
     }));
 
     let connection_loop_handle = bluetooth_connection_loop(state.clone(), session, sensor_names);
-    let event_loop_handle =
-        service_bluetooth_event_queue(state.clone(), session, min_update_period);
+    let event_loop_handle = service_bluetooth_event_queue(state.clone(), session);
     try_join!(connection_loop_handle, event_loop_handle).map(|((), ())| ())
 }
 
@@ -282,6 +282,7 @@ async fn bluetooth_connection_loop(
 struct SensorState {
     sensors: HashMap<MacAddress, Sensor>,
     homie: HomieDevice,
+    min_update_period: Duration,
 }
 
 /// Get the sensor entry for the given id, if any.
@@ -460,14 +461,13 @@ async fn check_for_stale_sensor(
 async fn service_bluetooth_event_queue(
     state: Arc<Mutex<SensorState>>,
     session: &MijiaSession,
-    min_update_period: Duration,
 ) -> Result<(), eyre::Report> {
     println!("Subscribing to events");
     let (msg_match, mut events) = session.event_stream().await?;
     println!("Processing events");
 
     while let Some(event) = events.next().await {
-        handle_bluetooth_event(state.clone(), event, min_update_period).await?
+        handle_bluetooth_event(state.clone(), event).await?
     }
 
     session
@@ -483,7 +483,6 @@ async fn service_bluetooth_event_queue(
 async fn handle_bluetooth_event(
     state: Arc<Mutex<SensorState>>,
     event: MijiaEvent,
-    min_update_period: Duration,
 ) -> Result<(), eyre::Report> {
     let state = &mut *state.lock().await;
     let homie = &mut state.homie;
@@ -492,7 +491,7 @@ async fn handle_bluetooth_event(
         MijiaEvent::Readings { id, readings } => {
             if let Some(sensor) = get_mut_sensor_by_id(sensors, &id) {
                 sensor
-                    .publish_readings(homie, &readings, min_update_period)
+                    .publish_readings(homie, &readings, state.min_update_period)
                     .await?;
                 match &sensor.connection_status {
                     ConnectionStatus::Connected { id: connected_id } => {
