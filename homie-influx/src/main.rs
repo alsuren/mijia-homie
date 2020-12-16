@@ -3,9 +3,7 @@ mod influx;
 
 use crate::config::{get_influxdb_client, get_mqtt_options, read_mappings, Config};
 use crate::influx::send_property_value;
-use eyre::Report;
 use futures::future::try_join_all;
-use futures::FutureExt;
 use homie_controller::{Event, HomieController, HomieEventLoop, PollError};
 use influx_db_client::Client;
 use rumqttc::ConnectionError;
@@ -41,10 +39,11 @@ async fn main() -> Result<(), eyre::Report> {
             config.mqtt.reconnect_interval,
         );
         controller.start().await?;
-        join_handles.push(handle.map(|res| Ok(res??)));
+        join_handles.push(handle);
     }
 
-    simplify_unit_vec(try_join_all(join_handles).await)
+    simplify_unit_vec(try_join_all(join_handles).await)?;
+    Ok(())
 }
 
 fn spawn_homie_poll_loop(
@@ -52,12 +51,12 @@ fn spawn_homie_poll_loop(
     controller: Arc<HomieController>,
     influx_db_client: Client,
     reconnect_interval: Duration,
-) -> JoinHandle<Result<(), eyre::Report>> {
+) -> JoinHandle<()> {
     task::spawn(async move {
         loop {
             match controller.poll(&mut event_loop).await {
                 Ok(Some(event)) => {
-                    handle_event(controller.as_ref(), &influx_db_client, event).await?
+                    handle_event(controller.as_ref(), &influx_db_client, event).await;
                 }
                 Ok(None) => {}
                 Err(e) => {
@@ -75,11 +74,7 @@ fn spawn_homie_poll_loop(
     })
 }
 
-async fn handle_event(
-    controller: &HomieController,
-    influx_db_client: &Client,
-    event: Event,
-) -> Result<(), Report> {
+async fn handle_event(controller: &HomieController, influx_db_client: &Client, event: Event) {
     match event {
         Event::PropertyValueChanged {
             device_id,
@@ -98,21 +93,23 @@ async fn handle_event(
                 fresh
             );
             if fresh {
-                send_property_value(
+                if let Err(e) = send_property_value(
                     controller,
                     influx_db_client,
                     device_id,
                     node_id,
                     property_id,
                 )
-                .await?;
+                .await
+                {
+                    log::error!("{:?}", e);
+                }
             }
         }
         _ => {
             log::info!("{} Event: {:?}", controller.base_topic(), event);
         }
     }
-    Ok(())
 }
 
 fn simplify_unit_vec<E>(m: Result<Vec<()>, E>) -> Result<(), E> {
