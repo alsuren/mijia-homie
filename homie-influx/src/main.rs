@@ -6,12 +6,14 @@ use crate::influx::send_property_value;
 use eyre::Report;
 use futures::future::try_join_all;
 use futures::FutureExt;
-use homie_controller::{Event, HomieController, HomieEventLoop};
+use homie_controller::{Event, HomieController, HomieEventLoop, PollError};
 use influx_db_client::Client;
+use rumqttc::ConnectionError;
 use stable_eyre::eyre;
-use stable_eyre::eyre::WrapErr;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::task::{self, JoinHandle};
+use tokio::time::delay_for;
 
 #[tokio::main]
 async fn main() -> Result<(), eyre::Report> {
@@ -32,7 +34,12 @@ async fn main() -> Result<(), eyre::Report> {
 
         let influxdb_client = get_influxdb_client(&config.influxdb, &mapping.influxdb_database)?;
 
-        let handle = spawn_homie_poll_loop(event_loop, controller.clone(), influxdb_client);
+        let handle = spawn_homie_poll_loop(
+            event_loop,
+            controller.clone(),
+            influxdb_client,
+            config.mqtt.reconnect_interval,
+        );
         controller.start().await?;
         join_handles.push(handle.map(|res| Ok(res??)));
     }
@@ -44,16 +51,25 @@ fn spawn_homie_poll_loop(
     mut event_loop: HomieEventLoop,
     controller: Arc<HomieController>,
     influx_db_client: Client,
+    reconnect_interval: Duration,
 ) -> JoinHandle<Result<(), eyre::Report>> {
     task::spawn(async move {
         loop {
-            if let Some(event) = controller.poll(&mut event_loop).await.wrap_err_with(|| {
-                format!(
-                    "Failed to poll HomieController for base topic '{}'.",
-                    controller.base_topic()
-                )
-            })? {
-                handle_event(controller.as_ref(), &influx_db_client, event).await?;
+            match controller.poll(&mut event_loop).await {
+                Ok(Some(event)) => {
+                    handle_event(controller.as_ref(), &influx_db_client, event).await?
+                }
+                Ok(None) => {}
+                Err(e) => {
+                    log::error!(
+                        "Failed to poll HomieController for base topic '{}': {}",
+                        controller.base_topic(),
+                        e
+                    );
+                    if let PollError::Connection(ConnectionError::Io(_)) = e {
+                        delay_for(reconnect_interval).await;
+                    }
+                }
             }
         }
     })

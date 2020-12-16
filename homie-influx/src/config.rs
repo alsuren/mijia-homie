@@ -3,15 +3,18 @@ use influx_db_client::reqwest::Url;
 use influx_db_client::Client;
 use rumqttc::MqttOptions;
 use rustls::ClientConfig;
+use serde::{Deserialize as _, Deserializer};
 use serde_derive::Deserialize;
 use stable_eyre::eyre;
 use stable_eyre::eyre::WrapErr;
 use std::fs::read_to_string;
 use std::sync::Arc;
+use std::time::Duration;
 
 const DEFAULT_MQTT_CLIENT_PREFIX: &str = "homie-influx";
 const DEFAULT_MQTT_HOST: &str = "test.mosquitto.org";
 const DEFAULT_MQTT_PORT: u16 = 1883;
+const DEFAULT_MQTT_RECONNECT_INTERVAL: Duration = Duration::from_secs(5);
 const DEFAULT_INFLUXDB_URL: &str = "http://localhost:8086";
 const CONFIG_FILENAME: &str = "homie-influx.toml";
 const DEFAULT_MAPPINGS_FILENAME: &str = "mappings.toml";
@@ -45,6 +48,17 @@ pub struct MqttConfig {
     pub username: Option<String>,
     pub password: Option<String>,
     pub client_prefix: String,
+    #[serde(
+        deserialize_with = "de_duration_seconds",
+        rename = "reconnect_interval_seconds"
+    )]
+    pub reconnect_interval: Duration,
+}
+
+/// Deserialize an integer as a number of seconds.
+fn de_duration_seconds<'de, D: Deserializer<'de>>(d: D) -> Result<Duration, D::Error> {
+    let seconds = u64::deserialize(d)?;
+    Ok(Duration::from_secs(seconds))
 }
 
 impl Default for MqttConfig {
@@ -56,6 +70,7 @@ impl Default for MqttConfig {
             username: None,
             password: None,
             client_prefix: DEFAULT_MQTT_CLIENT_PREFIX.to_owned(),
+            reconnect_interval: DEFAULT_MQTT_RECONNECT_INTERVAL,
         }
     }
 }
@@ -140,6 +155,7 @@ pub fn get_mqtt_options(config: &MqttConfig, client_name_suffix: &str) -> MqttOp
     let client_name = format!("{}-{}", config.client_prefix, client_name_suffix);
     let mut mqtt_options = MqttOptions::new(client_name, &config.host, config.port);
     mqtt_options.set_keep_alive(5);
+    mqtt_options.set_clean_session(false);
 
     if let (Some(username), Some(password)) = (&config.username, &config.password) {
         mqtt_options.set_credentials(username, password);
