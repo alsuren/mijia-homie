@@ -3,6 +3,7 @@ mod influx;
 
 use crate::config::{get_influxdb_client, get_mqtt_options, read_mappings, Config};
 use crate::influx::send_property_value;
+use eyre::Report;
 use futures::future::try_join_all;
 use futures::FutureExt;
 use homie_controller::{Event, HomieController, HomieEventLoop};
@@ -52,41 +53,50 @@ fn spawn_homie_poll_loop(
                     controller.base_topic()
                 )
             })? {
-                match event {
-                    Event::PropertyValueChanged {
-                        device_id,
-                        node_id,
-                        property_id,
-                        value,
-                        fresh,
-                    } => {
-                        log::trace!(
-                            "{}/{}/{}/{} = {} ({})",
-                            controller.base_topic(),
-                            device_id,
-                            node_id,
-                            property_id,
-                            value,
-                            fresh
-                        );
-                        if fresh {
-                            send_property_value(
-                                controller.as_ref(),
-                                &influx_db_client,
-                                device_id,
-                                node_id,
-                                property_id,
-                            )
-                            .await?;
-                        }
-                    }
-                    _ => {
-                        log::info!("{} Event: {:?}", controller.base_topic(), event);
-                    }
-                }
+                handle_event(controller.as_ref(), &influx_db_client, event).await?;
             }
         }
     })
+}
+
+async fn handle_event(
+    controller: &HomieController,
+    influx_db_client: &Client,
+    event: Event,
+) -> Result<(), Report> {
+    match event {
+        Event::PropertyValueChanged {
+            device_id,
+            node_id,
+            property_id,
+            value,
+            fresh,
+        } => {
+            log::trace!(
+                "{}/{}/{}/{} = {} ({})",
+                controller.base_topic(),
+                device_id,
+                node_id,
+                property_id,
+                value,
+                fresh
+            );
+            if fresh {
+                send_property_value(
+                    controller,
+                    influx_db_client,
+                    device_id,
+                    node_id,
+                    property_id,
+                )
+                .await?;
+            }
+        }
+        _ => {
+            log::info!("{} Event: {:?}", controller.base_topic(), event);
+        }
+    }
+    Ok(())
 }
 
 fn simplify_unit_vec<E>(m: Result<Vec<()>, E>) -> Result<(), E> {
