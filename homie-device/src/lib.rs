@@ -30,6 +30,10 @@ const HOMIE_IMPLEMENTATION: &str = "homie-rs";
 const STATS_INTERVAL: Duration = Duration::from_secs(60);
 const REQUESTS_CAP: usize = 10;
 
+/// The default duration to wait between attempts to reconnect to the MQTT broker if the connection
+/// is lost.
+pub const DEFAULT_RECONNECT_INTERVAL: Duration = Duration::from_secs(5);
+
 /// Error type for futures representing tasks spawned by this crate.
 #[derive(Error, Debug)]
 pub enum SpawnError {
@@ -100,6 +104,7 @@ pub struct HomieDeviceBuilder {
     firmware_version: Option<String>,
     mqtt_options: MqttOptions,
     update_callback: Option<UpdateCallback>,
+    reconnect_interval: Duration,
 }
 
 impl Debug for HomieDeviceBuilder {
@@ -125,6 +130,14 @@ impl HomieDeviceBuilder {
     pub fn set_firmware(&mut self, firmware_name: &str, firmware_version: &str) {
         self.firmware_name = Some(firmware_name.to_string());
         self.firmware_version = Some(firmware_version.to_string());
+    }
+
+    /// Set the duration to wait between attempts to reconnect to the MQTT broker if the connection
+    /// is lost.
+    ///
+    /// If this is not set it will default to `DEFAULT_RECONNECT_INTERVAL`.
+    pub fn set_reconnect_interval(&mut self, reconnect_interval: Duration) {
+        self.reconnect_interval = reconnect_interval;
     }
 
     pub fn set_update_callback<F, Fut>(&mut self, mut update_callback: F)
@@ -182,6 +195,8 @@ impl HomieDeviceBuilder {
         );
         last_will.retain = true;
         mqtt_options.set_last_will(last_will);
+        // Setting this to false means that our subscriptions will be kept when we reconnect.
+        mqtt_options.set_clean_session(false);
         let (client, event_loop) = AsyncClient::new(mqtt_options, REQUESTS_CAP);
 
         let publisher = DevicePublisher::new(client, self.device_base);
@@ -201,7 +216,12 @@ impl HomieDeviceBuilder {
             None
         };
 
-        let homie = HomieDevice::new(publisher, self.device_name, &extension_ids);
+        let homie = HomieDevice::new(
+            publisher,
+            self.device_name,
+            &extension_ids,
+            self.reconnect_interval,
+        );
 
         (event_loop, homie, stats, firmware, self.update_callback)
     }
@@ -216,6 +236,7 @@ pub struct HomieDevice {
     nodes: Vec<Node>,
     state: State,
     extension_ids: String,
+    reconnect_interval: Duration,
 }
 
 impl HomieDevice {
@@ -240,16 +261,23 @@ impl HomieDevice {
             firmware_version: None,
             mqtt_options,
             update_callback: None,
+            reconnect_interval: DEFAULT_RECONNECT_INTERVAL,
         }
     }
 
-    fn new(publisher: DevicePublisher, device_name: String, extension_ids: &[&str]) -> HomieDevice {
+    fn new(
+        publisher: DevicePublisher,
+        device_name: String,
+        extension_ids: &[&str],
+        reconnect_interval: Duration,
+    ) -> HomieDevice {
         HomieDevice {
             publisher,
             device_name,
             nodes: vec![],
             state: State::Disconnected,
             extension_ids: extension_ids.join(","),
+            reconnect_interval,
         }
     }
 
@@ -280,15 +308,25 @@ impl HomieDevice {
         let device_base = format!("{}/", self.publisher.device_base);
         let (incoming_tx, incoming_rx) = async_channel::unbounded();
 
+        let reconnect_interval = self.reconnect_interval;
         let mqtt_task = task::spawn(async move {
             loop {
-                let notification = event_loop.poll().await?;
-                log::trace!("Notification = {:?}", notification);
+                match event_loop.poll().await {
+                    Ok(notification) => {
+                        log::trace!("Notification = {:?}", notification);
 
-                if let Event::Incoming(incoming) = notification {
-                    incoming_tx.send(incoming).await.map_err(|_| {
-                        SpawnError::Internal("Incoming event channel receiver closed.")
-                    })?;
+                        if let Event::Incoming(incoming) = notification {
+                            incoming_tx.send(incoming).await.map_err(|_| {
+                                SpawnError::Internal("Incoming event channel receiver closed.")
+                            })?;
+                        }
+                    }
+                    Err(e) => {
+                        log::error!("Failed to poll EventLoop: {}", e);
+                        if let ConnectionError::Io(_) = e {
+                            sleep(reconnect_interval).await;
+                        }
+                    }
                 }
             }
         });
@@ -636,7 +674,12 @@ mod tests {
         let (cancel_tx, _cancel_rx) = async_channel::unbounded();
         let client = AsyncClient::from_senders(requests_tx, cancel_tx);
         let publisher = DevicePublisher::new(client, "homie/test-device".to_string());
-        let device = HomieDevice::new(publisher, "Test device".to_string(), &[]);
+        let device = HomieDevice::new(
+            publisher,
+            "Test device".to_string(),
+            &[],
+            DEFAULT_RECONNECT_INTERVAL,
+        );
         (device, requests_rx)
     }
 

@@ -1,4 +1,5 @@
 use eyre::Report;
+use homie_device::DEFAULT_RECONNECT_INTERVAL;
 use mijia::bluetooth::{MacAddress, ParseMacAddressError};
 use rumqttc::{MqttOptions, Transport};
 use rustls::ClientConfig;
@@ -45,6 +46,11 @@ pub struct MqttConfig {
     pub username: Option<String>,
     pub password: Option<String>,
     pub client_name: Option<String>,
+    #[serde(
+        deserialize_with = "de_duration_seconds",
+        rename = "reconnect_interval_seconds"
+    )]
+    pub reconnect_interval: Duration,
 }
 
 impl Default for MqttConfig {
@@ -56,6 +62,7 @@ impl Default for MqttConfig {
             username: None,
             password: None,
             client_name: None,
+            reconnect_interval: DEFAULT_RECONNECT_INTERVAL,
         }
     }
 }

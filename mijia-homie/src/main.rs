@@ -37,11 +37,13 @@ async fn main() -> Result<(), eyre::Report> {
     let config = Config::from_file()?;
     let sensor_names = read_sensor_names(&config.homie.sensor_names_filename)?;
 
+    let reconnect_interval = config.mqtt.reconnect_interval;
     let mqtt_options = get_mqtt_options(config.mqtt, &config.homie.device_id);
     let device_base = format!("{}/{}", config.homie.prefix, config.homie.device_id);
     let mut homie_builder =
         HomieDevice::builder(&device_base, &config.homie.device_name, mqtt_options);
     homie_builder.set_firmware(env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
+    homie_builder.set_reconnect_interval(reconnect_interval);
     let (homie, homie_handle) = homie_builder.spawn().await?;
 
     // Connect a Bluetooth session.
