@@ -42,7 +42,7 @@ async fn main() -> Result<(), eyre::Report> {
         join_handles.push(handle);
     }
 
-    simplify_unit_vec(try_join_all(join_handles).await)?;
+    try_join_all(join_handles).await?;
     Ok(())
 }
 
@@ -110,8 +110,4 @@ async fn handle_event(controller: &HomieController, influx_db_client: &Client, e
             log::info!("{} Event: {:?}", controller.base_topic(), event);
         }
     }
-}
-
-fn simplify_unit_vec<E>(m: Result<Vec<()>, E>) -> Result<(), E> {
-    m.map(|_| ())
 }
