@@ -463,6 +463,8 @@ impl HomieDevice {
         property_id: &str,
         value: impl ToString,
     ) -> Result<(), ClientError> {
+        // TODO: If we are disconnected, just keep track of the latest value for each property to
+        // publish after reconnecting, rather than queuing these all up.
         self.state
             .lock()
             .await
