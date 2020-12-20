@@ -28,7 +28,8 @@ toml = "0.5.7"
 url = { version = "2.2.0", features = ["serde"] }
 
 [package.metadata.deb]
-depends = "$auto, adduser"
+# $auto doesn't work because we don't build packages in the same container as we build the binaries.
+depends = "adduser, libssl1.0.0, libc6"
 section = "net"
 maintainer-scripts = "debian-scripts"
 conf-files = ["/etc/homie-influx/homie-influx.toml", "/etc/homie-influx/mappings.toml"]
