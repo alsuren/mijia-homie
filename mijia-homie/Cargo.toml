@@ -30,7 +30,8 @@ tokio = "0.2.24"
 toml = "0.5.7"
 
 [package.metadata.deb]
-depends = "$auto, adduser, bluez"
+# $auto doesn't work because we don't build packages in the same container as we build the binaries.
+depends = "adduser, bluez, libc6, libsystemd0, libgcrypt20, libdbus-1-3, libgpg-error0, liblzma5, liblz4-1"
 section = "net"
 maintainer-scripts = "debian-scripts"
 conf-files = ["/etc/mijia-homie/mijia-homie.toml"]
