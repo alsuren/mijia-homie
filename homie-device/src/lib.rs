@@ -398,8 +398,8 @@ impl HomieDevice {
                         }
                     }
                     Ok(Incoming::ConnAck(_)) => {
-                        // TODO: Republish nodes and everything, unless this is the initial connection.
-                        state.lock().await.send_state().await?;
+                        // TODO: Only if this is not the initial connection.
+                        state.lock().await.republish_all().await?;
                     }
                     _ => {}
                 }
@@ -505,6 +505,27 @@ impl DeviceState {
     /// Publish the current state.
     async fn send_state(&self) -> Result<(), ClientError> {
         self.publisher.publish_retained("$state", self.state).await
+    }
+
+    async fn republish_all(&self) -> Result<(), ClientError> {
+        for node in &self.nodes {
+            self.publisher.publish_node(node).await?;
+        }
+        self.publish_nodes().await?;
+        // TODO: Stats and firmware extensions
+        self.publisher
+            .publish_retained("$homie", HOMIE_VERSION)
+            .await?;
+        self.publisher
+            .publish_retained("$extensions", self.extension_ids.as_str())
+            .await?;
+        self.publisher
+            .publish_retained("$implementation", HOMIE_IMPLEMENTATION)
+            .await?;
+        self.publisher
+            .publish_retained("$name", self.device_name.as_str())
+            .await?;
+        self.send_state().await
     }
 
     /// Add a node to the Homie device and publish it.
