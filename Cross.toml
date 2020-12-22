@@ -11,16 +11,16 @@ image = "alsuren/cross-dbus:armv7-unknown-linux-gnu-0.2.1"
 # cargo install --git=https://github.com/alsuren/cross --branch=docker-build-context
 # and then comment out `image`, above and uncomment the following two lines:
 # context = "./docker"
-# dockerfile = "./docker/Dockerfile.buster-gst-armv7-unknown-linux-gnueabihf"
+# dockerfile = "./docker/Dockerfile.dbus.armv7-unknown-linux-gnueabihf"
 
 [target.aarch64-unknown-linux-gnu]
 image = "alsuren/cross-dbus:aarch64-unknown-linux-gnu-0.2.1"
 
 # context = "./docker"
-# dockerfile = "./docker/Dockerfile.buster-gst-aarch64-unknown-linux-gnu"
+# dockerfile = "./docker/Dockerfile.dbus.aarch64-unknown-linux-gnu"
 
 [target.x86_64-unknown-linux-gnu]
 image = "alsuren/cross-dbus:x86_64-unknown-linux-gnu-0.2.1"
 
 # context = "./docker"
-# dockerfile = "./docker/Dockerfile.buster-gst-x86_64-unknown-linux-gnu"
+# dockerfile = "./docker/Dockerfile.dbus.x86_64-unknown-linux-gnu"
