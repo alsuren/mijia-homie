@@ -2,7 +2,7 @@
 # Based on https://www.collabora.com/news-and-blog/blog/2020/06/23/cross-building-rust-gstreamer-plugins-for-the-raspberry-pi/
 # but with `RUN apt-get install -y libdbus-1-dev:armhf` thrown in to get the dependency we need.
 # This image has been pushed to dockerhub.
-image = "alsuren/xiaomi-temp-rpi-builder"
+image = "alsuren/cross-dbus:armv7-unknown-linux-gnu-0.2.1"
 
 
 # Once https://github.com/rust-embedded/cross/pull/446 gets somewhere, you
@@ -11,16 +11,16 @@ image = "alsuren/xiaomi-temp-rpi-builder"
 # cargo install --git=https://github.com/alsuren/cross --branch=docker-build-context
 # and then comment out `image`, above and uncomment the following two lines:
 # context = "./docker"
-# dockerfile = "./docker/Dockerfile.buster-gst-armv7-unknown-linux-gnueabihf"
+# dockerfile = "./docker/Dockerfile.dbus.armv7-unknown-linux-gnueabihf"
 
 [target.aarch64-unknown-linux-gnu]
-image = "alsuren/xiaomi-temp-aarch64-builder"
+image = "alsuren/cross-dbus:aarch64-unknown-linux-gnu-0.2.1"
 
 # context = "./docker"
-# dockerfile = "./docker/Dockerfile.buster-gst-aarch64-unknown-linux-gnu"
+# dockerfile = "./docker/Dockerfile.dbus.aarch64-unknown-linux-gnu"
 
 [target.x86_64-unknown-linux-gnu]
-image = "alsuren/xiaomi-temp-x86_64-builder"
+image = "alsuren/cross-dbus:x86_64-unknown-linux-gnu-0.2.1"
 
 # context = "./docker"
-# dockerfile = "./docker/Dockerfile.buster-gst-x86_64-unknown-linux-gnu"
+# dockerfile = "./docker/Dockerfile.dbus.x86_64-unknown-linux-gnu"
