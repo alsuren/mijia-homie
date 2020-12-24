@@ -42,7 +42,7 @@ jobs:
             ~/.cargo/git
             ~/.cargo/registry
             target
-          key: ${{ runner.os }}-${{ matrix.target }}-package-cargo-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-${{ matrix.target }}-package-cargo-${{ hashFiles('**/Cargo.lock', '**/Cross.toml') }}
       - name: Cache cargo-deb and cross
         uses: actions/cache@v2
         with:
