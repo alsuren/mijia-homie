@@ -1,7 +1,9 @@
 mod config;
 mod influx;
 
-use crate::config::{get_influxdb_client, get_mqtt_options, read_mappings, Config};
+use crate::config::{
+    get_influxdb_client, get_mqtt_options, get_tls_client_config, read_mappings, Config,
+};
 use crate::influx::send_property_value;
 use futures::future::try_join_all;
 use homie_controller::{Event, HomieController, HomieEventLoop, PollError};
@@ -22,11 +24,17 @@ async fn main() -> Result<(), eyre::Report> {
     let config = Config::from_file()?;
     let mappings = read_mappings(&config.homie)?;
 
+    let tls_client_config = get_tls_client_config(&config.mqtt);
+
     // Start a task per mapping to poll the Homie MQTT connection and send values to InfluxDB.
     let mut join_handles: Vec<_> = Vec::new();
     for mapping in &mappings {
         // Include Homie base topic in client name, because client name must be unique.
-        let mqtt_options = get_mqtt_options(&config.mqtt, &mapping.homie_prefix);
+        let mqtt_options = get_mqtt_options(
+            &config.mqtt,
+            &mapping.homie_prefix,
+            tls_client_config.clone(),
+        );
         let (controller, event_loop) = HomieController::new(mqtt_options, &mapping.homie_prefix);
         let controller = Arc::new(controller);
 

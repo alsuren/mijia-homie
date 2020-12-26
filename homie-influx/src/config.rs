@@ -1,13 +1,14 @@
 use eyre::Report;
 use influx_db_client::reqwest::Url;
 use influx_db_client::Client;
-use rumqttc::{MqttOptions, Transport};
+use rumqttc::{MqttOptions, TlsConfiguration, Transport};
 use rustls::ClientConfig;
 use serde::{Deserialize as _, Deserializer};
 use serde_derive::Deserialize;
 use stable_eyre::eyre;
 use stable_eyre::eyre::WrapErr;
 use std::fs::read_to_string;
+use std::sync::Arc;
 use std::time::Duration;
 
 const DEFAULT_MQTT_CLIENT_PREFIX: &str = "homie-influx";
@@ -148,9 +149,25 @@ pub fn get_influxdb_client(config: &InfluxDBConfig, database: &str) -> Result<Cl
     Ok(influxdb_client)
 }
 
+/// Construct a `ClientConfig` for TLS connections to the MQTT broker, if TLS is enabled.
+pub fn get_tls_client_config(config: &MqttConfig) -> Option<Arc<ClientConfig>> {
+    if config.use_tls {
+        let mut client_config = ClientConfig::new();
+        client_config.root_store = rustls_native_certs::load_native_certs()
+            .expect("Failed to load platform certificates.");
+        Some(Arc::new(client_config))
+    } else {
+        None
+    }
+}
+
 /// Construct the `MqttOptions` for connecting to the MQTT broker based on configuration options or
 /// defaults.
-pub fn get_mqtt_options(config: &MqttConfig, client_name_suffix: &str) -> MqttOptions {
+pub fn get_mqtt_options(
+    config: &MqttConfig,
+    client_name_suffix: &str,
+    tls_client_config: Option<Arc<ClientConfig>>,
+) -> MqttOptions {
     let client_name = format!("{}-{}", config.client_prefix, client_name_suffix);
     let mut mqtt_options = MqttOptions::new(client_name, &config.host, config.port);
     mqtt_options.set_keep_alive(5);
@@ -160,11 +177,10 @@ pub fn get_mqtt_options(config: &MqttConfig, client_name_suffix: &str) -> MqttOp
         mqtt_options.set_credentials(username, password);
     }
 
-    if config.use_tls {
-        let mut client_config = ClientConfig::new();
-        client_config.root_store = rustls_native_certs::load_native_certs()
-            .expect("Failed to load platform certificates.");
-        mqtt_options.set_transport(Transport::tls_with_config(client_config.into()));
+    if let Some(client_config) = tls_client_config {
+        mqtt_options.set_transport(Transport::tls_with_config(TlsConfiguration::Rustls(
+            client_config,
+        )));
     }
 
     mqtt_options
