@@ -15,8 +15,8 @@ futures = "0.3.8"
 local_ipaddress = "0.1.3"
 log = "0.4.11"
 mac_address = "1.1.1"
-rumqttc = "0.2.0"
-tokio = "0.2.24"
+rumqttc = "0.3.0"
+tokio = "0.3.6"
 thiserror = "1.0.22"
 
 [dev-dependencies]

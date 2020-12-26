@@ -43,7 +43,7 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
                 .await?;
             homie.publish_value("sensor", "humidity", humidity).await?;
 
-            time::delay_for(Duration::from_secs(10)).await;
+            time::sleep(Duration::from_secs(10)).await;
         }
     });
 

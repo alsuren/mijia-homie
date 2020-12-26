@@ -17,7 +17,7 @@ async fn main() -> Result<(), Report> {
 
     // Start scanning for Bluetooth devices, and wait a while for some to be discovered.
     session.bt_session.start_discovery().await?;
-    time::delay_for(SCAN_DURATION).await;
+    time::sleep(SCAN_DURATION).await;
 
     // Get the list of sensors which are currently known, connect to them and print their properties.
     let sensors = session.get_sensors().await?;

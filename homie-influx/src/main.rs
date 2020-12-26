@@ -1,7 +1,9 @@
 mod config;
 mod influx;
 
-use crate::config::{get_influxdb_client, get_mqtt_options, read_mappings, Config};
+use crate::config::{
+    get_influxdb_client, get_mqtt_options, get_tls_client_config, read_mappings, Config,
+};
 use crate::influx::send_property_value;
 use futures::future::try_join_all;
 use homie_controller::{Event, HomieController, HomieEventLoop, PollError};
@@ -11,7 +13,7 @@ use stable_eyre::eyre;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::task::{self, JoinHandle};
-use tokio::time::delay_for;
+use tokio::time::sleep;
 
 #[tokio::main]
 async fn main() -> Result<(), eyre::Report> {
@@ -22,11 +24,17 @@ async fn main() -> Result<(), eyre::Report> {
     let config = Config::from_file()?;
     let mappings = read_mappings(&config.homie)?;
 
+    let tls_client_config = get_tls_client_config(&config.mqtt);
+
     // Start a task per mapping to poll the Homie MQTT connection and send values to InfluxDB.
     let mut join_handles: Vec<_> = Vec::new();
     for mapping in &mappings {
         // Include Homie base topic in client name, because client name must be unique.
-        let mqtt_options = get_mqtt_options(&config.mqtt, &mapping.homie_prefix);
+        let mqtt_options = get_mqtt_options(
+            &config.mqtt,
+            &mapping.homie_prefix,
+            tls_client_config.clone(),
+        );
         let (controller, event_loop) = HomieController::new(mqtt_options, &mapping.homie_prefix);
         let controller = Arc::new(controller);
 
@@ -66,7 +74,7 @@ fn spawn_homie_poll_loop(
                         e
                     );
                     if let PollError::Connection(ConnectionError::Io(_)) = e {
-                        delay_for(reconnect_interval).await;
+                        sleep(reconnect_interval).await;
                     }
                 }
             }

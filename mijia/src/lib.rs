@@ -8,6 +8,7 @@ use std::ops::Range;
 use std::time::{Duration, SystemTime};
 use thiserror::Error;
 use tokio::stream::StreamExt;
+use tokio_compat_02::FutureExt;
 
 pub mod bluetooth;
 mod bluetooth_event;
@@ -338,6 +339,7 @@ impl MijiaSession {
         self.bt_session
             .connection
             .remove_match(msg_match.token())
+            .compat()
             .await
             .map_err(BluetoothError::DbusError)?;
 
@@ -379,6 +381,7 @@ impl MijiaSession {
             .bt_session
             .connection
             .add_match(rule)
+            .compat()
             .await?
             .msg_stream();
 

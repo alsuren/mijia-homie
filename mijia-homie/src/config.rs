@@ -1,13 +1,12 @@
 use eyre::Report;
 use mijia::bluetooth::{MacAddress, ParseMacAddressError};
-use rumqttc::MqttOptions;
+use rumqttc::{MqttOptions, Transport};
 use rustls::ClientConfig;
 use serde::{Deserialize as _, Deserializer};
 use serde_derive::Deserialize;
 use stable_eyre::eyre::WrapErr;
 use std::collections::HashMap;
 use std::fs::read_to_string;
-use std::sync::Arc;
 use std::time::Duration;
 
 const DEFAULT_MQTT_PREFIX: &str = "homie";
@@ -109,7 +108,7 @@ pub fn get_mqtt_options(config: MqttConfig, device_id: &str) -> MqttOptions {
         let mut client_config = ClientConfig::new();
         client_config.root_store =
             rustls_native_certs::load_native_certs().expect("could not load platform certs");
-        mqtt_options.set_tls_client_config(Arc::new(client_config));
+        mqtt_options.set_transport(Transport::tls_with_config(client_config.into()));
     }
     mqtt_options
 }
