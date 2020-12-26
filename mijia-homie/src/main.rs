@@ -19,7 +19,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::Mutex;
-use tokio::{task, time, try_join};
+use tokio::{time, try_join};
 
 const SCAN_INTERVAL: Duration = Duration::from_secs(15);
 const CONNECT_INTERVAL: Duration = Duration::from_secs(1);
@@ -46,15 +46,11 @@ async fn main() -> Result<(), eyre::Report> {
     homie_builder.set_firmware(env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
     let (homie, homie_handle) = homie_builder.spawn().await?;
 
-    let local = task::LocalSet::new();
-
     // Connect a Bluetooth session.
     let (dbus_handle, session) = MijiaSession::new().await?;
 
     let min_update_period = config.homie.min_update_period;
-    let sensor_handle = local.run_until(async move {
-        run_sensor_system(homie, &session, &sensor_names, min_update_period).await
-    });
+    let sensor_handle = run_sensor_system(homie, &session, &sensor_names, min_update_period);
 
     // Poll everything to completion, until the first one bombs out.
     let res: Result<_, eyre::Report> = try_join! {
