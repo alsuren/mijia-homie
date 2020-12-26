@@ -26,6 +26,7 @@ stable-eyre = "0.2.1"
 tokio = "0.3.6"
 toml = "0.5.8"
 url = { version = "2.2.0", features = ["serde"] }
+tokio-compat-02 = "0.1.2"
 
 [package.metadata.deb]
 # $auto doesn't work because we don't build packages in the same container as we build the binaries.

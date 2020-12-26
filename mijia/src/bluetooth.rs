@@ -14,6 +14,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 use thiserror::Error;
 use tokio::task::JoinError;
+use tokio_compat_02::FutureExt as _;
 
 /// An error carrying out a Bluetooth operation.
 #[derive(Debug, Error)]
@@ -130,7 +131,7 @@ impl BluetoothSession {
         // The resource is a task that should be spawned onto a tokio compatible
         // reactor ASAP. If the resource ever finishes, you lost connection to D-Bus.
         let dbus_handle = tokio::spawn(async {
-            let err = dbus_resource.await;
+            let err = dbus_resource.compat().await;
             Err(SpawnError::DbusConnectionLost(err))
         });
         Ok((
@@ -147,7 +148,7 @@ impl BluetoothSession {
             DBUS_METHOD_CALL_TIMEOUT,
             self.connection.clone(),
         );
-        let tree = bluez_root.get_managed_objects().await?;
+        let tree = bluez_root.get_managed_objects().compat().await?;
         let adapters: Vec<_> = tree
             .into_iter()
             .filter_map(|(path, interfaces)| interfaces.get("org.bluez.Adapter1").map(|_| path))
@@ -165,9 +166,10 @@ impl BluetoothSession {
                 DBUS_METHOD_CALL_TIMEOUT,
                 self.connection.clone(),
             );
-            adapter.set_powered(true).await?;
+            adapter.set_powered(true).compat().await?;
             adapter
                 .start_discovery()
+                .compat()
                 .await
                 .unwrap_or_else(|err| println!("starting discovery failed {:?}", err));
         }
@@ -182,7 +184,7 @@ impl BluetoothSession {
             DBUS_METHOD_CALL_TIMEOUT,
             self.connection.clone(),
         );
-        let tree = bluez_root.get_managed_objects().await?;
+        let tree = bluez_root.get_managed_objects().compat().await?;
 
         let sensors = tree
             .into_iter()
@@ -231,12 +233,12 @@ impl BluetoothSession {
 
     /// Connect to the Bluetooth device with the given D-Bus object path.
     pub async fn connect(&self, id: &DeviceId) -> Result<(), BluetoothError> {
-        Ok(self.device(id).connect().await?)
+        Ok(self.device(id).connect().compat().await?)
     }
 
     /// Disconnect from the Bluetooth device with the given D-Bus object path.
     pub async fn disconnect(&self, id: &DeviceId) -> Result<(), BluetoothError> {
-        Ok(self.device(id).disconnect().await?)
+        Ok(self.device(id).disconnect().compat().await?)
     }
 
     // TODO: Change this to lookup the path from the UUIDs instead.
@@ -248,7 +250,7 @@ impl BluetoothSession {
         characteristic_path: &str,
     ) -> Result<Vec<u8>, BluetoothError> {
         let characteristic = self.get_characteristic_proxy(id, characteristic_path);
-        Ok(characteristic.read_value(HashMap::new()).await?)
+        Ok(characteristic.read_value(HashMap::new()).compat().await?)
     }
 
     // TODO: Change this to lookup the path from the UUIDs instead.
@@ -263,6 +265,7 @@ impl BluetoothSession {
         let characteristic = self.get_characteristic_proxy(id, characteristic_path);
         Ok(characteristic
             .write_value(value.into(), HashMap::new())
+            .compat()
             .await?)
     }
 
@@ -274,7 +277,7 @@ impl BluetoothSession {
         characteristic_path: &str,
     ) -> Result<(), BluetoothError> {
         let characteristic = self.get_characteristic_proxy(id, characteristic_path);
-        characteristic.start_notify().await?;
+        characteristic.start_notify().compat().await?;
         Ok(())
     }
 
@@ -286,7 +289,7 @@ impl BluetoothSession {
         characteristic_path: &str,
     ) -> Result<(), BluetoothError> {
         let characteristic = self.get_characteristic_proxy(id, characteristic_path);
-        characteristic.stop_notify().await?;
+        characteristic.stop_notify().compat().await?;
         Ok(())
     }
 

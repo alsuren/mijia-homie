@@ -591,6 +591,7 @@ dependencies = [
  "serde_derive",
  "stable-eyre",
  "tokio 0.3.6",
+ "tokio-compat-02",
  "toml",
  "url",
 ]
@@ -863,6 +864,7 @@ dependencies = [
  "pretty_env_logger",
  "thiserror",
  "tokio 0.3.6",
+ "tokio-compat-02",
 ]
 
 [[package]]
@@ -1818,6 +1820,19 @@ dependencies = [
  "slab",
  "tokio-macros 0.3.2",
  "winapi 0.3.9",
+]
+
+[[package]]
+name = "tokio-compat-02"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bb4cec419b8b6f06c32e74aae6d8c5e79646d038a38e5ea2b36045f2c3296e22"
+dependencies = [
+ "bytes 0.5.6",
+ "once_cell",
+ "pin-project-lite 0.1.11",
+ "tokio 0.2.24",
+ "tokio 0.3.6",
 ]
 
 [[package]]
