@@ -51,7 +51,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     for _ in 0..3 {
         for &value in [true, false].iter() {
-            time::delay_for(Duration::from_secs(5)).await;
+            time::sleep(Duration::from_secs(5)).await;
             println!("Turning everything {}", if value { "on" } else { "off" });
             for device in controller.devices().values() {
                 for node in device.nodes.values() {

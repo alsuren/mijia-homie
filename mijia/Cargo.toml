@@ -17,7 +17,7 @@ futures = "0.3.8"
 itertools = "0.9.0"
 log = "0.4.11"
 thiserror = "1.0.22"
-tokio = "0.2.24"
+tokio = "0.3.6"
 
 [dev-dependencies]
 chrono = "0.4.19"

@@ -23,27 +23,27 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     let handle: JoinHandle<Result<(), Box<dyn Error + Send + Sync>>> = task::spawn(async move {
         println!("init");
 
-        time::delay_for(Duration::from_secs(5)).await;
+        time::sleep(Duration::from_secs(5)).await;
         homie.ready().await?;
         println!("ready");
 
-        time::delay_for(Duration::from_secs(5)).await;
+        time::sleep(Duration::from_secs(5)).await;
         homie.sleep().await?;
         println!("sleeping");
 
-        time::delay_for(Duration::from_secs(5)).await;
+        time::sleep(Duration::from_secs(5)).await;
         homie.ready().await?;
         println!("ready");
 
-        time::delay_for(Duration::from_secs(5)).await;
+        time::sleep(Duration::from_secs(5)).await;
         homie.alert().await?;
         println!("alert");
 
-        time::delay_for(Duration::from_secs(5)).await;
+        time::sleep(Duration::from_secs(5)).await;
         homie.ready().await?;
         println!("ready");
 
-        time::delay_for(Duration::from_secs(5)).await;
+        time::sleep(Duration::from_secs(5)).await;
         homie.disconnect().await?;
         println!("disconnected");
         Ok(())

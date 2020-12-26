@@ -274,7 +274,7 @@ async fn bluetooth_connection_loop(
                 action_sensor(state.clone(), session, &mac_address, connection_status).await?;
             }
         }
-        time::delay_for(CONNECT_INTERVAL).await;
+        time::sleep(CONNECT_INTERVAL).await;
     }
 }
 

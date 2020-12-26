@@ -11,7 +11,7 @@ use stable_eyre::eyre;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::task::{self, JoinHandle};
-use tokio::time::delay_for;
+use tokio::time::sleep;
 
 #[tokio::main]
 async fn main() -> Result<(), eyre::Report> {
@@ -66,7 +66,7 @@ fn spawn_homie_poll_loop(
                         e
                     );
                     if let PollError::Connection(ConnectionError::Io(_)) = e {
-                        delay_for(reconnect_interval).await;
+                        sleep(reconnect_interval).await;
                     }
                 }
             }

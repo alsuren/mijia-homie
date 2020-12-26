@@ -18,7 +18,7 @@ use std::str;
 use std::time::{Duration, Instant};
 use thiserror::Error;
 use tokio::task::{self, JoinError, JoinHandle};
-use tokio::time::delay_for;
+use tokio::time::sleep;
 
 mod types;
 pub use crate::types::{Datatype, Node, Property};
@@ -556,7 +556,7 @@ impl HomieStats {
                 self.publisher
                     .publish_retained("$stats/uptime", uptime.as_secs().to_string())
                     .await?;
-                delay_for(STATS_INTERVAL).await;
+                sleep(STATS_INTERVAL).await;
             }
         });
         task.map(|res| Ok(res??))
