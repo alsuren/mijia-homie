@@ -339,3 +339,14 @@ fn get_service_data(
             .collect(),
     )
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn device_adapter() {
+        let device_id = DeviceId::new("/org/bluez/hci0/dev_11_22_33_44_55_66");
+        assert_eq!(device_id.adapter(), "hci0");
+    }
+}
