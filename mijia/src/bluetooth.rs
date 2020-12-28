@@ -198,7 +198,9 @@ pub struct ServiceInfo {
     /// An opaque identifier for the service on the device, including a reference to which adapter
     /// it was discovered on.
     pub id: ServiceId,
+    /// The 128-bit UUID of the service.
     pub uuid: Uuid,
+    /// Whether this GATT service is a primary service.
     pub primary: bool,
 }
 
@@ -208,6 +210,7 @@ pub struct CharacteristicInfo {
     /// An opaque identifier for the characteristic on the device, including a reference to which
     /// adapter it was discovered on.
     pub id: CharacteristicId,
+    /// The 128-bit UUID of the characteristic.
     pub uuid: Uuid,
 }
 
