@@ -153,7 +153,7 @@ impl FromStr for MacAddress {
 }
 
 /// Information about a Bluetooth device which was discovered.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DeviceInfo {
     /// An opaque identifier for the device, including a reference to which adapter it was
     /// discovered on. This can be used to connect to it.
@@ -165,6 +165,25 @@ pub struct DeviceInfo {
     /// The GATT service data from the device's advertisement, if any. This is a map from the
     /// service UUID to its data.
     pub service_data: HashMap<String, Vec<u8>>,
+}
+
+/// Information about a GATT service on a Bluetooth device.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ServiceInfo {
+    /// An opaque identifier for the service on the device, including a reference to which adapter
+    /// it was discovered on.
+    pub id: ServiceId,
+    pub uuid: String,
+    pub primary: bool,
+}
+
+/// Information about a GATT characteristic on a Bluetooth device.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CharacteristicInfo {
+    /// An opaque identifier for the characteristic on the device, including a reference to which
+    /// adapter it was discovered on.
+    pub id: CharacteristicId,
+    pub uuid: String,
 }
 
 /// A connection to the Bluetooth daemon. This can be cheaply cloned and passed around to be used
@@ -282,46 +301,60 @@ impl BluetoothSession {
         Ok(sensors)
     }
 
-    pub async fn get_services(&self, device: &DeviceId) -> Result<Vec<ServiceId>, BluetoothError> {
+    /// Get a list of all GATT services which the given Bluetooth device offers.
+    ///
+    /// Note that this won't be filled in until the device is connected.
+    pub async fn get_services(
+        &self,
+        device: &DeviceId,
+    ) -> Result<Vec<ServiceInfo>, BluetoothError> {
         let introspection_xml = self.device(device).introspect().compat().await?;
         let device_node: Node = serde_xml_rs::from_str(&introspection_xml)?;
-        let services = device_node
-            .nodes
-            .iter()
-            .filter_map(|subnode| {
-                let subnode_name = subnode.name.as_ref().unwrap();
-                if subnode_name.starts_with("service") {
-                    Some(ServiceId {
-                        object_path: format!("{}/{}", device.object_path, subnode_name),
-                    })
-                } else {
-                    None
-                }
-            })
-            .collect();
+        let mut services = vec![];
+        for subnode in device_node.nodes {
+            let subnode_name = subnode.name.as_ref().unwrap();
+            if subnode_name.starts_with("service") {
+                let service_id = ServiceId {
+                    object_path: format!("{}/{}", device.object_path, subnode_name),
+                };
+                let service = self.service(&service_id);
+                let uuid = service.uuid().compat().await?;
+                let primary = service.primary().compat().await?;
+                services.push(ServiceInfo {
+                    id: service_id,
+                    uuid,
+                    primary,
+                });
+            }
+        }
         Ok(services)
     }
 
+    /// Get a list of all characteristics on the given GATT service.
     pub async fn get_characteristics(
         &self,
         service: &ServiceId,
-    ) -> Result<Vec<CharacteristicId>, BluetoothError> {
+    ) -> Result<Vec<CharacteristicInfo>, BluetoothError> {
         let introspection_xml = self.service(service).introspect().compat().await?;
         let service_node: Node = serde_xml_rs::from_str(&introspection_xml)?;
-        let characteristics = service_node
-            .nodes
-            .iter()
-            .filter_map(|subnode| {
-                let subnode_name = subnode.name.as_ref().unwrap();
-                if subnode_name.starts_with("char") {
-                    Some(CharacteristicId {
-                        object_path: format!("{}/{}", service.object_path, subnode_name),
-                    })
-                } else {
-                    None
-                }
-            })
-            .collect();
+        let mut characteristics = vec![];
+        for subnode in service_node.nodes {
+            let subnode_name = subnode.name.as_ref().unwrap();
+            if subnode_name.starts_with("char") {
+                let characteristic_id = CharacteristicId {
+                    object_path: format!("{}/{}", service.object_path, subnode_name),
+                };
+                let uuid = self
+                    .characteristic(&characteristic_id)
+                    .uuid()
+                    .compat()
+                    .await?;
+                characteristics.push(CharacteristicInfo {
+                    id: characteristic_id,
+                    uuid,
+                });
+            }
+        }
         Ok(characteristics)
     }
 
@@ -335,6 +368,18 @@ impl BluetoothSession {
     }
 
     fn service(&self, id: &ServiceId) -> impl OrgBluezGattService1 + Introspectable + Properties {
+        Proxy::new(
+            "org.bluez",
+            id.object_path.to_owned(),
+            DBUS_METHOD_CALL_TIMEOUT,
+            self.connection.clone(),
+        )
+    }
+
+    fn characteristic(
+        &self,
+        id: &CharacteristicId,
+    ) -> impl OrgBluezGattCharacteristic1 + Introspectable + Properties {
         Proxy::new(
             "org.bluez",
             id.object_path.to_owned(),
@@ -409,14 +454,11 @@ impl BluetoothSession {
         &self,
         id: &DeviceId,
         characteristic_path: &str,
-    ) -> Proxy<Arc<SyncConnection>> {
-        let full_path = id.object_path.to_string() + characteristic_path;
-        Proxy::new(
-            "org.bluez",
-            full_path,
-            DBUS_METHOD_CALL_TIMEOUT,
-            self.connection.clone(),
-        )
+    ) -> impl OrgBluezGattCharacteristic1 + Introspectable + Properties {
+        let characteristic_id = CharacteristicId {
+            object_path: id.object_path.to_string() + characteristic_path,
+        };
+        self.characteristic(&characteristic_id)
     }
 
     /// Get a stream of events for all devices.

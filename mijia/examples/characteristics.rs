@@ -24,7 +24,7 @@ async fn main() -> Result<(), eyre::Report> {
             println!("{}: {:?}", device.mac_address, device.id);
             println!("Services: {:#?}", services);
             for service in services {
-                let characteristics = session.get_characteristics(&service).await?;
+                let characteristics = session.get_characteristics(&service.id).await?;
                 println!(
                     "Service {:?} characteristics: {:#?}",
                     service, characteristics
