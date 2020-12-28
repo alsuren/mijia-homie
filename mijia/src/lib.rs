@@ -11,6 +11,7 @@ pub mod bluetooth;
 mod bluetooth_event;
 mod decode;
 mod introspect;
+use bluetooth::CharacteristicInfo;
 pub use bluetooth::{BluetoothError, BluetoothSession, DeviceId, MacAddress, SpawnError};
 use bluetooth_event::BluetoothEvent;
 pub use decode::comfort_level::ComfortLevel;
@@ -22,16 +23,19 @@ use decode::time::{decode_time, encode_time};
 pub use decode::{DecodeError, EncodeError};
 
 const MIJIA_NAME: &str = "LYWSD03MMC";
-const CLOCK_CHARACTERISTIC_PATH: &str = "/service0021/char0022";
-const HISTORY_RANGE_CHARACTERISTIC_PATH: &str = "/service0021/char0025";
-const HISTORY_INDEX_CHARACTERISTIC_PATH: &str = "/service0021/char0028";
-const HISTORY_LAST_RECORD_CHARACTERISTIC_PATH: &str = "/service0021/char002b";
+const SERVICE_UUID: &str = "ebe0ccb0-7a0a-4b0c-8a1a-6ff2997da3a6";
+const CLOCK_CHARACTERISTIC_UUID: &str = "ebe0ccb7-7a0a-4b0c-8a1a-6ff2997da3a6";
+const HISTORY_RANGE_CHARACTERISTIC_UUID: &str = "ebe0ccb9-7a0a-4b0c-8a1a-6ff2997da3a6";
+const HISTORY_INDEX_CHARACTERISTIC_UUID: &str = "ebe0ccba-7a0a-4b0c-8a1a-6ff2997da3a6";
 const HISTORY_RECORDS_CHARACTERISTIC_PATH: &str = "/service0021/char002e";
-const TEMPERATURE_UNIT_CHARACTERISTIC_PATH: &str = "/service0021/char0032";
+const HISTORY_LAST_RECORD_CHARACTERISTIC_UUID: &str = "ebe0ccbb-7a0a-4b0c-8a1a-6ff2997da3a6";
+const HISTORY_RECORDS_CHARACTERISTIC_UUID: &str = "ebe0ccbc-7a0a-4b0c-8a1a-6ff2997da3a6";
+const TEMPERATURE_UNIT_CHARACTERISTIC_UUID: &str = "ebe0ccbe-7a0a-4b0c-8a1a-6ff2997da3a6";
 const SENSOR_READING_CHARACTERISTIC_PATH: &str = "/service0021/char0035";
-const HISTORY_DELETE_CHARACTERISTIC_PATH: &str = "/service0021/char003f";
-const COMFORT_LEVEL_CHARACTERISTIC_PATH: &str = "/service0021/char0042";
-const CONNECTION_INTERVAL_CHARACTERISTIC_PATH: &str = "/service0021/char0045";
+const SENSOR_READING_CHARACTERISTIC_UUID: &str = "ebe0ccc1-7a0a-4b0c-8a1a-6ff2997da3a6";
+const HISTORY_DELETE_CHARACTERISTIC_UUID: &str = "ebe0ccd1-7a0a-4b0c-8a1a-6ff2997da3a6";
+const COMFORT_LEVEL_CHARACTERISTIC_UUID: &str = "ebe0ccd7-7a0a-4b0c-8a1a-6ff2997da3a6";
+const CONNECTION_INTERVAL_CHARACTERISTIC_UUID: &str = "ebe0ccd8-7a0a-4b0c-8a1a-6ff2997da3a6";
 /// 500 in little-endian
 const CONNECTION_INTERVAL_500_MS: [u8; 3] = [0xF4, 0x01, 0x00];
 const HISTORY_DELETE_VALUE: [u8; 1] = [0x01];
@@ -50,6 +54,17 @@ pub enum MijiaError {
     /// The error was with encoding a value to send to a sensor.
     #[error(transparent)]
     Encoding(#[from] EncodeError),
+    /// The error was with finding a service or characteristic by UUID.
+    #[error("Service or characteristic UUID {uuid} not found.")]
+    UUIDNotFound { uuid: String },
+}
+
+impl MijiaError {
+    fn uuid_not_found(uuid: &str) -> Self {
+        MijiaError::UUIDNotFound {
+            uuid: uuid.to_owned(),
+        }
+    }
 }
 
 /// The MAC address and opaque connection ID of a Mijia sensor which was discovered.
@@ -169,9 +184,12 @@ impl MijiaSession {
 
     /// Get the current time of the sensor.
     pub async fn get_time(&self, id: &DeviceId) -> Result<SystemTime, MijiaError> {
+        let characteristic = self
+            .get_characteristic(id, CLOCK_CHARACTERISTIC_UUID)
+            .await?;
         let value = self
             .bt_session
-            .read_characteristic_value(id, CLOCK_CHARACTERISTIC_PATH)
+            .read_characteristic_value(&characteristic.id)
             .await?;
         Ok(decode_time(&value)?)
     }
@@ -179,17 +197,23 @@ impl MijiaSession {
     /// Set the current time of the sensor.
     pub async fn set_time(&self, id: &DeviceId, time: SystemTime) -> Result<(), MijiaError> {
         let time_bytes = encode_time(time)?;
+        let characteristic = self
+            .get_characteristic(id, CLOCK_CHARACTERISTIC_UUID)
+            .await?;
         Ok(self
             .bt_session
-            .write_characteristic_value(id, CLOCK_CHARACTERISTIC_PATH, time_bytes)
+            .write_characteristic_value(&characteristic.id, time_bytes)
             .await?)
     }
 
     /// Get the temperature unit which the sensor uses for its display.
     pub async fn get_temperature_unit(&self, id: &DeviceId) -> Result<TemperatureUnit, MijiaError> {
+        let characteristic = self
+            .get_characteristic(id, TEMPERATURE_UNIT_CHARACTERISTIC_UUID)
+            .await?;
         let value = self
             .bt_session
-            .read_characteristic_value(id, TEMPERATURE_UNIT_CHARACTERISTIC_PATH)
+            .read_characteristic_value(&characteristic.id)
             .await?;
         Ok(TemperatureUnit::decode(&value)?)
     }
@@ -199,18 +223,24 @@ impl MijiaSession {
         &self,
         id: &DeviceId,
         unit: TemperatureUnit,
-    ) -> Result<(), BluetoothError> {
+    ) -> Result<(), MijiaError> {
+        let characteristic = self
+            .get_characteristic(id, TEMPERATURE_UNIT_CHARACTERISTIC_UUID)
+            .await?;
         Ok(self
             .bt_session
-            .write_characteristic_value(id, TEMPERATURE_UNIT_CHARACTERISTIC_PATH, unit.encode())
+            .write_characteristic_value(&characteristic.id, unit.encode())
             .await?)
     }
 
     /// Get the comfort level configuration which determines when the sensor displays a happy face.
     pub async fn get_comfort_level(&self, id: &DeviceId) -> Result<ComfortLevel, MijiaError> {
+        let characteristic = self
+            .get_characteristic(id, COMFORT_LEVEL_CHARACTERISTIC_UUID)
+            .await?;
         let value = self
             .bt_session
-            .read_characteristic_value(id, COMFORT_LEVEL_CHARACTERISTIC_PATH)
+            .read_characteristic_value(&characteristic.id)
             .await?;
         Ok(ComfortLevel::decode(&value)?)
     }
@@ -221,34 +251,36 @@ impl MijiaSession {
         id: &DeviceId,
         comfort_level: &ComfortLevel,
     ) -> Result<(), MijiaError> {
+        let characteristic = self
+            .get_characteristic(id, COMFORT_LEVEL_CHARACTERISTIC_UUID)
+            .await?;
         Ok(self
             .bt_session
-            .write_characteristic_value(
-                id,
-                COMFORT_LEVEL_CHARACTERISTIC_PATH,
-                comfort_level.encode()?,
-            )
+            .write_characteristic_value(&characteristic.id, comfort_level.encode()?)
             .await?)
     }
 
     /// Get the range of indices for historical data stored on the sensor.
     pub async fn get_history_range(&self, id: &DeviceId) -> Result<Range<u32>, MijiaError> {
+        let characteristic = self
+            .get_characteristic(id, HISTORY_RANGE_CHARACTERISTIC_UUID)
+            .await?;
         let value = self
             .bt_session
-            .read_characteristic_value(id, HISTORY_RANGE_CHARACTERISTIC_PATH)
+            .read_characteristic_value(&characteristic.id)
             .await?;
         Ok(decode_range(&value)?)
     }
 
     /// Delete all historical data stored on the sensor.
-    pub async fn delete_history(&self, id: &DeviceId) -> Result<(), BluetoothError> {
-        self.bt_session
-            .write_characteristic_value(
-                id,
-                HISTORY_DELETE_CHARACTERISTIC_PATH,
-                HISTORY_DELETE_VALUE,
-            )
-            .await
+    pub async fn delete_history(&self, id: &DeviceId) -> Result<(), MijiaError> {
+        let characteristic = self
+            .get_characteristic(id, HISTORY_DELETE_CHARACTERISTIC_UUID)
+            .await?;
+        Ok(self
+            .bt_session
+            .write_characteristic_value(&characteristic.id, HISTORY_DELETE_VALUE)
+            .await?)
     }
 
     /// Get the last historical record stored on the sensor.
@@ -256,9 +288,12 @@ impl MijiaSession {
         &self,
         id: &DeviceId,
     ) -> Result<HistoryRecord, MijiaError> {
+        let characteristic = self
+            .get_characteristic(id, HISTORY_LAST_RECORD_CHARACTERISTIC_UUID)
+            .await?;
         let value = self
             .bt_session
-            .read_characteristic_value(id, HISTORY_LAST_RECORD_CHARACTERISTIC_PATH)
+            .read_characteristic_value(&characteristic.id)
             .await?;
         Ok(HistoryRecord::decode(&value)?)
     }
@@ -273,26 +308,42 @@ impl MijiaSession {
         &self,
         id: &DeviceId,
         start_index: Option<u32>,
-    ) -> Result<(), BluetoothError> {
+    ) -> Result<(), MijiaError> {
+        let service = self
+            .bt_session
+            .get_service_by_uuid(id, SERVICE_UUID)
+            .await?
+            .ok_or_else(|| MijiaError::uuid_not_found(SERVICE_UUID))?;
+        let history_records_characteristic = self
+            .bt_session
+            .get_characteristic_by_uuid(&service.id, HISTORY_RECORDS_CHARACTERISTIC_UUID)
+            .await?
+            .ok_or_else(|| MijiaError::uuid_not_found(HISTORY_RECORDS_CHARACTERISTIC_UUID))?;
         if let Some(start_index) = start_index {
+            let history_index_characteristic = self
+                .bt_session
+                .get_characteristic_by_uuid(&service.id, HISTORY_INDEX_CHARACTERISTIC_UUID)
+                .await?
+                .ok_or_else(|| MijiaError::uuid_not_found(HISTORY_INDEX_CHARACTERISTIC_UUID))?;
             self.bt_session
                 .write_characteristic_value(
-                    id,
-                    HISTORY_INDEX_CHARACTERISTIC_PATH,
+                    &history_index_characteristic.id,
                     start_index.to_le_bytes(),
                 )
                 .await?
         }
-        self.bt_session
-            .start_notify(id, HISTORY_RECORDS_CHARACTERISTIC_PATH)
-            .await
+        Ok(self
+            .bt_session
+            .start_notify(&history_records_characteristic.id)
+            .await?)
     }
 
     /// Stop receiving historical records from the sensor.
-    pub async fn stop_notify_history(&self, id: &DeviceId) -> Result<(), BluetoothError> {
-        self.bt_session
-            .stop_notify(id, HISTORY_RECORDS_CHARACTERISTIC_PATH)
-            .await
+    pub async fn stop_notify_history(&self, id: &DeviceId) -> Result<(), MijiaError> {
+        let characteristic = self
+            .get_characteristic(id, HISTORY_RECORDS_CHARACTERISTIC_UUID)
+            .await?;
+        Ok(self.bt_session.stop_notify(&characteristic.id).await?)
     }
 
     /// Try to get all historical records for the sensor.
@@ -344,14 +395,28 @@ impl MijiaSession {
     /// connection interval to save power.
     ///
     /// Notifications will be delivered as events by `MijiaSession::event_stream()`.
-    pub async fn start_notify_sensor(&self, id: &DeviceId) -> Result<(), BluetoothError> {
+    pub async fn start_notify_sensor(&self, id: &DeviceId) -> Result<(), MijiaError> {
+        let service = self
+            .bt_session
+            .get_service_by_uuid(id, SERVICE_UUID)
+            .await?
+            .ok_or_else(|| MijiaError::uuid_not_found(SERVICE_UUID))?;
+        let sensor_reading_characteristic = self
+            .bt_session
+            .get_characteristic_by_uuid(&service.id, SENSOR_READING_CHARACTERISTIC_UUID)
+            .await?
+            .ok_or_else(|| MijiaError::uuid_not_found(SENSOR_READING_CHARACTERISTIC_UUID))?;
+        let connection_interval_characteristic = self
+            .bt_session
+            .get_characteristic_by_uuid(&service.id, CONNECTION_INTERVAL_CHARACTERISTIC_UUID)
+            .await?
+            .ok_or_else(|| MijiaError::uuid_not_found(CONNECTION_INTERVAL_CHARACTERISTIC_UUID))?;
         self.bt_session
-            .start_notify(id, SENSOR_READING_CHARACTERISTIC_PATH)
+            .start_notify(&sensor_reading_characteristic.id)
             .await?;
         self.bt_session
             .write_characteristic_value(
-                id,
-                CONNECTION_INTERVAL_CHARACTERISTIC_PATH,
+                &connection_interval_characteristic.id,
                 CONNECTION_INTERVAL_500_MS,
             )
             .await?;
@@ -362,5 +427,23 @@ impl MijiaSession {
     pub async fn event_stream(&self) -> Result<impl Stream<Item = MijiaEvent>, BluetoothError> {
         let events = self.bt_session.event_stream().await?;
         Ok(events.filter_map(MijiaEvent::from))
+    }
+
+    async fn get_characteristic(
+        &self,
+        id: &DeviceId,
+        characteristic_uuid: &str,
+    ) -> Result<CharacteristicInfo, MijiaError> {
+        let service = self
+            .bt_session
+            .get_service_by_uuid(id, SERVICE_UUID)
+            .await?
+            .ok_or_else(|| MijiaError::uuid_not_found(SERVICE_UUID))?;
+        let characteristic = self
+            .bt_session
+            .get_characteristic_by_uuid(&service.id, characteristic_uuid)
+            .await?
+            .ok_or_else(|| MijiaError::uuid_not_found(characteristic_uuid))?;
+        Ok(characteristic)
     }
 }
