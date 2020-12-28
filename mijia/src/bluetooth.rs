@@ -1,11 +1,13 @@
+use crate::bluetooth_event::BluetoothEvent;
 use crate::DBUS_METHOD_CALL_TIMEOUT;
 use bluez_generated::{OrgBluezAdapter1, OrgBluezDevice1, OrgBluezGattCharacteristic1};
 use core::fmt::Debug;
 use core::future::Future;
 use dbus::arg::{RefArg, Variant};
 use dbus::nonblock::stdintf::org_freedesktop_dbus::ObjectManager;
+use dbus::nonblock::MsgMatch;
 use dbus::nonblock::{Proxy, SyncConnection};
-use futures::FutureExt;
+use futures::{FutureExt, Stream};
 use itertools::Itertools;
 use std::collections::HashMap;
 use std::error::Error;
@@ -13,6 +15,7 @@ use std::fmt::{self, Display, Formatter};
 use std::str::FromStr;
 use std::sync::Arc;
 use thiserror::Error;
+use tokio::stream::StreamExt;
 use tokio::task::JoinError;
 use tokio_compat_02::FutureExt as _;
 
@@ -305,6 +308,37 @@ impl BluetoothSession {
             DBUS_METHOD_CALL_TIMEOUT,
             self.connection.clone(),
         )
+    }
+
+    /// Get a stream of events for all devices.
+    ///
+    /// If the `MsgMatch` is dropped then the `Stream` will close. To clean up properly, call
+    /// `remove_event_stream_match` with the `MsgMatch` once the stream is no longer needed.
+    pub async fn event_stream(
+        &self,
+    ) -> Result<(MsgMatch, impl Stream<Item = BluetoothEvent>), BluetoothError> {
+        let mut rule = dbus::message::MatchRule::new();
+        rule.msg_type = Some(dbus::message::MessageType::Signal);
+        // BusName validation just checks that the length and format is valid, so it should never
+        // fail for a constant that we know is valid.
+        rule.sender = Some(dbus::strings::BusName::new("org.bluez").unwrap());
+
+        let (msg_match, events) = self.connection.add_match(rule).compat().await?.msg_stream();
+
+        Ok((msg_match, events.filter_map(BluetoothEvent::from)))
+    }
+
+    /// Remove a match previously added by `event_stream()`. This should be called when the stream
+    /// is no longer needed.
+    pub async fn remove_event_stream_match(
+        &self,
+        msg_match: &MsgMatch,
+    ) -> Result<(), BluetoothError> {
+        self.connection
+            .remove_match(msg_match.token())
+            .compat()
+            .await
+            .map_err(BluetoothError::DbusError)
     }
 }
 

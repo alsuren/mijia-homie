@@ -49,8 +49,7 @@ async fn main() -> Result<(), Report> {
     }
     session
         .bt_session
-        .connection
-        .remove_match(msg_match.token())
+        .remove_event_stream_match(&msg_match)
         .await?;
 
     Ok(())

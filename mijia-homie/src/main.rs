@@ -468,8 +468,7 @@ async fn service_bluetooth_event_queue(
 
     session
         .bt_session
-        .connection
-        .remove_match(msg_match.token())
+        .remove_event_stream_match(&msg_match)
         .await?;
     // This should be unreachable, because the events Stream should never end,
     // unless something has gone horribly wrong (or msg_match got dropped?)

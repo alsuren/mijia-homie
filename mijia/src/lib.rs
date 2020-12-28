@@ -2,13 +2,11 @@
 
 use core::future::Future;
 use dbus::nonblock::MsgMatch;
-use dbus::Message;
 use futures::Stream;
 use std::ops::Range;
 use std::time::{Duration, SystemTime};
 use thiserror::Error;
 use tokio::stream::StreamExt;
-use tokio_compat_02::FutureExt;
 
 pub mod bluetooth;
 mod bluetooth_event;
@@ -77,9 +75,9 @@ pub enum MijiaEvent {
 }
 
 impl MijiaEvent {
-    fn from(conn_msg: Message) -> Option<Self> {
-        match BluetoothEvent::from(conn_msg) {
-            Some(BluetoothEvent::Value { object_path, value }) => {
+    fn from(event: BluetoothEvent) -> Option<Self> {
+        match event {
+            BluetoothEvent::Value { object_path, value } => {
                 if let Some(object_path) =
                     object_path.strip_suffix(SENSOR_READING_CHARACTERISTIC_PATH)
                 {
@@ -115,10 +113,10 @@ impl MijiaEvent {
                     None
                 }
             }
-            Some(BluetoothEvent::Connected {
+            BluetoothEvent::Connected {
                 object_path,
                 connected: false,
-            }) => Some(MijiaEvent::Disconnected {
+            } => Some(MijiaEvent::Disconnected {
                 id: DeviceId { object_path },
             }),
             _ => None,
@@ -338,11 +336,8 @@ impl MijiaSession {
 
         self.stop_notify_history(&id).await?;
         self.bt_session
-            .connection
-            .remove_match(msg_match.token())
-            .compat()
-            .await
-            .map_err(BluetoothError::DbusError)?;
+            .remove_event_stream_match(&msg_match)
+            .await?;
 
         Ok(history)
     }
@@ -372,20 +367,7 @@ impl MijiaSession {
     pub async fn event_stream(
         &self,
     ) -> Result<(MsgMatch, impl Stream<Item = MijiaEvent>), BluetoothError> {
-        let mut rule = dbus::message::MatchRule::new();
-        rule.msg_type = Some(dbus::message::MessageType::Signal);
-        // BusName validation just checks that the length and format is valid, so it should never
-        // fail for a constant that we know is valid.
-        rule.sender = Some(dbus::strings::BusName::new("org.bluez").unwrap());
-
-        let (msg_match, events) = self
-            .bt_session
-            .connection
-            .add_match(rule)
-            .compat()
-            .await?
-            .msg_stream();
-
-        Ok((msg_match, Box::pin(events.filter_map(MijiaEvent::from))))
+        let (msg_match, events) = self.bt_session.event_stream().await?;
+        Ok((msg_match, events.filter_map(MijiaEvent::from)))
     }
 }
