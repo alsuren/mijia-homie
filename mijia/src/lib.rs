@@ -80,13 +80,17 @@ pub enum MijiaEvent {
 impl MijiaEvent {
     fn from(event: BluetoothEvent) -> Option<Self> {
         match event {
-            BluetoothEvent::Value { object_path, value } => {
-                if let Some(object_path) =
-                    object_path.strip_suffix(SENSOR_READING_CHARACTERISTIC_PATH)
+            BluetoothEvent::Value {
+                characteristic,
+                value,
+            } => {
+                if let Some(device_path) = characteristic
+                    .object_path
+                    .strip_suffix(SENSOR_READING_CHARACTERISTIC_PATH)
                 {
                     match Readings::decode(&value) {
                         Ok(readings) => Some(MijiaEvent::Readings {
-                            id: DeviceId::new(object_path),
+                            id: DeviceId::new(device_path),
                             readings,
                         }),
                         Err(e) => {
@@ -94,12 +98,13 @@ impl MijiaEvent {
                             None
                         }
                     }
-                } else if let Some(object_path) =
-                    object_path.strip_suffix(HISTORY_RECORDS_CHARACTERISTIC_PATH)
+                } else if let Some(device_path) = characteristic
+                    .object_path
+                    .strip_suffix(HISTORY_RECORDS_CHARACTERISTIC_PATH)
                 {
                     match HistoryRecord::decode(&value) {
                         Ok(record) => Some(MijiaEvent::HistoryRecord {
-                            id: DeviceId::new(object_path),
+                            id: DeviceId::new(device_path),
                             record,
                         }),
                         Err(e) => {
@@ -109,19 +114,17 @@ impl MijiaEvent {
                     }
                 } else {
                     log::trace!(
-                        "Got BluetoothEvent::Value for object path {} with value {:?}",
-                        object_path,
+                        "Got BluetoothEvent::Value for characteristic {:?} with value {:?}",
+                        characteristic,
                         value
                     );
                     None
                 }
             }
             BluetoothEvent::Connected {
-                object_path,
+                device,
                 connected: false,
-            } => Some(MijiaEvent::Disconnected {
-                id: DeviceId { object_path },
-            }),
+            } => Some(MijiaEvent::Disconnected { id: device }),
             _ => None,
         }
     }
