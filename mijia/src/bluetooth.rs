@@ -358,6 +358,33 @@ impl BluetoothSession {
         Ok(characteristics)
     }
 
+    /// Find a GATT service with the given UUID advertised by the given device, if any.
+    ///
+    /// Note that this generally won't work until the device is connected.
+    pub async fn get_service_by_uuid(
+        &self,
+        device: &DeviceId,
+        uuid: &str,
+    ) -> Result<Option<ServiceInfo>, BluetoothError> {
+        let services = self.get_services(device).await?;
+        Ok(services
+            .into_iter()
+            .find(|service_info| service_info.uuid == uuid))
+    }
+
+    /// Find a characteristic with the given UUID as part of the given GATT service advertised by a
+    /// device, if there is any.
+    pub async fn get_characteristic_by_uuid(
+        &self,
+        service: &ServiceId,
+        uuid: &str,
+    ) -> Result<Option<CharacteristicInfo>, BluetoothError> {
+        let characteristics = self.get_characteristics(service).await?;
+        Ok(characteristics
+            .into_iter()
+            .find(|characteristic_info| characteristic_info.uuid == uuid))
+    }
+
     fn device(&self, id: &DeviceId) -> impl OrgBluezDevice1 + Introspectable + Properties {
         Proxy::new(
             "org.bluez",
