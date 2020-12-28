@@ -22,11 +22,11 @@ async fn main() -> Result<(), eyre::Report> {
         let services = session.get_services(&device.id).await?;
         if !services.is_empty() {
             println!("{}: {:?}", device.mac_address, device.id);
-            println!("Services: {:?}", services);
+            println!("Services: {:#?}", services);
             for service in services {
                 let characteristics = session.get_characteristics(&service).await?;
                 println!(
-                    "Service {:?} characteristics: {:?}",
+                    "Service {:?} characteristics: {:#?}",
                     service, characteristics
                 );
             }
