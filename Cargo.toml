@@ -1,6 +1,7 @@
 [workspace]
 
 members = [
+    "bluez-async",
     "bluez-generated",
     "homie-controller",
     "homie-device",

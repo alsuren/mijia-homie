@@ -254,6 +254,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "bluez-async"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "bitflags",
+ "bluez-generated",
+ "dbus",
+ "dbus-tokio",
+ "eyre",
+ "futures",
+ "itertools 0.10.0",
+ "log",
+ "pretty_env_logger",
+ "serde",
+ "serde-xml-rs",
+ "serde_derive",
+ "thiserror",
+ "tokio 1.0.1",
+ "uuid",
+]
+
+[[package]]
 name = "bluez-generated"
 version = "0.2.0"
 dependencies = [
@@ -1231,20 +1253,12 @@ dependencies = [
 name = "mijia"
 version = "0.2.0"
 dependencies = [
- "async-trait",
- "bitflags",
- "bluez-generated",
+ "bluez-async",
  "chrono",
- "dbus",
- "dbus-tokio",
  "eyre",
  "futures",
- "itertools 0.10.0",
  "log",
  "pretty_env_logger",
- "serde",
- "serde-xml-rs",
- "serde_derive",
  "thiserror",
  "tokio 1.0.1",
  "tokio-stream",
