@@ -38,6 +38,17 @@ pub enum BluetoothError {
     /// Error parsing XML for introspection.
     #[error("Error parsing XML for introspection: {0}")]
     XmlParseError(#[from] serde_xml_rs::Error),
+    /// No service or characteristic was found for some UUID.
+    #[error("Service or characteristic UUID {uuid} not found.")]
+    UUIDNotFound { uuid: String },
+}
+
+impl BluetoothError {
+    fn uuid_not_found(uuid: &str) -> Self {
+        Self::UUIDNotFound {
+            uuid: uuid.to_owned(),
+        }
+    }
 }
 
 /// Error type for futures representing tasks spawned by this crate.
@@ -365,11 +376,12 @@ impl BluetoothSession {
         &self,
         device: &DeviceId,
         uuid: &str,
-    ) -> Result<Option<ServiceInfo>, BluetoothError> {
+    ) -> Result<ServiceInfo, BluetoothError> {
         let services = self.get_services(device).await?;
-        Ok(services
+        services
             .into_iter()
-            .find(|service_info| service_info.uuid == uuid))
+            .find(|service_info| service_info.uuid == uuid)
+            .ok_or_else(|| BluetoothError::uuid_not_found(uuid))
     }
 
     /// Find a characteristic with the given UUID as part of the given GATT service advertised by a
@@ -378,11 +390,27 @@ impl BluetoothSession {
         &self,
         service: &ServiceId,
         uuid: &str,
-    ) -> Result<Option<CharacteristicInfo>, BluetoothError> {
+    ) -> Result<CharacteristicInfo, BluetoothError> {
         let characteristics = self.get_characteristics(service).await?;
-        Ok(characteristics
+        characteristics
             .into_iter()
-            .find(|characteristic_info| characteristic_info.uuid == uuid))
+            .find(|characteristic_info| characteristic_info.uuid == uuid)
+            .ok_or_else(|| BluetoothError::uuid_not_found(uuid))
+    }
+
+    /// Convenience method to get a GATT charactacteristic with the given UUID advertised by a
+    /// device as part of the given service.
+    ///
+    /// This is equivalent to calling `get_service_by_uuid` and then `get_characteristic_by_uuid`.
+    pub async fn get_service_characteristic_by_uuid(
+        &self,
+        device: &DeviceId,
+        service_uuid: &str,
+        characteristic_uuid: &str,
+    ) -> Result<CharacteristicInfo, BluetoothError> {
+        let service = self.get_service_by_uuid(device, service_uuid).await?;
+        self.get_characteristic_by_uuid(&service.id, characteristic_uuid)
+            .await
     }
 
     fn device(&self, id: &DeviceId) -> impl OrgBluezDevice1 + Introspectable + Properties {
