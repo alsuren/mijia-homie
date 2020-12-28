@@ -10,6 +10,7 @@ use tokio::stream::StreamExt;
 pub mod bluetooth;
 mod bluetooth_event;
 mod decode;
+mod introspect;
 pub use bluetooth::{BluetoothError, BluetoothSession, DeviceId, MacAddress, SpawnError};
 use bluetooth_event::BluetoothEvent;
 pub use decode::comfort_level::ComfortLevel;

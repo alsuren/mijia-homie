@@ -1,10 +1,13 @@
 use crate::bluetooth_event::BluetoothEvent;
+use crate::introspect::Node;
 use crate::DBUS_METHOD_CALL_TIMEOUT;
-use bluez_generated::{OrgBluezAdapter1, OrgBluezDevice1, OrgBluezGattCharacteristic1};
+use bluez_generated::{
+    OrgBluezAdapter1, OrgBluezDevice1, OrgBluezGattCharacteristic1, OrgBluezGattService1,
+};
 use core::fmt::Debug;
 use core::future::Future;
 use dbus::arg::{RefArg, Variant};
-use dbus::nonblock::stdintf::org_freedesktop_dbus::ObjectManager;
+use dbus::nonblock::stdintf::org_freedesktop_dbus::{Introspectable, ObjectManager, Properties};
 use dbus::nonblock::MsgMatch;
 use dbus::nonblock::{Proxy, SyncConnection};
 use dbus::Message;
@@ -32,6 +35,9 @@ pub enum BluetoothError {
     /// There was an error talking to the BlueZ daemon over D-Bus.
     #[error(transparent)]
     DbusError(#[from] dbus::Error),
+    /// Error parsing XML for introspection.
+    #[error("Error parsing XML for introspection: {0}")]
+    XmlParseError(#[from] serde_xml_rs::Error),
 }
 
 /// Error type for futures representing tasks spawned by this crate.
@@ -61,6 +67,53 @@ impl DeviceId {
     /// Get the ID of the Bluetooth adapter on which this device was discovered, e.g. `"hci0"`.
     pub fn adapter(&self) -> &str {
         self.object_path.split('/').nth(3).unwrap()
+    }
+}
+
+/// Opaque identifier for a GATT service on a Bluetooth device.
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct ServiceId {
+    pub(crate) object_path: String,
+}
+
+impl ServiceId {
+    pub(crate) fn new(object_path: &str) -> Self {
+        Self {
+            object_path: object_path.to_owned(),
+        }
+    }
+
+    /// Get the ID of the device on which this service was advertised.
+    pub fn device(&self) -> DeviceId {
+        let index = self
+            .object_path
+            .rfind('/')
+            .expect("ServiceId object_path doesn't contain a slash.");
+        DeviceId::new(&self.object_path[0..index])
+    }
+}
+
+/// Opaque identifier for a GATT characteristic on a Bluetooth device.
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct CharacteristicId {
+    pub(crate) object_path: String,
+}
+
+impl CharacteristicId {
+    #[cfg(test)]
+    pub(crate) fn new(object_path: &str) -> Self {
+        Self {
+            object_path: object_path.to_owned(),
+        }
+    }
+
+    /// Get the ID of the service on which this characteristic was advertised.
+    pub fn service(&self) -> ServiceId {
+        let index = self
+            .object_path
+            .rfind('/')
+            .expect("CharacteristicId object_path doesn't contain a slash.");
+        ServiceId::new(&self.object_path[0..index])
     }
 }
 
@@ -229,7 +282,59 @@ impl BluetoothSession {
         Ok(sensors)
     }
 
-    fn device(&self, id: &DeviceId) -> impl OrgBluezDevice1 {
+    pub async fn get_services(&self, device: &DeviceId) -> Result<Vec<ServiceId>, BluetoothError> {
+        let introspection_xml = self.device(device).introspect().compat().await?;
+        let device_node: Node = serde_xml_rs::from_str(&introspection_xml)?;
+        let services = device_node
+            .nodes
+            .iter()
+            .filter_map(|subnode| {
+                let subnode_name = subnode.name.as_ref().unwrap();
+                if subnode_name.starts_with("service") {
+                    Some(ServiceId {
+                        object_path: format!("{}/{}", device.object_path, subnode_name),
+                    })
+                } else {
+                    None
+                }
+            })
+            .collect();
+        Ok(services)
+    }
+
+    pub async fn get_characteristics(
+        &self,
+        service: &ServiceId,
+    ) -> Result<Vec<CharacteristicId>, BluetoothError> {
+        let introspection_xml = self.service(service).introspect().compat().await?;
+        let service_node: Node = serde_xml_rs::from_str(&introspection_xml)?;
+        let characteristics = service_node
+            .nodes
+            .iter()
+            .filter_map(|subnode| {
+                let subnode_name = subnode.name.as_ref().unwrap();
+                if subnode_name.starts_with("char") {
+                    Some(CharacteristicId {
+                        object_path: format!("{}/{}", service.object_path, subnode_name),
+                    })
+                } else {
+                    None
+                }
+            })
+            .collect();
+        Ok(characteristics)
+    }
+
+    fn device(&self, id: &DeviceId) -> impl OrgBluezDevice1 + Introspectable + Properties {
+        Proxy::new(
+            "org.bluez",
+            id.object_path.to_owned(),
+            DBUS_METHOD_CALL_TIMEOUT,
+            self.connection.clone(),
+        )
+    }
+
+    fn service(&self, id: &ServiceId) -> impl OrgBluezGattService1 + Introspectable + Properties {
         Proxy::new(
             "org.bluez",
             id.object_path.to_owned(),
@@ -409,5 +514,20 @@ mod tests {
     fn device_adapter() {
         let device_id = DeviceId::new("/org/bluez/hci0/dev_11_22_33_44_55_66");
         assert_eq!(device_id.adapter(), "hci0");
+    }
+
+    #[test]
+    fn service_device() {
+        let device_id = DeviceId::new("/org/bluez/hci0/dev_11_22_33_44_55_66");
+        let service_id = ServiceId::new("/org/bluez/hci0/dev_11_22_33_44_55_66/service0022");
+        assert_eq!(service_id.device(), device_id);
+    }
+
+    #[test]
+    fn characteristic_service() {
+        let service_id = ServiceId::new("/org/bluez/hci0/dev_11_22_33_44_55_66/service0022");
+        let characteristic_id =
+            CharacteristicId::new("/org/bluez/hci0/dev_11_22_33_44_55_66/service0022/char0033");
+        assert_eq!(characteristic_id.service(), service_id);
     }
 }
