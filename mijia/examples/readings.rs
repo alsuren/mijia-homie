@@ -16,7 +16,7 @@ async fn main() -> Result<(), Report> {
     let filters = parse_args()?;
 
     let (_, session) = MijiaSession::new().await?;
-    let (msg_match, mut events) = session.event_stream().await?;
+    let mut events = session.event_stream().await?;
 
     // Start scanning for Bluetooth devices, and wait a while for some to be discovered.
     session.bt_session.start_discovery().await?;
@@ -47,10 +47,6 @@ async fn main() -> Result<(), Report> {
             _ => println!("Event: {:?}", event),
         }
     }
-    session
-        .bt_session
-        .remove_event_stream_match(&msg_match)
-        .await?;
 
     Ok(())
 }

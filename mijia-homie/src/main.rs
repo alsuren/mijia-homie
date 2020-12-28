@@ -459,19 +459,15 @@ async fn service_bluetooth_event_queue(
     session: &MijiaSession,
 ) -> Result<(), eyre::Report> {
     println!("Subscribing to events");
-    let (msg_match, mut events) = session.event_stream().await?;
+    let mut events = session.event_stream().await?;
     println!("Processing events");
 
     while let Some(event) = events.next().await {
         handle_bluetooth_event(state.clone(), event).await?
     }
 
-    session
-        .bt_session
-        .remove_event_stream_match(&msg_match)
-        .await?;
     // This should be unreachable, because the events Stream should never end,
-    // unless something has gone horribly wrong (or msg_match got dropped?)
+    // unless something has gone horribly wrong.
     panic!("no more events");
 }
 

@@ -1,7 +1,6 @@
 //! A library for connecting to Xiaomi Mijia 2 Bluetooth temperature/humidity sensors.
 
 use core::future::Future;
-use dbus::nonblock::MsgMatch;
 use futures::Stream;
 use std::ops::Range;
 use std::time::{Duration, SystemTime};
@@ -302,7 +301,7 @@ impl MijiaSession {
     ) -> Result<Vec<Option<HistoryRecord>>, MijiaError> {
         let history_range = self.get_history_range(&id).await?;
         // TODO: Get event stream that is filtered by D-Bus.
-        let (msg_match, events) = self.event_stream().await?;
+        let events = self.event_stream().await?;
         let mut events = events.timeout(HISTORY_RECORD_TIMEOUT);
         self.start_notify_history(&id, Some(0)).await?;
 
@@ -335,9 +334,6 @@ impl MijiaSession {
         }
 
         self.stop_notify_history(&id).await?;
-        self.bt_session
-            .remove_event_stream_match(&msg_match)
-            .await?;
 
         Ok(history)
     }
@@ -362,12 +358,8 @@ impl MijiaSession {
     }
 
     /// Get a stream of reading/history/disconnected events for all sensors.
-    ///
-    /// If the MsgMatch is dropped then the Stream will close.
-    pub async fn event_stream(
-        &self,
-    ) -> Result<(MsgMatch, impl Stream<Item = MijiaEvent>), BluetoothError> {
-        let (msg_match, events) = self.bt_session.event_stream().await?;
-        Ok((msg_match, events.filter_map(MijiaEvent::from)))
+    pub async fn event_stream(&self) -> Result<impl Stream<Item = MijiaEvent>, BluetoothError> {
+        let events = self.bt_session.event_stream().await?;
+        Ok(events.filter_map(MijiaEvent::from))
     }
 }
