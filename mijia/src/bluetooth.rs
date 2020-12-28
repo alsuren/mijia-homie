@@ -413,6 +413,30 @@ impl BluetoothSession {
             .await
     }
 
+    /// Get information about the given GATT service.
+    pub async fn get_service_info(&self, id: &ServiceId) -> Result<ServiceInfo, BluetoothError> {
+        let service = self.service(&id);
+        let uuid = service.uuid().compat().await?;
+        let primary = service.primary().compat().await?;
+        Ok(ServiceInfo {
+            id: id.to_owned(),
+            uuid,
+            primary,
+        })
+    }
+
+    /// Get information about the given GATT characteristic.
+    pub async fn get_characteristic_info(
+        &self,
+        id: &CharacteristicId,
+    ) -> Result<CharacteristicInfo, BluetoothError> {
+        let uuid = self.characteristic(&id).uuid().compat().await?;
+        Ok(CharacteristicInfo {
+            id: id.to_owned(),
+            uuid,
+        })
+    }
+
     fn device(&self, id: &DeviceId) -> impl OrgBluezDevice1 + Introspectable + Properties {
         Proxy::new(
             "org.bluez",

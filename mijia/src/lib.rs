@@ -26,11 +26,9 @@ const SERVICE_UUID: &str = "ebe0ccb0-7a0a-4b0c-8a1a-6ff2997da3a6";
 const CLOCK_CHARACTERISTIC_UUID: &str = "ebe0ccb7-7a0a-4b0c-8a1a-6ff2997da3a6";
 const HISTORY_RANGE_CHARACTERISTIC_UUID: &str = "ebe0ccb9-7a0a-4b0c-8a1a-6ff2997da3a6";
 const HISTORY_INDEX_CHARACTERISTIC_UUID: &str = "ebe0ccba-7a0a-4b0c-8a1a-6ff2997da3a6";
-const HISTORY_RECORDS_CHARACTERISTIC_PATH: &str = "/service0021/char002e";
 const HISTORY_LAST_RECORD_CHARACTERISTIC_UUID: &str = "ebe0ccbb-7a0a-4b0c-8a1a-6ff2997da3a6";
 const HISTORY_RECORDS_CHARACTERISTIC_UUID: &str = "ebe0ccbc-7a0a-4b0c-8a1a-6ff2997da3a6";
 const TEMPERATURE_UNIT_CHARACTERISTIC_UUID: &str = "ebe0ccbe-7a0a-4b0c-8a1a-6ff2997da3a6";
-const SENSOR_READING_CHARACTERISTIC_PATH: &str = "/service0021/char0035";
 const SENSOR_READING_CHARACTERISTIC_UUID: &str = "ebe0ccc1-7a0a-4b0c-8a1a-6ff2997da3a6";
 const HISTORY_DELETE_CHARACTERISTIC_UUID: &str = "ebe0ccd1-7a0a-4b0c-8a1a-6ff2997da3a6";
 const COMFORT_LEVEL_CHARACTERISTIC_UUID: &str = "ebe0ccd7-7a0a-4b0c-8a1a-6ff2997da3a6";
@@ -78,47 +76,46 @@ pub enum MijiaEvent {
 }
 
 impl MijiaEvent {
-    fn from(event: BluetoothEvent) -> Option<Self> {
+    async fn from(event: BluetoothEvent, session: BluetoothSession) -> Option<Self> {
         match event {
             BluetoothEvent::Value {
                 characteristic,
                 value,
             } => {
-                if let Some(device_path) = characteristic
-                    .object_path
-                    .strip_suffix(SENSOR_READING_CHARACTERISTIC_PATH)
-                {
-                    match Readings::decode(&value) {
+                let info = session
+                    .get_characteristic_info(&characteristic)
+                    .await
+                    .map_err(|e| log::error!("Error getting characteristic UUID: {:?}", e))
+                    .ok()?;
+                match info.uuid.as_ref() {
+                    SENSOR_READING_CHARACTERISTIC_UUID => match Readings::decode(&value) {
                         Ok(readings) => Some(MijiaEvent::Readings {
-                            id: DeviceId::new(device_path),
+                            id: characteristic.service().device(),
                             readings,
                         }),
                         Err(e) => {
                             log::error!("Error decoding readings: {:?}", e);
                             None
                         }
-                    }
-                } else if let Some(device_path) = characteristic
-                    .object_path
-                    .strip_suffix(HISTORY_RECORDS_CHARACTERISTIC_PATH)
-                {
-                    match HistoryRecord::decode(&value) {
+                    },
+                    HISTORY_RECORDS_CHARACTERISTIC_UUID => match HistoryRecord::decode(&value) {
                         Ok(record) => Some(MijiaEvent::HistoryRecord {
-                            id: DeviceId::new(device_path),
+                            id: characteristic.service().device(),
                             record,
                         }),
                         Err(e) => {
                             log::error!("Error decoding historical record: {:?}", e);
                             None
                         }
+                    },
+                    _ => {
+                        log::trace!(
+                            "Got BluetoothEvent::Value for characteristic {:?} with value {:?}",
+                            characteristic,
+                            value
+                        );
+                        None
                     }
-                } else {
-                    log::trace!(
-                        "Got BluetoothEvent::Value for characteristic {:?} with value {:?}",
-                        characteristic,
-                        value
-                    );
-                    None
                 }
             }
             BluetoothEvent::Connected {
@@ -441,6 +438,10 @@ impl MijiaSession {
     /// Get a stream of reading/history/disconnected events for all sensors.
     pub async fn event_stream(&self) -> Result<impl Stream<Item = MijiaEvent>, BluetoothError> {
         let events = self.bt_session.event_stream().await?;
-        Ok(events.filter_map(MijiaEvent::from))
+        let session = self.bt_session.clone();
+        Ok(Box::pin(futures::stream::StreamExt::filter_map(
+            events,
+            move |event| MijiaEvent::from(event, session.clone()),
+        )))
     }
 }
