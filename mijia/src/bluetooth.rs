@@ -1,18 +1,25 @@
+use crate::bluetooth_event::BluetoothEvent;
 use crate::DBUS_METHOD_CALL_TIMEOUT;
 use bluez_generated::{OrgBluezAdapter1, OrgBluezDevice1, OrgBluezGattCharacteristic1};
 use core::fmt::Debug;
 use core::future::Future;
 use dbus::arg::{RefArg, Variant};
 use dbus::nonblock::stdintf::org_freedesktop_dbus::ObjectManager;
+use dbus::nonblock::MsgMatch;
 use dbus::nonblock::{Proxy, SyncConnection};
-use futures::FutureExt;
+use dbus::Message;
+use futures::channel::mpsc::UnboundedReceiver;
+use futures::{FutureExt, Stream};
 use itertools::Itertools;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
+use std::pin::Pin;
 use std::str::FromStr;
 use std::sync::Arc;
+use std::task::{Context, Poll};
 use thiserror::Error;
+use tokio::stream::StreamExt;
 use tokio::task::JoinError;
 use tokio_compat_02::FutureExt as _;
 
@@ -306,6 +313,60 @@ impl BluetoothSession {
             self.connection.clone(),
         )
     }
+
+    /// Get a stream of events for all devices.
+    pub async fn event_stream(&self) -> Result<impl Stream<Item = BluetoothEvent>, BluetoothError> {
+        let mut rule = dbus::message::MatchRule::new();
+        rule.msg_type = Some(dbus::message::MessageType::Signal);
+        // BusName validation just checks that the length and format is valid, so it should never
+        // fail for a constant that we know is valid.
+        rule.sender = Some(dbus::strings::BusName::new("org.bluez").unwrap());
+
+        let msg_match = self.connection.add_match(rule).compat().await?;
+        let event_stream = EventStream::new(msg_match, self.connection.clone());
+        Ok(event_stream.filter_map(BluetoothEvent::from))
+    }
+}
+
+/// Wrapper for a stream of D-Bus events which automatically removes the `MsgMatch` from the D-Bus
+/// connection when it is dropped.
+struct EventStream {
+    msg_match: Option<MsgMatch>,
+    events: UnboundedReceiver<Message>,
+    connection: Arc<SyncConnection>,
+}
+
+impl EventStream {
+    fn new(msg_match: MsgMatch, connection: Arc<SyncConnection>) -> Self {
+        let (msg_match, events) = msg_match.msg_stream();
+        Self {
+            msg_match: Some(msg_match),
+            events,
+            connection,
+        }
+    }
+}
+
+impl Stream for EventStream {
+    type Item = Message;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        Pin::new(&mut self.events).poll_next(cx)
+    }
+}
+
+impl Drop for EventStream {
+    fn drop(&mut self) {
+        let connection = self.connection.clone();
+        let msg_match = self.msg_match.take().unwrap();
+        tokio::spawn(async move {
+            connection
+                .remove_match(msg_match.token())
+                .compat()
+                .await
+                .unwrap()
+        });
+    }
 }
 
 fn get_service_data(
@@ -338,4 +399,15 @@ fn get_service_data(
             })
             .collect(),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn device_adapter() {
+        let device_id = DeviceId::new("/org/bluez/hci0/dev_11_22_33_44_55_66");
+        assert_eq!(device_id.adapter(), "hci0");
+    }
 }

@@ -1,14 +1,11 @@
 //! A library for connecting to Xiaomi Mijia 2 Bluetooth temperature/humidity sensors.
 
 use core::future::Future;
-use dbus::nonblock::MsgMatch;
-use dbus::Message;
 use futures::Stream;
 use std::ops::Range;
 use std::time::{Duration, SystemTime};
 use thiserror::Error;
 use tokio::stream::StreamExt;
-use tokio_compat_02::FutureExt;
 
 pub mod bluetooth;
 mod bluetooth_event;
@@ -77,9 +74,9 @@ pub enum MijiaEvent {
 }
 
 impl MijiaEvent {
-    fn from(conn_msg: Message) -> Option<Self> {
-        match BluetoothEvent::from(conn_msg) {
-            Some(BluetoothEvent::Value { object_path, value }) => {
+    fn from(event: BluetoothEvent) -> Option<Self> {
+        match event {
+            BluetoothEvent::Value { object_path, value } => {
                 if let Some(object_path) =
                     object_path.strip_suffix(SENSOR_READING_CHARACTERISTIC_PATH)
                 {
@@ -115,10 +112,10 @@ impl MijiaEvent {
                     None
                 }
             }
-            Some(BluetoothEvent::Connected {
+            BluetoothEvent::Connected {
                 object_path,
                 connected: false,
-            }) => Some(MijiaEvent::Disconnected {
+            } => Some(MijiaEvent::Disconnected {
                 id: DeviceId { object_path },
             }),
             _ => None,
@@ -128,6 +125,7 @@ impl MijiaEvent {
 
 /// A wrapper around a Bluetooth session which adds some methods for dealing with Mijia sensors.
 /// The underlying Bluetooth session may still be accessed.
+#[derive(Debug)]
 pub struct MijiaSession {
     pub bt_session: BluetoothSession,
 }
@@ -303,7 +301,7 @@ impl MijiaSession {
     ) -> Result<Vec<Option<HistoryRecord>>, MijiaError> {
         let history_range = self.get_history_range(&id).await?;
         // TODO: Get event stream that is filtered by D-Bus.
-        let (msg_match, events) = self.event_stream().await?;
+        let events = self.event_stream().await?;
         let mut events = events.timeout(HISTORY_RECORD_TIMEOUT);
         self.start_notify_history(&id, Some(0)).await?;
 
@@ -336,12 +334,6 @@ impl MijiaSession {
         }
 
         self.stop_notify_history(&id).await?;
-        self.bt_session
-            .connection
-            .remove_match(msg_match.token())
-            .compat()
-            .await
-            .map_err(BluetoothError::DbusError)?;
 
         Ok(history)
     }
@@ -366,25 +358,8 @@ impl MijiaSession {
     }
 
     /// Get a stream of reading/history/disconnected events for all sensors.
-    ///
-    /// If the MsgMatch is dropped then the Stream will close.
-    pub async fn event_stream(
-        &self,
-    ) -> Result<(MsgMatch, impl Stream<Item = MijiaEvent>), BluetoothError> {
-        let mut rule = dbus::message::MatchRule::new();
-        rule.msg_type = Some(dbus::message::MessageType::Signal);
-        // BusName validation just checks that the length and format is valid, so it should never
-        // fail for a constant that we know is valid.
-        rule.sender = Some(dbus::strings::BusName::new("org.bluez").unwrap());
-
-        let (msg_match, events) = self
-            .bt_session
-            .connection
-            .add_match(rule)
-            .compat()
-            .await?
-            .msg_stream();
-
-        Ok((msg_match, Box::pin(events.filter_map(MijiaEvent::from))))
+    pub async fn event_stream(&self) -> Result<impl Stream<Item = MijiaEvent>, BluetoothError> {
+        let events = self.bt_session.event_stream().await?;
+        Ok(events.filter_map(MijiaEvent::from))
     }
 }
