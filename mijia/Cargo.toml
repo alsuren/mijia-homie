@@ -6,7 +6,7 @@ edition = "2018"
 license = "MIT OR Apache-2.0"
 description = "A library for connecting to Xiaomi Mijia 2 Bluetooth temperature/humidity sensors."
 repository = "https://github.com/alsuren/mijia-homie/"
-keywords = ["blue", "bluetooth"]
+keywords = ["ble", "bluetooth", "humidity", "temperature"]
 categories = ["hardware-support"]
 
 [dependencies]
