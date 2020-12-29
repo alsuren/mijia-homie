@@ -499,7 +499,7 @@ impl BluetoothSession {
     }
 
     /// Read the value of the given GATT characteristic.
-    pub(crate) async fn read_characteristic_value(
+    pub async fn read_characteristic_value(
         &self,
         id: &CharacteristicId,
     ) -> Result<Vec<u8>, BluetoothError> {
@@ -508,7 +508,7 @@ impl BluetoothSession {
     }
 
     /// Write the given value to the given GATT characteristic.
-    pub(crate) async fn write_characteristic_value(
+    pub async fn write_characteristic_value(
         &self,
         id: &CharacteristicId,
         value: impl Into<Vec<u8>>,
@@ -521,14 +521,14 @@ impl BluetoothSession {
     }
 
     /// Start notifications on the given GATT characteristic.
-    pub(crate) async fn start_notify(&self, id: &CharacteristicId) -> Result<(), BluetoothError> {
+    pub async fn start_notify(&self, id: &CharacteristicId) -> Result<(), BluetoothError> {
         let characteristic = self.characteristic(id);
         characteristic.start_notify().compat().await?;
         Ok(())
     }
 
     /// Stop notifications on the given GATT characteristic.
-    pub(crate) async fn stop_notify(&self, id: &CharacteristicId) -> Result<(), BluetoothError> {
+    pub async fn stop_notify(&self, id: &CharacteristicId) -> Result<(), BluetoothError> {
         let characteristic = self.characteristic(id);
         characteristic.stop_notify().compat().await?;
         Ok(())
