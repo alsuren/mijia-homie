@@ -1,6 +1,5 @@
 use crate::bluetooth_event::BluetoothEvent;
 use crate::introspect::Node;
-use crate::DBUS_METHOD_CALL_TIMEOUT;
 use bluez_generated::{
     OrgBluezAdapter1, OrgBluezDevice1, OrgBluezGattCharacteristic1, OrgBluezGattService1,
 };
@@ -21,11 +20,14 @@ use std::pin::Pin;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::task::{Context, Poll};
+use std::time::Duration;
 use thiserror::Error;
 use tokio::stream::StreamExt;
 use tokio::task::JoinError;
 use tokio_compat_02::FutureExt as _;
 use uuid::Uuid;
+
+const DBUS_METHOD_CALL_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// An error carrying out a Bluetooth operation.
 #[derive(Debug, Error)]

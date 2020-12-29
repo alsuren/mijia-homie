@@ -46,7 +46,6 @@ const CONNECTION_INTERVAL_CHARACTERISTIC_UUID: Uuid =
 /// 500 in little-endian
 const CONNECTION_INTERVAL_500_MS: [u8; 3] = [0xF4, 0x01, 0x00];
 const HISTORY_DELETE_VALUE: [u8; 1] = [0x01];
-const DBUS_METHOD_CALL_TIMEOUT: Duration = Duration::from_secs(30);
 const HISTORY_RECORD_TIMEOUT: Duration = Duration::from_secs(2);
 
 /// An error interacting with a Mijia sensor.
