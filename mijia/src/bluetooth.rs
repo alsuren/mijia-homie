@@ -1,4 +1,4 @@
-use crate::bluetooth_event::BluetoothEvent;
+pub use crate::bluetooth_event::BluetoothEvent;
 use crate::introspect::Node;
 use bluez_generated::{
     OrgBluezAdapter1, OrgBluezDevice1, OrgBluezGattCharacteristic1, OrgBluezGattService1,
