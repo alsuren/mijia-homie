@@ -421,10 +421,12 @@ impl MijiaSession {
     ///
     /// Notifications will be delivered as events by `MijiaSession::event_stream()`.
     pub async fn start_notify_sensor(&self, id: &DeviceId) -> Result<(), BluetoothError> {
+        // service = await thing.gatt.getPrimaryService("ebe0ccb0-7a0a-4b0c-8a1a-6ff2997da3a6")
         let service = self
             .bt_session
             .get_service_by_uuid(id, SERVICE_UUID)
             .await?;
+        // sensor_reading_characteristic = await service.getCharacteristic("ebe0ccc1-7a0a-4b0c-8a1a-6ff2997da3a6")
         let sensor_reading_characteristic = self
             .bt_session
             .get_characteristic_by_uuid(&service.id, SENSOR_READING_CHARACTERISTIC_UUID)
@@ -433,6 +435,8 @@ impl MijiaSession {
             .bt_session
             .get_characteristic_by_uuid(&service.id, CONNECTION_INTERVAL_CHARACTERISTIC_UUID)
             .await?;
+        // sensor_reading_characteristic.startNotifications()
+        // characteristic.addEventListener("characteristicvaluechanged", v => console.log(v))
         self.bt_session
             .start_notify(&sensor_reading_characteristic.id)
             .await?;

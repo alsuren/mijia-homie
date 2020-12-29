@@ -24,6 +24,16 @@ async fn main() -> Result<(), Report> {
 
     // Get the list of sensors which are currently known, connect those which match the filter and
     // subscribe to readings.
+    // This is approximately equivalent to
+    r#""
+        thing = await navigator.bluetooth.requestDevice({
+            filters: [{namePrefix: "LYWSD03MMC"}],
+            optionalServices: ["ebe0ccb0-7a0a-4b0c-8a1a-6ff2997da3a6"]
+        })
+    "#;
+    //
+    // but the web bluetooth api has no way to specify mac addresses, and web bluetooth prompts
+    // the user to pick a single device instead.
     let sensors = session.get_sensors().await?;
     println!("Sensors:");
     for sensor in sensors
@@ -31,6 +41,7 @@ async fn main() -> Result<(), Report> {
         .filter(|sensor| should_include_sensor(sensor, &filters))
     {
         println!("Connecting to {} ({:?})", sensor.mac_address, sensor.id);
+        // This is like `await thing.gatt.connect()`
         if let Err(e) = session.bt_session.connect(&sensor.id).await {
             println!("Failed to connect to {}: {:?}", sensor.mac_address, e);
         } else {
