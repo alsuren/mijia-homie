@@ -29,30 +29,32 @@
 use dbus::{arg::cast, arg::RefArg, arg::TypeMismatchError, arg::Variant, Message};
 use std::collections::HashMap;
 
+use crate::bluetooth::{AdapterId, CharacteristicId, DeviceId};
+
 #[derive(Clone, Debug)]
 pub enum BluetoothEvent {
     Powered {
-        object_path: String,
+        adapter: AdapterId,
         powered: bool,
     },
     Discovering {
-        object_path: String,
+        adapter: AdapterId,
         discovering: bool,
     },
     Connected {
-        object_path: String,
+        device: DeviceId,
         connected: bool,
     },
     ServicesResolved {
-        object_path: String,
+        device: DeviceId,
         services_resolved: bool,
     },
     Value {
-        object_path: String,
+        characteristic: CharacteristicId,
         value: Box<[u8]>,
     },
     RSSI {
-        object_path: String,
+        device: DeviceId,
         rssi: i16,
     },
     None,
@@ -73,7 +75,7 @@ impl BluetoothEvent {
                 if let Some(value) = properties.get("Powered") {
                     if let Some(powered) = cast::<bool>(&value.0) {
                         let event = BluetoothEvent::Powered {
-                            object_path,
+                            adapter: AdapterId { object_path },
                             powered: *powered,
                         };
 
@@ -84,7 +86,7 @@ impl BluetoothEvent {
                 if let Some(value) = properties.get("Discovering") {
                     if let Some(discovering) = cast::<bool>(&value.0) {
                         let event = BluetoothEvent::Discovering {
-                            object_path,
+                            adapter: AdapterId { object_path },
                             discovering: *discovering,
                         };
 
@@ -95,7 +97,7 @@ impl BluetoothEvent {
                 if let Some(value) = properties.get("Connected") {
                     if let Some(connected) = cast::<bool>(&value.0) {
                         let event = BluetoothEvent::Connected {
-                            object_path,
+                            device: DeviceId { object_path },
                             connected: *connected,
                         };
 
@@ -106,7 +108,7 @@ impl BluetoothEvent {
                 if let Some(value) = properties.get("ServicesResolved") {
                     if let Some(services_resolved) = cast::<bool>(&value.0) {
                         let event = BluetoothEvent::ServicesResolved {
-                            object_path,
+                            device: DeviceId { object_path },
                             services_resolved: *services_resolved,
                         };
 
@@ -117,7 +119,7 @@ impl BluetoothEvent {
                 if let Some(value) = properties.get("Value") {
                     if let Some(value) = cast::<Vec<u8>>(&value.0) {
                         let event = BluetoothEvent::Value {
-                            object_path,
+                            characteristic: CharacteristicId { object_path },
                             value: value.clone().into_boxed_slice(),
                         };
 
@@ -128,7 +130,7 @@ impl BluetoothEvent {
                 if let Some(value) = properties.get("RSSI") {
                     if let Some(rssi) = cast::<i16>(&value.0) {
                         let event = BluetoothEvent::RSSI {
-                            object_path,
+                            device: DeviceId { object_path },
                             rssi: *rssi,
                         };
 

@@ -862,9 +862,13 @@ dependencies = [
  "itertools",
  "log",
  "pretty_env_logger",
+ "serde",
+ "serde-xml-rs",
+ "serde_derive",
  "thiserror",
  "tokio 0.3.6",
  "tokio-compat-02",
+ "uuid",
 ]
 
 [[package]]
@@ -1597,6 +1601,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde-xml-rs"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "efe415925cf3d0bbb2fc47d09b56ce03eef51c5d56846468a39bcc293c7a846c"
+dependencies = [
+ "log",
+ "serde",
+ "thiserror",
+ "xml-rs",
+]
+
+[[package]]
 name = "serde_derive"
 version = "1.0.118"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2034,6 +2050,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "05e42f7c18b8f902290b009cde6d651262f956c98bc51bca4cd1d511c9cd85c7"
 
 [[package]]
+name = "uuid"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9fde2f6a4bea1d6e007c4ad38c6839fa71cbb63b6dbf5b595aa38dc9b1093c11"
+
+[[package]]
 name = "vcpkg"
 version = "0.2.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2244,3 +2266,9 @@ dependencies = [
  "tokio 0.3.6",
  "tungstenite",
 ]
+
+[[package]]
+name = "xml-rs"
+version = "0.8.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b07db065a5cf61a7e4ba64f29e67db906fb1787316516c4e6e5ff0fea1efcd8a"
