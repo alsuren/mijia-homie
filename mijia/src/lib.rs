@@ -9,11 +9,10 @@ use tokio::stream::StreamExt;
 use uuid::Uuid;
 
 pub mod bluetooth;
-mod bluetooth_event;
 mod decode;
-mod introspect;
-use bluetooth::{BluetoothError, BluetoothSession, DeviceId, MacAddress, SpawnError};
-use bluetooth_event::BluetoothEvent;
+use bluetooth::{
+    BluetoothError, BluetoothEvent, BluetoothSession, DeviceId, MacAddress, SpawnError,
+};
 pub use decode::comfort_level::ComfortLevel;
 use decode::history::decode_range;
 pub use decode::history::HistoryRecord;
