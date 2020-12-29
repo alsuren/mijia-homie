@@ -111,8 +111,8 @@ mod tests {
     #[test]
     fn introspect_root() {
         let value: Node = serde_xml_rs::from_str(
-            r#"<!DOCTYPE node PUBLIC "-//freedesktop//DTD D-BUS Object Introspection 
-            1.0//EN" "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd">
+            r#"<!DOCTYPE node PUBLIC "-//freedesktop//DTD D-BUS Object Introspection 1.0//EN"
+            "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd">
             <node>
                 <interface name="org.freedesktop.DBus.Introspectable">
                     <method name="Introspect">
