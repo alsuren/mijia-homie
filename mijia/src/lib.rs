@@ -6,6 +6,7 @@ use std::ops::Range;
 use std::time::{Duration, SystemTime};
 use thiserror::Error;
 use tokio::stream::StreamExt;
+use uuid::Uuid;
 
 pub mod bluetooth;
 mod bluetooth_event;
@@ -22,17 +23,26 @@ use decode::time::{decode_time, encode_time};
 pub use decode::{DecodeError, EncodeError};
 
 const MIJIA_NAME: &str = "LYWSD03MMC";
-const SERVICE_UUID: &str = "ebe0ccb0-7a0a-4b0c-8a1a-6ff2997da3a6";
-const CLOCK_CHARACTERISTIC_UUID: &str = "ebe0ccb7-7a0a-4b0c-8a1a-6ff2997da3a6";
-const HISTORY_RANGE_CHARACTERISTIC_UUID: &str = "ebe0ccb9-7a0a-4b0c-8a1a-6ff2997da3a6";
-const HISTORY_INDEX_CHARACTERISTIC_UUID: &str = "ebe0ccba-7a0a-4b0c-8a1a-6ff2997da3a6";
-const HISTORY_LAST_RECORD_CHARACTERISTIC_UUID: &str = "ebe0ccbb-7a0a-4b0c-8a1a-6ff2997da3a6";
-const HISTORY_RECORDS_CHARACTERISTIC_UUID: &str = "ebe0ccbc-7a0a-4b0c-8a1a-6ff2997da3a6";
-const TEMPERATURE_UNIT_CHARACTERISTIC_UUID: &str = "ebe0ccbe-7a0a-4b0c-8a1a-6ff2997da3a6";
-const SENSOR_READING_CHARACTERISTIC_UUID: &str = "ebe0ccc1-7a0a-4b0c-8a1a-6ff2997da3a6";
-const HISTORY_DELETE_CHARACTERISTIC_UUID: &str = "ebe0ccd1-7a0a-4b0c-8a1a-6ff2997da3a6";
-const COMFORT_LEVEL_CHARACTERISTIC_UUID: &str = "ebe0ccd7-7a0a-4b0c-8a1a-6ff2997da3a6";
-const CONNECTION_INTERVAL_CHARACTERISTIC_UUID: &str = "ebe0ccd8-7a0a-4b0c-8a1a-6ff2997da3a6";
+const SERVICE_UUID: Uuid = Uuid::from_u128(0xebe0ccb0_7a0a_4b0c_8a1a_6ff2997da3a6);
+const CLOCK_CHARACTERISTIC_UUID: Uuid = Uuid::from_u128(0xebe0ccb7_7a0a_4b0c_8a1a_6ff2997da3a6);
+const HISTORY_RANGE_CHARACTERISTIC_UUID: Uuid =
+    Uuid::from_u128(0xebe0ccb9_7a0a_4b0c_8a1a_6ff2997da3a6);
+const HISTORY_INDEX_CHARACTERISTIC_UUID: Uuid =
+    Uuid::from_u128(0xebe0ccba_7a0a_4b0c_8a1a_6ff2997da3a6);
+const HISTORY_LAST_RECORD_CHARACTERISTIC_UUID: Uuid =
+    Uuid::from_u128(0xebe0ccbb_7a0a_4b0c_8a1a_6ff2997da3a6);
+const HISTORY_RECORDS_CHARACTERISTIC_UUID: Uuid =
+    Uuid::from_u128(0xebe0ccbc_7a0a_4b0c_8a1a_6ff2997da3a6);
+const TEMPERATURE_UNIT_CHARACTERISTIC_UUID: Uuid =
+    Uuid::from_u128(0xebe0ccbe_7a0a_4b0c_8a1a_6ff2997da3a6);
+const SENSOR_READING_CHARACTERISTIC_UUID: Uuid =
+    Uuid::from_u128(0xebe0ccc1_7a0a_4b0c_8a1a_6ff2997da3a6);
+const HISTORY_DELETE_CHARACTERISTIC_UUID: Uuid =
+    Uuid::from_u128(0xebe0ccd1_7a0a_4b0c_8a1a_6ff2997da3a6);
+const COMFORT_LEVEL_CHARACTERISTIC_UUID: Uuid =
+    Uuid::from_u128(0xebe0ccd7_7a0a_4b0c_8a1a_6ff2997da3a6);
+const CONNECTION_INTERVAL_CHARACTERISTIC_UUID: Uuid =
+    Uuid::from_u128(0xebe0ccd8_7a0a_4b0c_8a1a_6ff2997da3a6);
 /// 500 in little-endian
 const CONNECTION_INTERVAL_500_MS: [u8; 3] = [0xF4, 0x01, 0x00];
 const HISTORY_DELETE_VALUE: [u8; 1] = [0x01];
@@ -87,7 +97,7 @@ impl MijiaEvent {
                     .await
                     .map_err(|e| log::error!("Error getting characteristic UUID: {:?}", e))
                     .ok()?;
-                match info.uuid.as_ref() {
+                match info.uuid {
                     SENSOR_READING_CHARACTERISTIC_UUID => match Readings::decode(&value) {
                         Ok(readings) => Some(MijiaEvent::Readings {
                             id: characteristic.service().device(),

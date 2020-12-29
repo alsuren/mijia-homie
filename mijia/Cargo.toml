@@ -22,6 +22,7 @@ serde-xml-rs = "0.4.0"
 thiserror = "1.0.22"
 tokio = "0.3.6"
 tokio-compat-02 = "0.1.2"
+uuid = "0.8.1"
 
 [dev-dependencies]
 chrono = "0.4.19"

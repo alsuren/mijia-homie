@@ -25,6 +25,7 @@ use thiserror::Error;
 use tokio::stream::StreamExt;
 use tokio::task::JoinError;
 use tokio_compat_02::FutureExt as _;
+use uuid::Uuid;
 
 /// An error carrying out a Bluetooth operation.
 #[derive(Debug, Error)]
@@ -40,15 +41,10 @@ pub enum BluetoothError {
     XmlParseError(#[from] serde_xml_rs::Error),
     /// No service or characteristic was found for some UUID.
     #[error("Service or characteristic UUID {uuid} not found.")]
-    UUIDNotFound { uuid: String },
-}
-
-impl BluetoothError {
-    fn uuid_not_found(uuid: &str) -> Self {
-        Self::UUIDNotFound {
-            uuid: uuid.to_owned(),
-        }
-    }
+    UUIDNotFound { uuid: Uuid },
+    /// Error parsing a UUID from a string.
+    #[error("Error parsing UUID string: {0}")]
+    UUIDParseError(#[from] uuid::Error),
 }
 
 /// Error type for futures representing tasks spawned by this crate.
@@ -202,7 +198,7 @@ pub struct ServiceInfo {
     /// An opaque identifier for the service on the device, including a reference to which adapter
     /// it was discovered on.
     pub id: ServiceId,
-    pub uuid: String,
+    pub uuid: Uuid,
     pub primary: bool,
 }
 
@@ -212,7 +208,7 @@ pub struct CharacteristicInfo {
     /// An opaque identifier for the characteristic on the device, including a reference to which
     /// adapter it was discovered on.
     pub id: CharacteristicId,
-    pub uuid: String,
+    pub uuid: Uuid,
 }
 
 /// A connection to the Bluetooth daemon. This can be cheaply cloned and passed around to be used
@@ -347,7 +343,7 @@ impl BluetoothSession {
                     object_path: format!("{}/{}", device.object_path, subnode_name),
                 };
                 let service = self.service(&service_id);
-                let uuid = service.uuid().compat().await?;
+                let uuid = Uuid::parse_str(&service.uuid().compat().await?)?;
                 let primary = service.primary().compat().await?;
                 services.push(ServiceInfo {
                     id: service_id,
@@ -373,11 +369,13 @@ impl BluetoothSession {
                 let characteristic_id = CharacteristicId {
                     object_path: format!("{}/{}", service.object_path, subnode_name),
                 };
-                let uuid = self
-                    .characteristic(&characteristic_id)
-                    .uuid()
-                    .compat()
-                    .await?;
+                let uuid = Uuid::parse_str(
+                    &self
+                        .characteristic(&characteristic_id)
+                        .uuid()
+                        .compat()
+                        .await?,
+                )?;
                 characteristics.push(CharacteristicInfo {
                     id: characteristic_id,
                     uuid,
@@ -393,13 +391,13 @@ impl BluetoothSession {
     pub async fn get_service_by_uuid(
         &self,
         device: &DeviceId,
-        uuid: &str,
+        uuid: Uuid,
     ) -> Result<ServiceInfo, BluetoothError> {
         let services = self.get_services(device).await?;
         services
             .into_iter()
             .find(|service_info| service_info.uuid == uuid)
-            .ok_or_else(|| BluetoothError::uuid_not_found(uuid))
+            .ok_or_else(|| BluetoothError::UUIDNotFound { uuid })
     }
 
     /// Find a characteristic with the given UUID as part of the given GATT service advertised by a
@@ -407,13 +405,13 @@ impl BluetoothSession {
     pub async fn get_characteristic_by_uuid(
         &self,
         service: &ServiceId,
-        uuid: &str,
+        uuid: Uuid,
     ) -> Result<CharacteristicInfo, BluetoothError> {
         let characteristics = self.get_characteristics(service).await?;
         characteristics
             .into_iter()
             .find(|characteristic_info| characteristic_info.uuid == uuid)
-            .ok_or_else(|| BluetoothError::uuid_not_found(uuid))
+            .ok_or_else(|| BluetoothError::UUIDNotFound { uuid })
     }
 
     /// Convenience method to get a GATT charactacteristic with the given UUID advertised by a
@@ -423,8 +421,8 @@ impl BluetoothSession {
     pub async fn get_service_characteristic_by_uuid(
         &self,
         device: &DeviceId,
-        service_uuid: &str,
-        characteristic_uuid: &str,
+        service_uuid: Uuid,
+        characteristic_uuid: Uuid,
     ) -> Result<CharacteristicInfo, BluetoothError> {
         let service = self.get_service_by_uuid(device, service_uuid).await?;
         self.get_characteristic_by_uuid(&service.id, characteristic_uuid)
@@ -434,7 +432,7 @@ impl BluetoothSession {
     /// Get information about the given GATT service.
     pub async fn get_service_info(&self, id: &ServiceId) -> Result<ServiceInfo, BluetoothError> {
         let service = self.service(&id);
-        let uuid = service.uuid().compat().await?;
+        let uuid = Uuid::parse_str(&service.uuid().compat().await?)?;
         let primary = service.primary().compat().await?;
         Ok(ServiceInfo {
             id: id.to_owned(),
@@ -448,7 +446,7 @@ impl BluetoothSession {
         &self,
         id: &CharacteristicId,
     ) -> Result<CharacteristicInfo, BluetoothError> {
-        let uuid = self.characteristic(&id).uuid().compat().await?;
+        let uuid = Uuid::parse_str(&self.characteristic(&id).uuid().compat().await?)?;
         Ok(CharacteristicInfo {
             id: id.to_owned(),
             uuid,
