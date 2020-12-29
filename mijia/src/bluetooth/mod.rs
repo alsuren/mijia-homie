@@ -1,6 +1,8 @@
+mod bleuuid;
 mod bluetooth_event;
 mod introspect;
 
+pub use self::bleuuid::{uuid_from_u16, uuid_from_u32, BleUuid};
 pub use self::bluetooth_event::BluetoothEvent;
 use self::introspect::Node;
 use bluez_generated::{
