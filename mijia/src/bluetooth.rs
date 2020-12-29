@@ -60,6 +60,20 @@ pub enum SpawnError {
     Join(#[from] JoinError),
 }
 
+/// Opaque identifier for a Bluetooth adapter on the system.
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct AdapterId {
+    pub(crate) object_path: String,
+}
+
+impl AdapterId {
+    pub(crate) fn new(object_path: &str) -> Self {
+        Self {
+            object_path: object_path.to_owned(),
+        }
+    }
+}
+
 /// Opaque identifier for a Bluetooth device which the system knows about. This includes a reference
 /// to which Bluetooth adapter it was discovered on, which means that any attempt to connect to it
 /// will also happen from that adapter (in case the system has more than one).
@@ -76,8 +90,12 @@ impl DeviceId {
     }
 
     /// Get the ID of the Bluetooth adapter on which this device was discovered, e.g. `"hci0"`.
-    pub fn adapter(&self) -> &str {
-        self.object_path.split('/').nth(3).unwrap()
+    pub fn adapter(&self) -> AdapterId {
+        let index = self
+            .object_path
+            .rfind('/')
+            .expect("DeviceId object_path must contain a slash.");
+        AdapterId::new(&self.object_path[0..index])
     }
 }
 
@@ -606,8 +624,9 @@ mod tests {
 
     #[test]
     fn device_adapter() {
+        let adapter_id = AdapterId::new("/org/bluez/hci0");
         let device_id = DeviceId::new("/org/bluez/hci0/dev_11_22_33_44_55_66");
-        assert_eq!(device_id.adapter(), "hci0");
+        assert_eq!(device_id.adapter(), adapter_id);
     }
 
     #[test]

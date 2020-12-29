@@ -29,16 +29,16 @@
 use dbus::{arg::cast, arg::RefArg, arg::TypeMismatchError, arg::Variant, Message};
 use std::collections::HashMap;
 
-use crate::bluetooth::{CharacteristicId, DeviceId};
+use crate::bluetooth::{AdapterId, CharacteristicId, DeviceId};
 
 #[derive(Clone, Debug)]
 pub enum BluetoothEvent {
     Powered {
-        adapter: String,
+        adapter: AdapterId,
         powered: bool,
     },
     Discovering {
-        adapter: String,
+        adapter: AdapterId,
         discovering: bool,
     },
     Connected {
@@ -75,7 +75,7 @@ impl BluetoothEvent {
                 if let Some(value) = properties.get("Powered") {
                     if let Some(powered) = cast::<bool>(&value.0) {
                         let event = BluetoothEvent::Powered {
-                            adapter: object_path,
+                            adapter: AdapterId { object_path },
                             powered: *powered,
                         };
 
@@ -86,7 +86,7 @@ impl BluetoothEvent {
                 if let Some(value) = properties.get("Discovering") {
                     if let Some(discovering) = cast::<bool>(&value.0) {
                         let event = BluetoothEvent::Discovering {
-                            adapter: object_path,
+                            adapter: AdapterId { object_path },
                             discovering: *discovering,
                         };
 
