@@ -99,7 +99,7 @@ impl ServiceId {
         let index = self
             .object_path
             .rfind('/')
-            .expect("ServiceId object_path doesn't contain a slash.");
+            .expect("ServiceId object_path must contain a slash.");
         DeviceId::new(&self.object_path[0..index])
     }
 }
@@ -123,7 +123,7 @@ impl CharacteristicId {
         let index = self
             .object_path
             .rfind('/')
-            .expect("CharacteristicId object_path doesn't contain a slash.");
+            .expect("CharacteristicId object_path must contain a slash.");
         ServiceId::new(&self.object_path[0..index])
     }
 }
