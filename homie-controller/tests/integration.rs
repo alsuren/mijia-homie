@@ -46,7 +46,7 @@ async fn test_device() {
             "property_id",
             "Property name",
             true,
-            None,
+            Some("unit"),
             None,
         )],
     );
@@ -59,9 +59,20 @@ async fn test_device() {
             log::trace!("Event: {:?}", event);
             let devices = controller.devices();
             if let Some(device) = devices.get("device_id") {
+                // For some reason we get the ready state before all the attributes of the property
+                // have been filled in, so we need to explicitly check for the unit being set.
                 if device.state == State::Ready
                     && device.has_required_attributes()
                     && device.nodes.len() == 1
+                    && device
+                        .nodes
+                        .get("node_id")
+                        .unwrap()
+                        .properties
+                        .get("property_id")
+                        .unwrap()
+                        .unit
+                        .is_some()
                 {
                     break;
                 }
@@ -83,6 +94,8 @@ async fn test_device() {
     assert_eq!(node.properties.len(), 1);
     let property = node.properties.get("property_id").unwrap();
     assert_eq!(property.name, Some("Property name".to_string()));
+    assert_eq!(property.settable, true);
+    assert_eq!(property.unit, Some("unit".to_string()));
     assert_eq!(property.value, None);
 
     // Send a value from the device to the controller.
