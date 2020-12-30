@@ -2,11 +2,13 @@
 //! controller connected to the same MQTT broker, and ensures that the controller can discover the
 //! device as expected.
 
-use homie_controller::{HomieController, State};
+use futures::future::ready;
+use homie_controller::{Event, HomieController, State};
 use homie_device::{HomieDevice, Node, Property, SpawnError};
 use librumqttd::{Broker, Config};
 use rumqttc::{ConnectionError, MqttOptions, StateError};
 use std::io::ErrorKind;
+use std::sync::{Arc, Mutex};
 use std::thread;
 
 // A high port number which is hopefully not in use, to use for the MQTT broker.
@@ -25,20 +27,26 @@ async fn test_device() {
     controller.start().await.unwrap();
 
     // Start device
+    let updates = Arc::new(Mutex::new(vec![]));
+    let updates_ref = updates.clone();
     let device_options = MqttOptions::new("homie_device", "localhost", PORT);
-    let (mut homie, homie_handle) =
-        HomieDevice::builder("homie/device_id", "Device name", device_options)
-            .spawn()
-            .await
-            .unwrap();
+    let mut device_builder = HomieDevice::builder("homie/device_id", "Device name", device_options);
+    device_builder.set_update_callback(move |node_id, property_id, value| {
+        assert_eq!(property_id, "property_id");
+        assert_eq!(node_id, "node_id");
+        updates_ref.lock().unwrap().push(value.clone());
+        ready(Some(value))
+    });
+    let (mut homie, homie_handle) = device_builder.spawn().await.unwrap();
     let node = Node::new(
         "node_id",
         "Node name",
         "node_type",
-        vec![Property::boolean(
+        vec![Property::integer(
             "property_id",
             "Property name",
             true,
+            None,
             None,
         )],
     );
@@ -75,6 +83,80 @@ async fn test_device() {
     assert_eq!(node.properties.len(), 1);
     let property = node.properties.get("property_id").unwrap();
     assert_eq!(property.name, Some("Property name".to_string()));
+    assert_eq!(property.value, None);
+
+    // Send a value from the device to the controller.
+    homie
+        .publish_value("node_id", "property_id", 42)
+        .await
+        .unwrap();
+
+    // Wait until the controller receives the value.
+    loop {
+        if let Some(event) = controller.poll(&mut event_loop).await.unwrap() {
+            log::trace!("Event: {:?}", event);
+            if let Event::PropertyValueChanged {
+                device_id,
+                node_id,
+                property_id,
+                value,
+                fresh,
+            } = event
+            {
+                assert_eq!(device_id, "device_id");
+                assert_eq!(node_id, "node_id");
+                assert_eq!(property_id, "property_id");
+                assert_eq!(value, "42");
+                assert_eq!(fresh, true);
+                break;
+            }
+        }
+    }
+
+    // Check that the device looks how we expect.
+    let devices = controller.devices();
+    let device = devices.get("device_id").unwrap();
+    let node = device.nodes.get("node_id").unwrap();
+    let property = node.properties.get("property_id").unwrap();
+    log::info!("Property: {:?}", property);
+    assert_eq!(property.value(), Ok(42));
+
+    // Send a value from the controller to the device.
+    controller
+        .set("device_id", "node_id", "property_id", 13)
+        .await
+        .unwrap();
+
+    // Wait for the device to receive the value and send it back to the controller.
+    loop {
+        if let Some(event) = controller.poll(&mut event_loop).await.unwrap() {
+            log::trace!("Event: {:?}", event);
+            if let Event::PropertyValueChanged {
+                device_id,
+                node_id,
+                property_id,
+                value,
+                fresh,
+            } = event
+            {
+                assert_eq!(device_id, "device_id");
+                assert_eq!(node_id, "node_id");
+                assert_eq!(property_id, "property_id");
+                assert_eq!(value, "13");
+                assert_eq!(fresh, true);
+                break;
+            }
+        }
+    }
+    assert_eq!(*updates.lock().unwrap(), vec!["13".to_string()]);
+
+    // Check that the value sent back is reflected on the controller's view of the device.
+    let devices = controller.devices();
+    let device = devices.get("device_id").unwrap();
+    let node = device.nodes.get("node_id").unwrap();
+    let property = node.properties.get("property_id").unwrap();
+    log::info!("Property: {:?}", property);
+    assert_eq!(property.value(), Ok(13));
 
     // Disconnect the device.
     homie.disconnect().await.unwrap();
