@@ -16,8 +16,6 @@ const PORT: u16 = 10883;
 
 #[tokio::test]
 async fn test_device() {
-    pretty_env_logger::init();
-
     // Start MQTT broker.
     spawn_mqtt_broker(PORT);
 
