@@ -23,3 +23,4 @@ chrono = "0.4.19"
 eyre = "0.6.5"
 pretty_env_logger = "0.4.0"
 tokio = { version = "1.0.1", features = ["macros", "rt", "rt-multi-thread", "time"] }
+toml = "0.5.8"

@@ -1262,6 +1262,7 @@ dependencies = [
  "thiserror",
  "tokio 1.0.1",
  "tokio-stream",
+ "toml",
  "uuid",
 ]
 
