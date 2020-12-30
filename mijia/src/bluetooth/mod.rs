@@ -1,33 +1,31 @@
 mod bleuuid;
-mod bluetooth_event;
+mod events;
 mod introspect;
 
 pub use self::bleuuid::{uuid_from_u16, uuid_from_u32, BleUuid};
-pub use self::bluetooth_event::BluetoothEvent;
+pub use self::events::{AdapterEvent, BluetoothEvent, CharacteristicEvent, DeviceEvent};
 use self::introspect::Node;
 use bluez_generated::{
     OrgBluezAdapter1, OrgBluezDevice1, OrgBluezGattCharacteristic1, OrgBluezGattService1,
 };
-use core::fmt::Debug;
-use core::future::Future;
 use dbus::arg::{RefArg, Variant};
 use dbus::nonblock::stdintf::org_freedesktop_dbus::{Introspectable, ObjectManager, Properties};
-use dbus::nonblock::MsgMatch;
-use dbus::nonblock::{Proxy, SyncConnection};
+use dbus::nonblock::{MsgMatch, Proxy, SyncConnection};
 use dbus::Message;
 use futures::channel::mpsc::UnboundedReceiver;
+use futures::stream::{self, StreamExt};
 use futures::{FutureExt, Stream};
 use itertools::Itertools;
 use std::collections::HashMap;
 use std::error::Error;
-use std::fmt::{self, Display, Formatter};
+use std::fmt::{self, Debug, Display, Formatter};
+use std::future::Future;
 use std::pin::Pin;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::time::Duration;
 use thiserror::Error;
-use tokio::stream::StreamExt;
 use tokio::task::JoinError;
 use tokio_compat_02::FutureExt as _;
 use uuid::Uuid;
@@ -549,7 +547,8 @@ impl BluetoothSession {
 
         let msg_match = self.connection.add_match(rule).compat().await?;
         let event_stream = EventStream::new(msg_match, self.connection.clone());
-        Ok(event_stream.filter_map(BluetoothEvent::from))
+        Ok(event_stream
+            .flat_map(|message| stream::iter(BluetoothEvent::message_to_events(message))))
     }
 }
 
