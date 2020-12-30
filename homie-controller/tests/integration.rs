@@ -208,7 +208,7 @@ fn spawn_mqtt_broker(port: u16) {
     max_inflight_size = 1024
 
     [console]
-    port = 13030
+    port = 0
     "#,
         port
     ))
