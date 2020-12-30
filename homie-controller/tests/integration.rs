@@ -8,7 +8,7 @@ use homie_device::{HomieDevice, Node, Property, SpawnError};
 use librumqttd::{Broker, Config};
 use rumqttc::{ConnectionError, MqttOptions, StateError};
 use std::io::ErrorKind;
-use std::sync::{Arc, Mutex};
+use std::sync::mpsc;
 use std::thread;
 
 // A high port number which is hopefully not in use, to use for the MQTT broker.
@@ -25,14 +25,13 @@ async fn test_device() {
     controller.start().await.unwrap();
 
     // Start device
-    let updates = Arc::new(Mutex::new(vec![]));
-    let updates_ref = updates.clone();
+    let (updates_tx, updates_rx) = mpsc::sync_channel(10);
     let device_options = MqttOptions::new("homie_device", "localhost", PORT);
     let mut device_builder = HomieDevice::builder("homie/device_id", "Device name", device_options);
     device_builder.set_update_callback(move |node_id, property_id, value| {
         assert_eq!(property_id, "property_id");
         assert_eq!(node_id, "node_id");
-        updates_ref.lock().unwrap().push(value.clone());
+        updates_tx.send(value.clone()).unwrap();
         ready(Some(value))
     });
     let (mut homie, homie_handle) = device_builder.spawn().await.unwrap();
@@ -163,7 +162,10 @@ async fn test_device() {
             }
         }
     }
-    assert_eq!(*updates.lock().unwrap(), vec!["13".to_string()]);
+    assert_eq!(
+        updates_rx.try_iter().collect::<Vec<_>>(),
+        vec!["13".to_string()]
+    );
 
     // Check that the value sent back is reflected on the controller's view of the device.
     {
