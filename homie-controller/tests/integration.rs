@@ -79,22 +79,24 @@ async fn test_device() {
     }
 
     // Check that the device looks how we expect.
-    let devices = controller.devices();
-    let device = devices.get("device_id").unwrap();
-    log::info!("Device: {:?}", device);
-    assert_eq!(device.name, Some("Device name".to_string()));
-    assert_eq!(device.homie_version, "4.0");
-    assert_eq!(device.state, State::Ready);
-    assert_eq!(device.nodes.len(), 1);
-    let node = device.nodes.get("node_id").unwrap();
-    assert_eq!(node.name, Some("Node name".to_string()));
-    assert_eq!(node.node_type, Some("node_type".to_string()));
-    assert_eq!(node.properties.len(), 1);
-    let property = node.properties.get("property_id").unwrap();
-    assert_eq!(property.name, Some("Property name".to_string()));
-    assert_eq!(property.settable, true);
-    assert_eq!(property.unit, Some("unit".to_string()));
-    assert_eq!(property.value, None);
+    {
+        let devices = controller.devices();
+        let device = devices.get("device_id").unwrap();
+        log::info!("Device: {:?}", device);
+        assert_eq!(device.name, Some("Device name".to_string()));
+        assert_eq!(device.homie_version, "4.0");
+        assert_eq!(device.state, State::Ready);
+        assert_eq!(device.nodes.len(), 1);
+        let node = device.nodes.get("node_id").unwrap();
+        assert_eq!(node.name, Some("Node name".to_string()));
+        assert_eq!(node.node_type, Some("node_type".to_string()));
+        assert_eq!(node.properties.len(), 1);
+        let property = node.properties.get("property_id").unwrap();
+        assert_eq!(property.name, Some("Property name".to_string()));
+        assert_eq!(property.settable, true);
+        assert_eq!(property.unit, Some("unit".to_string()));
+        assert_eq!(property.value, None);
+    }
 
     // Send a value from the device to the controller.
     homie
@@ -125,12 +127,14 @@ async fn test_device() {
     }
 
     // Check that the device looks how we expect.
-    let devices = controller.devices();
-    let device = devices.get("device_id").unwrap();
-    let node = device.nodes.get("node_id").unwrap();
-    let property = node.properties.get("property_id").unwrap();
-    log::info!("Property: {:?}", property);
-    assert_eq!(property.value(), Ok(42));
+    {
+        let devices = controller.devices();
+        let device = devices.get("device_id").unwrap();
+        let node = device.nodes.get("node_id").unwrap();
+        let property = node.properties.get("property_id").unwrap();
+        log::info!("Property: {:?}", property);
+        assert_eq!(property.value(), Ok(42));
+    }
 
     // Send a value from the controller to the device.
     controller
@@ -162,12 +166,14 @@ async fn test_device() {
     assert_eq!(*updates.lock().unwrap(), vec!["13".to_string()]);
 
     // Check that the value sent back is reflected on the controller's view of the device.
-    let devices = controller.devices();
-    let device = devices.get("device_id").unwrap();
-    let node = device.nodes.get("node_id").unwrap();
-    let property = node.properties.get("property_id").unwrap();
-    log::info!("Property: {:?}", property);
-    assert_eq!(property.value(), Ok(13));
+    {
+        let devices = controller.devices();
+        let device = devices.get("device_id").unwrap();
+        let node = device.nodes.get("node_id").unwrap();
+        let property = node.properties.get("property_id").unwrap();
+        log::info!("Property: {:?}", property);
+        assert_eq!(property.value(), Ok(13));
+    }
 
     // Disconnect the device.
     homie.disconnect().await.unwrap();
