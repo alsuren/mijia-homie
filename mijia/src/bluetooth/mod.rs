@@ -407,7 +407,7 @@ impl BluetoothSession {
         services
             .into_iter()
             .find(|service_info| service_info.uuid == uuid)
-            .ok_or_else(|| BluetoothError::UUIDNotFound { uuid })
+            .ok_or(BluetoothError::UUIDNotFound { uuid })
     }
 
     /// Find a characteristic with the given UUID as part of the given GATT service advertised by a
@@ -421,7 +421,7 @@ impl BluetoothSession {
         characteristics
             .into_iter()
             .find(|characteristic_info| characteristic_info.uuid == uuid)
-            .ok_or_else(|| BluetoothError::UUIDNotFound { uuid })
+            .ok_or(BluetoothError::UUIDNotFound { uuid })
     }
 
     /// Convenience method to get a GATT charactacteristic with the given UUID advertised by a
