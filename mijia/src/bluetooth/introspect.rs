@@ -1,4 +1,7 @@
+use dbus::nonblock::stdintf::org_freedesktop_dbus::Introspectable;
 use serde_derive::Deserialize;
+
+use super::BluetoothError;
 
 #[derive(Clone, Debug, Deserialize, PartialEq)]
 pub struct Node {
@@ -102,6 +105,12 @@ pub enum Access {
     Read,
     #[serde(rename = "write")]
     Write,
+}
+
+pub async fn introspect(introspectable: &impl Introspectable) -> Result<Node, BluetoothError> {
+    let introspection_xml: String = introspectable.introspect().await?;
+    let device_node: Node = serde_xml_rs::from_str(&introspection_xml)?;
+    Ok(device_node)
 }
 
 #[cfg(test)]

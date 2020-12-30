@@ -5,7 +5,7 @@ mod messagestream;
 
 pub use self::bleuuid::{uuid_from_u16, uuid_from_u32, BleUuid};
 pub use self::events::{AdapterEvent, BluetoothEvent, CharacteristicEvent, DeviceEvent};
-use self::introspect::Node;
+use self::introspect::introspect;
 use self::messagestream::MessageStream;
 use bluez_generated::{
     OrgBluezAdapter1, OrgBluezDevice1, OrgBluezGattCharacteristic1, OrgBluezGattService1,
@@ -339,8 +339,7 @@ impl BluetoothSession {
         &self,
         device: &DeviceId,
     ) -> Result<Vec<ServiceInfo>, BluetoothError> {
-        let introspection_xml = self.device(device).introspect().compat().await?;
-        let device_node: Node = serde_xml_rs::from_str(&introspection_xml)?;
+        let device_node = introspect(&self.device(device)).compat().await?;
         let mut services = vec![];
         for subnode in device_node.nodes {
             let subnode_name = subnode.name.as_ref().unwrap();
@@ -366,8 +365,7 @@ impl BluetoothSession {
         &self,
         service: &ServiceId,
     ) -> Result<Vec<CharacteristicInfo>, BluetoothError> {
-        let introspection_xml = self.service(service).introspect().compat().await?;
-        let service_node: Node = serde_xml_rs::from_str(&introspection_xml)?;
+        let service_node = introspect(&self.service(service)).compat().await?;
         let mut characteristics = vec![];
         for subnode in service_node.nodes {
             let subnode_name = subnode.name.as_ref().unwrap();
