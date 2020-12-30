@@ -1,6 +1,10 @@
-use crate::bluetooth_event::BluetoothEvent;
-use crate::introspect::Node;
-use crate::DBUS_METHOD_CALL_TIMEOUT;
+mod bleuuid;
+mod bluetooth_event;
+mod introspect;
+
+pub use self::bleuuid::{uuid_from_u16, uuid_from_u32, BleUuid};
+pub use self::bluetooth_event::BluetoothEvent;
+use self::introspect::Node;
 use bluez_generated::{
     OrgBluezAdapter1, OrgBluezDevice1, OrgBluezGattCharacteristic1, OrgBluezGattService1,
 };
@@ -21,11 +25,14 @@ use std::pin::Pin;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::task::{Context, Poll};
+use std::time::Duration;
 use thiserror::Error;
 use tokio::stream::StreamExt;
 use tokio::task::JoinError;
 use tokio_compat_02::FutureExt as _;
 use uuid::Uuid;
+
+const DBUS_METHOD_CALL_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// An error carrying out a Bluetooth operation.
 #[derive(Debug, Error)]
@@ -400,7 +407,7 @@ impl BluetoothSession {
         services
             .into_iter()
             .find(|service_info| service_info.uuid == uuid)
-            .ok_or_else(|| BluetoothError::UUIDNotFound { uuid })
+            .ok_or(BluetoothError::UUIDNotFound { uuid })
     }
 
     /// Find a characteristic with the given UUID as part of the given GATT service advertised by a
@@ -414,7 +421,7 @@ impl BluetoothSession {
         characteristics
             .into_iter()
             .find(|characteristic_info| characteristic_info.uuid == uuid)
-            .ok_or_else(|| BluetoothError::UUIDNotFound { uuid })
+            .ok_or(BluetoothError::UUIDNotFound { uuid })
     }
 
     /// Convenience method to get a GATT charactacteristic with the given UUID advertised by a
@@ -497,7 +504,7 @@ impl BluetoothSession {
     }
 
     /// Read the value of the given GATT characteristic.
-    pub(crate) async fn read_characteristic_value(
+    pub async fn read_characteristic_value(
         &self,
         id: &CharacteristicId,
     ) -> Result<Vec<u8>, BluetoothError> {
@@ -506,7 +513,7 @@ impl BluetoothSession {
     }
 
     /// Write the given value to the given GATT characteristic.
-    pub(crate) async fn write_characteristic_value(
+    pub async fn write_characteristic_value(
         &self,
         id: &CharacteristicId,
         value: impl Into<Vec<u8>>,
@@ -519,14 +526,14 @@ impl BluetoothSession {
     }
 
     /// Start notifications on the given GATT characteristic.
-    pub(crate) async fn start_notify(&self, id: &CharacteristicId) -> Result<(), BluetoothError> {
+    pub async fn start_notify(&self, id: &CharacteristicId) -> Result<(), BluetoothError> {
         let characteristic = self.characteristic(id);
         characteristic.start_notify().compat().await?;
         Ok(())
     }
 
     /// Stop notifications on the given GATT characteristic.
-    pub(crate) async fn stop_notify(&self, id: &CharacteristicId) -> Result<(), BluetoothError> {
+    pub async fn stop_notify(&self, id: &CharacteristicId) -> Result<(), BluetoothError> {
         let characteristic = self.characteristic(id);
         characteristic.stop_notify().compat().await?;
         Ok(())

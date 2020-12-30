@@ -9,10 +9,8 @@ use futures::stream::StreamExt;
 use futures::TryFutureExt;
 use homie_device::{HomieDevice, Node, Property};
 use itertools::Itertools;
-use mijia::{
-    BluetoothError, BluetoothSession, DeviceId, MacAddress, MijiaEvent, MijiaSession, Readings,
-    SensorProps,
-};
+use mijia::bluetooth::{BluetoothError, BluetoothSession, DeviceId, MacAddress};
+use mijia::{MijiaEvent, MijiaSession, Readings, SensorProps};
 use stable_eyre::eyre;
 use stable_eyre::eyre::WrapErr;
 use std::collections::HashMap;

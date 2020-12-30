@@ -6,7 +6,7 @@ edition = "2018"
 license = "MIT OR Apache-2.0"
 description = "A library for connecting to Xiaomi Mijia 2 Bluetooth temperature/humidity sensors."
 repository = "https://github.com/alsuren/mijia-homie/"
-keywords = ["blue", "bluetooth"]
+keywords = ["ble", "bluetooth", "humidity", "temperature"]
 categories = ["hardware-support"]
 
 [dependencies]
@@ -14,7 +14,7 @@ bluez-generated = { version = "0.2.0", path = "../bluez-generated" }
 dbus = { version = "0.9.0", features = ["futures"] }
 dbus-tokio = "0.6.0"
 futures = "0.3.8"
-itertools = "0.9.0"
+itertools = "0.10.0"
 log = "0.4.11"
 serde = "1.0.118"
 serde_derive = "1.0.118"
