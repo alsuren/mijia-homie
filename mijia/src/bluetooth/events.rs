@@ -113,6 +113,8 @@ impl BluetoothEvent {
                 }
                 _ => {}
             }
+        } else {
+            log::info!("Other message: {:?}", message);
         }
         events
     }
