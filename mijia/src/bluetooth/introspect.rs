@@ -1,4 +1,8 @@
+use async_trait::async_trait;
+use dbus::nonblock::stdintf::org_freedesktop_dbus::Introspectable;
 use serde_derive::Deserialize;
+
+use super::BluetoothError;
 
 #[derive(Clone, Debug, Deserialize, PartialEq)]
 pub struct Node {
@@ -102,6 +106,22 @@ pub enum Access {
     Read,
     #[serde(rename = "write")]
     Write,
+}
+
+/// Extension trait to introspect D-Bus objects and parse the resulting XML into a typed structure.
+#[async_trait]
+pub trait IntrospectParse {
+    async fn introspect_parse(&self) -> Result<Node, BluetoothError>;
+}
+
+#[async_trait]
+impl<T: Introspectable + Sync> IntrospectParse for T {
+    /// Introspect this object, and parse the resulting XML into a typed structure.
+    async fn introspect_parse(&self) -> Result<Node, BluetoothError> {
+        let introspection_xml: String = self.introspect().await?;
+        let device_node: Node = serde_xml_rs::from_str(&introspection_xml)?;
+        Ok(device_node)
+    }
 }
 
 #[cfg(test)]
