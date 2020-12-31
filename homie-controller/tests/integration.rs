@@ -162,10 +162,7 @@ async fn test_device() {
             }
         }
     }
-    assert_eq!(
-        updates_rx.try_iter().collect::<Vec<_>>(),
-        vec!["13".to_string()]
-    );
+    assert_eq!(updates_rx.try_iter().collect::<Vec<_>>(), vec!["13"]);
 
     // Check that the value sent back is reflected on the controller's view of the device.
     {
@@ -221,6 +218,9 @@ fn spawn_mqtt_broker(port: u16) {
     .unwrap();
     let mut broker = Broker::new(broker_config);
     thread::spawn(move || {
-        broker.start().unwrap();
+        broker.start().expect(&format!(
+            "Failed to start MQTT broker. This may be because port {} is already in use",
+            port,
+        ));
     });
 }
