@@ -1,7 +1,6 @@
+use async_trait::async_trait;
 use dbus::nonblock::stdintf::org_freedesktop_dbus::Introspectable;
-use futures::Future;
 use serde_derive::Deserialize;
-use std::pin::Pin;
 
 use super::BluetoothError;
 
@@ -110,23 +109,18 @@ pub enum Access {
 }
 
 /// Extension trait to introspect D-Bus objects and parse the resulting XML into a typed structure.
+#[async_trait]
 pub trait IntrospectParse {
-    fn introspect_parse(
-        &self,
-    ) -> Pin<Box<dyn Future<Output = Result<Node, BluetoothError>> + Send>>;
+    async fn introspect_parse(&self) -> Result<Node, BluetoothError>;
 }
 
-impl<T: Introspectable> IntrospectParse for T {
+#[async_trait]
+impl<T: Introspectable + Sync> IntrospectParse for T {
     /// Introspect this object, and parse the resulting XML into a typed structure.
-    fn introspect_parse(
-        &self,
-    ) -> Pin<Box<dyn Future<Output = Result<Node, BluetoothError>> + Send>> {
-        let introspect_future = self.introspect();
-        Box::pin(async move {
-            let introspection_xml: String = introspect_future.await?;
-            let device_node: Node = serde_xml_rs::from_str(&introspection_xml)?;
-            Ok(device_node)
-        })
+    async fn introspect_parse(&self) -> Result<Node, BluetoothError> {
+        let introspection_xml: String = self.introspect().await?;
+        let device_node: Node = serde_xml_rs::from_str(&introspection_xml)?;
+        Ok(device_node)
     }
 }
 
