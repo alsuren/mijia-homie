@@ -7,6 +7,7 @@ use homie_controller::{Event, HomieController, State};
 use homie_device::{HomieDevice, Node, Property, SpawnError};
 use librumqttd::{Broker, Config};
 use rumqttc::{ConnectionError, MqttOptions, StateError};
+use std::env;
 use std::io::ErrorKind;
 use std::sync::mpsc;
 use std::thread;
@@ -16,6 +17,12 @@ const PORT: u16 = 10883;
 
 #[tokio::test]
 async fn test_device() {
+    let mut log_builder = pretty_env_logger::formatted_builder();
+    if let Ok(s) = env::var("RUST_LOG") {
+        log_builder.parse_filters(&s);
+    }
+    let _ = log_builder.is_test(true).try_init();
+
     // Start MQTT broker.
     spawn_mqtt_broker(PORT);
 
