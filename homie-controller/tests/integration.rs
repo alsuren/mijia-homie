@@ -182,12 +182,20 @@ async fn test_device() {
     }
 
     // Disconnect the device.
-    homie.disconnect().await.unwrap();
-    let err = homie_handle.await.unwrap_err();
-    if let SpawnError::Connection(ConnectionError::MqttState(StateError::Io(e))) = err {
-        assert_eq!(e.kind(), ErrorKind::ConnectionAborted);
-    } else {
-        panic!("Unexpected error {:?}", err);
+    {
+        homie.disconnect().await.unwrap();
+        let err = homie_handle.await.unwrap_err();
+        if let SpawnError::Connection(ConnectionError::MqttState(StateError::Io(e))) = err {
+            assert_eq!(e.kind(), ErrorKind::ConnectionAborted);
+        } else {
+            panic!("Unexpected error {:?}", err);
+        }
+    }
+
+    // Disconnect the controller.
+    controller.disconnect().await.unwrap();
+    while let Ok(event) = controller.poll(&mut event_loop).await {
+        log::trace!("Event: {:?}", event);
     }
 }
 
