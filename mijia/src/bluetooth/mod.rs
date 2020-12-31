@@ -539,13 +539,11 @@ impl BluetoothSession {
 
     /// Get a stream of events for all devices.
     pub async fn event_stream(&self) -> Result<impl Stream<Item = BluetoothEvent>, BluetoothError> {
-        let mut rule = dbus::message::MatchRule::new();
-        rule.msg_type = Some(dbus::message::MessageType::Signal);
-        // BusName validation just checks that the length and format is valid, so it should never
-        // fail for a constant that we know is valid.
-        rule.sender = Some(dbus::strings::BusName::new("org.bluez").unwrap());
-
-        let msg_match = self.connection.add_match(rule).compat().await?;
+        let msg_match = self
+            .connection
+            .add_match(BluetoothEvent::match_rule())
+            .compat()
+            .await?;
         let event_stream = EventStream::new(msg_match, self.connection.clone());
         Ok(event_stream
             .flat_map(|message| stream::iter(BluetoothEvent::message_to_events(message))))

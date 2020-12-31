@@ -1,5 +1,5 @@
 use dbus::arg::prop_cast;
-use dbus::message::SignalArgs;
+use dbus::message::{MatchRule, SignalArgs};
 use dbus::nonblock::stdintf::org_freedesktop_dbus::PropertiesPropertiesChanged;
 use dbus::Message;
 
@@ -57,6 +57,14 @@ pub enum CharacteristicEvent {
 }
 
 impl BluetoothEvent {
+    /// Return a `MatchRule` which will match all D-Bus messages which represent Bluetooth events.
+    pub(crate) fn match_rule() -> MatchRule<'static> {
+        // BusName validation just checks that the length and format is valid, so it should never
+        // fail for a constant that we know is valid.
+        let bus_name = "org.bluez".into();
+        PropertiesPropertiesChanged::match_rule(Some(&bus_name), None).static_clone()
+    }
+
     /// Return a list of Bluetooth events parsed from the given D-Bus message.
     pub(crate) fn message_to_events(message: Message) -> Vec<BluetoothEvent> {
         let mut events = vec![];
@@ -114,7 +122,7 @@ impl BluetoothEvent {
                 _ => {}
             }
         } else {
-            log::info!("Other message: {:?}", message);
+            log::info!("Unexpected message: {:?}", message);
         }
         events
     }
