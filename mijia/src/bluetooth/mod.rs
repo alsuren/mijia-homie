@@ -1,18 +1,18 @@
 mod bleuuid;
 mod events;
 mod introspect;
+mod messagestream;
 
 pub use self::bleuuid::{uuid_from_u16, uuid_from_u32, BleUuid};
 pub use self::events::{AdapterEvent, BluetoothEvent, CharacteristicEvent, DeviceEvent};
 use self::introspect::Node;
+use self::messagestream::MessageStream;
 use bluez_generated::{
     OrgBluezAdapter1, OrgBluezDevice1, OrgBluezGattCharacteristic1, OrgBluezGattService1,
 };
 use dbus::arg::{RefArg, Variant};
 use dbus::nonblock::stdintf::org_freedesktop_dbus::{Introspectable, ObjectManager, Properties};
-use dbus::nonblock::{MsgMatch, Proxy, SyncConnection};
-use dbus::Message;
-use futures::channel::mpsc::UnboundedReceiver;
+use dbus::nonblock::{Proxy, SyncConnection};
 use futures::stream::{self, StreamExt};
 use futures::{FutureExt, Stream};
 use itertools::Itertools;
@@ -20,10 +20,8 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::fmt::{self, Debug, Display, Formatter};
 use std::future::Future;
-use std::pin::Pin;
 use std::str::FromStr;
 use std::sync::Arc;
-use std::task::{Context, Poll};
 use std::time::Duration;
 use thiserror::Error;
 use tokio::task::JoinError;
@@ -544,50 +542,9 @@ impl BluetoothSession {
             .add_match(BluetoothEvent::match_rule())
             .compat()
             .await?;
-        let event_stream = EventStream::new(msg_match, self.connection.clone());
-        Ok(event_stream
+        let message_stream = MessageStream::new(msg_match, self.connection.clone());
+        Ok(message_stream
             .flat_map(|message| stream::iter(BluetoothEvent::message_to_events(message))))
-    }
-}
-
-/// Wrapper for a stream of D-Bus events which automatically removes the `MsgMatch` from the D-Bus
-/// connection when it is dropped.
-struct EventStream {
-    msg_match: Option<MsgMatch>,
-    events: UnboundedReceiver<Message>,
-    connection: Arc<SyncConnection>,
-}
-
-impl EventStream {
-    fn new(msg_match: MsgMatch, connection: Arc<SyncConnection>) -> Self {
-        let (msg_match, events) = msg_match.msg_stream();
-        Self {
-            msg_match: Some(msg_match),
-            events,
-            connection,
-        }
-    }
-}
-
-impl Stream for EventStream {
-    type Item = Message;
-
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        Pin::new(&mut self.events).poll_next(cx)
-    }
-}
-
-impl Drop for EventStream {
-    fn drop(&mut self) {
-        let connection = self.connection.clone();
-        let msg_match = self.msg_match.take().unwrap();
-        tokio::spawn(async move {
-            connection
-                .remove_match(msg_match.token())
-                .compat()
-                .await
-                .unwrap()
-        });
     }
 }
 
