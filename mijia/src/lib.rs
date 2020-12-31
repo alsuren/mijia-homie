@@ -11,7 +11,8 @@ use uuid::Uuid;
 pub mod bluetooth;
 mod decode;
 use bluetooth::{
-    BluetoothError, BluetoothEvent, BluetoothSession, DeviceId, MacAddress, SpawnError,
+    BluetoothError, BluetoothEvent, BluetoothSession, CharacteristicEvent, DeviceEvent, DeviceId,
+    MacAddress, SpawnError,
 };
 pub use decode::comfort_level::ComfortLevel;
 use decode::history::decode_range;
@@ -86,9 +87,9 @@ pub enum MijiaEvent {
 impl MijiaEvent {
     async fn from(event: BluetoothEvent, session: BluetoothSession) -> Option<Self> {
         match event {
-            BluetoothEvent::Value {
-                characteristic,
-                value,
+            BluetoothEvent::Characteristic {
+                id: characteristic,
+                event: CharacteristicEvent::Value { value },
             } => {
                 let info = session
                     .get_characteristic_info(&characteristic)
@@ -126,10 +127,10 @@ impl MijiaEvent {
                     }
                 }
             }
-            BluetoothEvent::Connected {
-                device,
-                connected: false,
-            } => Some(MijiaEvent::Disconnected { id: device }),
+            BluetoothEvent::Device {
+                id,
+                event: DeviceEvent::Connected { connected: false },
+            } => Some(MijiaEvent::Disconnected { id }),
             _ => None,
         }
     }

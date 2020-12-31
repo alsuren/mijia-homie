@@ -1,33 +1,29 @@
 mod bleuuid;
-mod bluetooth_event;
+mod events;
 mod introspect;
+mod messagestream;
 
 pub use self::bleuuid::{uuid_from_u16, uuid_from_u32, BleUuid};
-pub use self::bluetooth_event::BluetoothEvent;
+pub use self::events::{AdapterEvent, BluetoothEvent, CharacteristicEvent, DeviceEvent};
 use self::introspect::Node;
+use self::messagestream::MessageStream;
 use bluez_generated::{
     OrgBluezAdapter1, OrgBluezDevice1, OrgBluezGattCharacteristic1, OrgBluezGattService1,
 };
-use core::fmt::Debug;
-use core::future::Future;
 use dbus::arg::{RefArg, Variant};
 use dbus::nonblock::stdintf::org_freedesktop_dbus::{Introspectable, ObjectManager, Properties};
-use dbus::nonblock::MsgMatch;
 use dbus::nonblock::{Proxy, SyncConnection};
-use dbus::Message;
-use futures::channel::mpsc::UnboundedReceiver;
+use futures::stream::{self, StreamExt};
 use futures::{FutureExt, Stream};
 use itertools::Itertools;
 use std::collections::HashMap;
 use std::error::Error;
-use std::fmt::{self, Display, Formatter};
-use std::pin::Pin;
+use std::fmt::{self, Debug, Display, Formatter};
+use std::future::Future;
 use std::str::FromStr;
 use std::sync::Arc;
-use std::task::{Context, Poll};
 use std::time::Duration;
 use thiserror::Error;
-use tokio::stream::StreamExt;
 use tokio::task::JoinError;
 use tokio_compat_02::FutureExt as _;
 use uuid::Uuid;
@@ -541,56 +537,14 @@ impl BluetoothSession {
 
     /// Get a stream of events for all devices.
     pub async fn event_stream(&self) -> Result<impl Stream<Item = BluetoothEvent>, BluetoothError> {
-        let mut rule = dbus::message::MatchRule::new();
-        rule.msg_type = Some(dbus::message::MessageType::Signal);
-        // BusName validation just checks that the length and format is valid, so it should never
-        // fail for a constant that we know is valid.
-        rule.sender = Some(dbus::strings::BusName::new("org.bluez").unwrap());
-
-        let msg_match = self.connection.add_match(rule).compat().await?;
-        let event_stream = EventStream::new(msg_match, self.connection.clone());
-        Ok(event_stream.filter_map(BluetoothEvent::from))
-    }
-}
-
-/// Wrapper for a stream of D-Bus events which automatically removes the `MsgMatch` from the D-Bus
-/// connection when it is dropped.
-struct EventStream {
-    msg_match: Option<MsgMatch>,
-    events: UnboundedReceiver<Message>,
-    connection: Arc<SyncConnection>,
-}
-
-impl EventStream {
-    fn new(msg_match: MsgMatch, connection: Arc<SyncConnection>) -> Self {
-        let (msg_match, events) = msg_match.msg_stream();
-        Self {
-            msg_match: Some(msg_match),
-            events,
-            connection,
-        }
-    }
-}
-
-impl Stream for EventStream {
-    type Item = Message;
-
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        Pin::new(&mut self.events).poll_next(cx)
-    }
-}
-
-impl Drop for EventStream {
-    fn drop(&mut self) {
-        let connection = self.connection.clone();
-        let msg_match = self.msg_match.take().unwrap();
-        tokio::spawn(async move {
-            connection
-                .remove_match(msg_match.token())
-                .compat()
-                .await
-                .unwrap()
-        });
+        let msg_match = self
+            .connection
+            .add_match(BluetoothEvent::match_rule())
+            .compat()
+            .await?;
+        let message_stream = MessageStream::new(msg_match, self.connection.clone());
+        Ok(message_stream
+            .flat_map(|message| stream::iter(BluetoothEvent::message_to_events(message))))
     }
 }
 
