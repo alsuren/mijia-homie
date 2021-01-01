@@ -3,7 +3,7 @@ use dbus::message::{MatchRule, SignalArgs};
 use dbus::nonblock::stdintf::org_freedesktop_dbus::{
     ObjectManagerInterfacesAdded, PropertiesPropertiesChanged,
 };
-use dbus::Message;
+use dbus::{Message, Path};
 
 use super::{AdapterId, CharacteristicId, DeviceId};
 
@@ -71,73 +71,90 @@ impl BluetoothEvent {
 
     /// Return a list of Bluetooth events parsed from the given D-Bus message.
     pub(crate) fn message_to_events(message: Message) -> Vec<BluetoothEvent> {
-        let mut events = vec![];
-        // Return events for PropertiesChanged signals.
         if let Some(properties_changed) = PropertiesPropertiesChanged::from_message(&message) {
             let object_path = message.path().unwrap().into_static();
-            log::trace!(
-                "PropertiesChanged for {}: {:?}",
-                object_path,
-                properties_changed
-            );
-            let changed_properties = &properties_changed.changed_properties;
-            match properties_changed.interface_name.as_ref() {
-                "org.bluez.Adapter1" => {
-                    let id = AdapterId { object_path };
-                    if let Some(&powered) = prop_cast(changed_properties, "Powered") {
-                        events.push(BluetoothEvent::Adapter {
-                            id: id.clone(),
-                            event: AdapterEvent::Powered { powered },
-                        })
-                    }
-                    if let Some(&discovering) = prop_cast(changed_properties, "Discovering") {
-                        events.push(BluetoothEvent::Adapter {
-                            id,
-                            event: AdapterEvent::Discovering { discovering },
-                        });
-                    }
-                }
-                "org.bluez.Device1" => {
-                    let id = DeviceId { object_path };
-                    if let Some(&connected) = prop_cast(changed_properties, "Connected") {
-                        events.push(BluetoothEvent::Device {
-                            id: id.clone(),
-                            event: DeviceEvent::Connected { connected },
-                        });
-                    }
-                    if let Some(&rssi) = prop_cast(changed_properties, "RSSI") {
-                        events.push(BluetoothEvent::Device {
-                            id,
-                            event: DeviceEvent::RSSI { rssi },
-                        });
-                    }
-                }
-                "org.bluez.GattCharacteristic1" => {
-                    let id = CharacteristicId { object_path };
-                    if let Some(value) = prop_cast::<Vec<u8>>(changed_properties, "Value") {
-                        events.push(BluetoothEvent::Characteristic {
-                            id,
-                            event: CharacteristicEvent::Value {
-                                value: value.to_owned(),
-                            },
-                        })
-                    }
-                }
-                _ => {}
-            }
+            Self::properties_changed_to_events(object_path, properties_changed)
         } else if let Some(interfaces_added) = ObjectManagerInterfacesAdded::from_message(&message)
         {
-            log::trace!("InterfacesAdded: {:#?}", interfaces_added);
-            let object_path = interfaces_added.object;
-            if let Some(_device) = interfaces_added.interfaces.get("org.bluez.Device1") {
-                let id = DeviceId { object_path };
-                events.push(BluetoothEvent::Device {
-                    id,
-                    event: DeviceEvent::Discovered,
-                })
-            }
+            Self::interfaces_added_to_events(interfaces_added)
         } else {
             log::info!("Unexpected message: {:?}", message);
+            vec![]
+        }
+    }
+
+    /// Return a list of Bluetooth events parsed from an InterfacesAdded signal.
+    fn interfaces_added_to_events(
+        interfaces_added: ObjectManagerInterfacesAdded,
+    ) -> Vec<BluetoothEvent> {
+        log::trace!("InterfacesAdded: {:#?}", interfaces_added);
+        let mut events = vec![];
+        let object_path = interfaces_added.object;
+        if let Some(_device) = interfaces_added.interfaces.get("org.bluez.Device1") {
+            let id = DeviceId { object_path };
+            events.push(BluetoothEvent::Device {
+                id,
+                event: DeviceEvent::Discovered,
+            })
+        }
+        events
+    }
+
+    /// Return a list of Bluetooth events parsed from a PropertiesChanged signal.
+    fn properties_changed_to_events(
+        object_path: Path<'static>,
+        properties_changed: PropertiesPropertiesChanged,
+    ) -> Vec<BluetoothEvent> {
+        log::trace!(
+            "PropertiesChanged for {}: {:?}",
+            object_path,
+            properties_changed
+        );
+        let mut events = vec![];
+        let changed_properties = &properties_changed.changed_properties;
+        match properties_changed.interface_name.as_ref() {
+            "org.bluez.Adapter1" => {
+                let id = AdapterId { object_path };
+                if let Some(&powered) = prop_cast(changed_properties, "Powered") {
+                    events.push(BluetoothEvent::Adapter {
+                        id: id.clone(),
+                        event: AdapterEvent::Powered { powered },
+                    })
+                }
+                if let Some(&discovering) = prop_cast(changed_properties, "Discovering") {
+                    events.push(BluetoothEvent::Adapter {
+                        id,
+                        event: AdapterEvent::Discovering { discovering },
+                    });
+                }
+            }
+            "org.bluez.Device1" => {
+                let id = DeviceId { object_path };
+                if let Some(&connected) = prop_cast(changed_properties, "Connected") {
+                    events.push(BluetoothEvent::Device {
+                        id: id.clone(),
+                        event: DeviceEvent::Connected { connected },
+                    });
+                }
+                if let Some(&rssi) = prop_cast(changed_properties, "RSSI") {
+                    events.push(BluetoothEvent::Device {
+                        id,
+                        event: DeviceEvent::RSSI { rssi },
+                    });
+                }
+            }
+            "org.bluez.GattCharacteristic1" => {
+                let id = CharacteristicId { object_path };
+                if let Some(value) = prop_cast::<Vec<u8>>(changed_properties, "Value") {
+                    events.push(BluetoothEvent::Characteristic {
+                        id,
+                        event: CharacteristicEvent::Value {
+                            value: value.to_owned(),
+                        },
+                    })
+                }
+            }
+            _ => {}
         }
         events
     }
