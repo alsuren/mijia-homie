@@ -1,4 +1,6 @@
-use dbus::arg::prop_cast;
+use bluez_generated::{
+    OrgBluezAdapter1Properties, OrgBluezDevice1Properties, OrgBluezGattCharacteristic1Properties,
+};
 use dbus::message::{MatchRule, SignalArgs};
 use dbus::nonblock::stdintf::org_freedesktop_dbus::{
     ObjectManagerInterfacesAdded, PropertiesPropertiesChanged,
@@ -116,7 +118,9 @@ impl BluetoothEvent {
         log::trace!("InterfacesAdded: {:?}", interfaces_added);
         let mut events = vec![];
         let object_path = interfaces_added.object;
-        if let Some(_device) = interfaces_added.interfaces.get("org.bluez.Device1") {
+        if let Some(_device) =
+            OrgBluezDevice1Properties::from_interfaces(&interfaces_added.interfaces)
+        {
             let id = DeviceId { object_path };
             events.push(BluetoothEvent::Device {
                 id,
@@ -139,39 +143,42 @@ impl BluetoothEvent {
         let mut events = vec![];
         let changed_properties = &properties_changed.changed_properties;
         match properties_changed.interface_name.as_ref() {
-            "org.bluez.Adapter1" => {
+            OrgBluezAdapter1Properties::INTERFACE_NAME => {
                 let id = AdapterId { object_path };
-                if let Some(&powered) = prop_cast(changed_properties, "Powered") {
+                let adapter = OrgBluezAdapter1Properties(changed_properties);
+                if let Some(powered) = adapter.powered() {
                     events.push(BluetoothEvent::Adapter {
                         id: id.clone(),
                         event: AdapterEvent::Powered { powered },
                     })
                 }
-                if let Some(&discovering) = prop_cast(changed_properties, "Discovering") {
+                if let Some(discovering) = adapter.discovering() {
                     events.push(BluetoothEvent::Adapter {
                         id,
                         event: AdapterEvent::Discovering { discovering },
                     });
                 }
             }
-            "org.bluez.Device1" => {
+            OrgBluezDevice1Properties::INTERFACE_NAME => {
                 let id = DeviceId { object_path };
-                if let Some(&connected) = prop_cast(changed_properties, "Connected") {
+                let device = OrgBluezDevice1Properties(changed_properties);
+                if let Some(connected) = device.connected() {
                     events.push(BluetoothEvent::Device {
                         id: id.clone(),
                         event: DeviceEvent::Connected { connected },
                     });
                 }
-                if let Some(&rssi) = prop_cast(changed_properties, "RSSI") {
+                if let Some(rssi) = device.rssi() {
                     events.push(BluetoothEvent::Device {
                         id,
                         event: DeviceEvent::RSSI { rssi },
                     });
                 }
             }
-            "org.bluez.GattCharacteristic1" => {
+            OrgBluezGattCharacteristic1Properties::INTERFACE_NAME => {
                 let id = CharacteristicId { object_path };
-                if let Some(value) = prop_cast::<Vec<u8>>(changed_properties, "Value") {
+                let characteristic = OrgBluezGattCharacteristic1Properties(changed_properties);
+                if let Some(value) = characteristic.value() {
                     events.push(BluetoothEvent::Characteristic {
                         id,
                         event: CharacteristicEvent::Value {
