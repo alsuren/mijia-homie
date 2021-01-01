@@ -1,7 +1,9 @@
 use dbus::arg::prop_cast;
 use dbus::message::{MatchRule, SignalArgs};
-use dbus::nonblock::stdintf::org_freedesktop_dbus::PropertiesPropertiesChanged;
-use dbus::Message;
+use dbus::nonblock::stdintf::org_freedesktop_dbus::{
+    ObjectManagerInterfacesAdded, PropertiesPropertiesChanged,
+};
+use dbus::{Message, MessageType};
 
 use super::{AdapterId, CharacteristicId, DeviceId};
 
@@ -43,6 +45,8 @@ pub enum AdapterEvent {
 /// Details of an event related to a Bluetooth device.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DeviceEvent {
+    /// A new device has been discovered.
+    Discovered,
     /// The device has connected or disconnected.
     Connected { connected: bool },
     /// A new value is available for the RSSI of the device.
@@ -121,6 +125,21 @@ impl BluetoothEvent {
                 }
                 _ => {}
             }
+        } else if let Some(interfaces_added) = ObjectManagerInterfacesAdded::from_message(&message)
+        {
+            let object_path = interfaces_added.object.to_string();
+            log::trace!(
+                "InterfacesAdded for {}: {:#?}",
+                object_path,
+                interfaces_added
+            );
+            if let Some(_device) = interfaces_added.interfaces.get("org.bluez.Device1") {
+                let id = DeviceId { object_path };
+                events.push(BluetoothEvent::Device {
+                    id,
+                    event: DeviceEvent::Discovered,
+                })
+            }
         } else {
             log::info!("Unexpected message: {:?}", message);
         }
@@ -197,6 +216,26 @@ mod tests {
             vec![BluetoothEvent::Characteristic {
                 id,
                 event: CharacteristicEvent::Value { value }
+            }]
+        )
+    }
+
+    #[test]
+    fn device_discovered() {
+        let properties = HashMap::new();
+        let mut interfaces = HashMap::new();
+        interfaces.insert("org.bluez.Device1".to_string(), properties);
+        let interfaces_added = ObjectManagerInterfacesAdded {
+            object: "/org/bluez/hci0/dev_11_22_33_44_55_66".into(),
+            interfaces,
+        };
+        let message = interfaces_added.to_emit_message(&"/".into());
+        let id = DeviceId::new("/org/bluez/hci0/dev_11_22_33_44_55_66");
+        assert_eq!(
+            BluetoothEvent::message_to_events(message),
+            vec![BluetoothEvent::Device {
+                id,
+                event: DeviceEvent::Discovered
             }]
         )
     }
