@@ -61,12 +61,32 @@ pub enum CharacteristicEvent {
 }
 
 impl BluetoothEvent {
-    /// Return a `MatchRule` which will match all D-Bus messages which represent Bluetooth events.
-    pub(crate) fn match_rule() -> MatchRule<'static> {
+    /// Return a set of `MatchRule`s which will match all D-Bus messages which represent Bluetooth
+    /// events.
+    pub(crate) fn match_rules() -> Vec<MatchRule<'static>> {
         // BusName validation just checks that the length and format is valid, so it should never
         // fail for a constant that we know is valid.
         let bus_name = "org.bluez".into();
-        PropertiesPropertiesChanged::match_rule(Some(&bus_name), None).static_clone()
+
+        let mut match_rules = vec![];
+
+        // Match ObjectManager signals so we can get events for new devices being discovered.
+        {
+            let match_rule =
+                ObjectManagerInterfacesAdded::match_rule(Some(&bus_name), None).static_clone();
+            match_rules.push(match_rule);
+        }
+
+        // Match PropertiesChanged signals for the given device or characteristic and all objects
+        // under it. If no object is specified then this will match PropertiesChanged signals for
+        // all BlueZ objects.
+        {
+            let match_rule =
+                PropertiesPropertiesChanged::match_rule(Some(&bus_name), None).static_clone();
+            match_rules.push(match_rule);
+        }
+
+        match_rules
     }
 
     /// Return a list of Bluetooth events parsed from the given D-Bus message.

@@ -14,7 +14,7 @@ use dbus::arg::{RefArg, Variant};
 use dbus::nonblock::stdintf::org_freedesktop_dbus::{Introspectable, ObjectManager, Properties};
 use dbus::nonblock::{Proxy, SyncConnection};
 use dbus::Path;
-use futures::stream::{self, StreamExt};
+use futures::stream::{self, select_all, StreamExt};
 use futures::{FutureExt, Stream};
 use itertools::Itertools;
 use std::collections::HashMap;
@@ -534,13 +534,12 @@ impl BluetoothSession {
 
     /// Get a stream of events for all devices.
     pub async fn event_stream(&self) -> Result<impl Stream<Item = BluetoothEvent>, BluetoothError> {
-        let msg_match = self
-            .connection
-            .add_match(BluetoothEvent::match_rule())
-            .compat()
-            .await?;
-        let message_stream = MessageStream::new(msg_match, self.connection.clone());
-        Ok(message_stream
+        let mut message_streams = vec![];
+        for match_rule in BluetoothEvent::match_rules() {
+            let msg_match = self.connection.add_match(match_rule).compat().await?;
+            message_streams.push(MessageStream::new(msg_match, self.connection.clone()));
+        }
+        Ok(select_all(message_streams)
             .flat_map(|message| stream::iter(BluetoothEvent::message_to_events(message))))
     }
 }
