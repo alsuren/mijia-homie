@@ -113,7 +113,7 @@ impl BluetoothEvent {
     fn interfaces_added_to_events(
         interfaces_added: ObjectManagerInterfacesAdded,
     ) -> Vec<BluetoothEvent> {
-        log::trace!("InterfacesAdded: {:#?}", interfaces_added);
+        log::trace!("InterfacesAdded: {:?}", interfaces_added);
         let mut events = vec![];
         let object_path = interfaces_added.object;
         if let Some(_device) = interfaces_added.interfaces.get("org.bluez.Device1") {
