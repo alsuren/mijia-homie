@@ -133,7 +133,6 @@ mod tests {
     use std::collections::HashMap;
 
     use dbus::arg::{RefArg, Variant};
-    use dbus::Path;
 
     use super::*;
 
@@ -146,7 +145,7 @@ mod tests {
             changed_properties,
             invalidated_properties: vec![],
         };
-        let message = properties_changed.to_emit_message(&Path::new("/org/bluez/hci0").unwrap());
+        let message = properties_changed.to_emit_message(&"/org/bluez/hci0".into());
         let id = AdapterId::new("/org/bluez/hci0");
         assert_eq!(
             BluetoothEvent::message_to_events(message),
@@ -167,8 +166,8 @@ mod tests {
             changed_properties,
             invalidated_properties: vec![],
         };
-        let message = properties_changed
-            .to_emit_message(&Path::new("/org/bluez/hci0/dev_11_22_33_44_55_66").unwrap());
+        let message =
+            properties_changed.to_emit_message(&"/org/bluez/hci0/dev_11_22_33_44_55_66".into());
         let id = DeviceId::new("/org/bluez/hci0/dev_11_22_33_44_55_66");
         assert_eq!(
             BluetoothEvent::message_to_events(message),
@@ -189,9 +188,8 @@ mod tests {
             changed_properties,
             invalidated_properties: vec![],
         };
-        let message = properties_changed.to_emit_message(
-            &Path::new("/org/bluez/hci0/dev_11_22_33_44_55_66/service0012/char0034").unwrap(),
-        );
+        let message = properties_changed
+            .to_emit_message(&"/org/bluez/hci0/dev_11_22_33_44_55_66/service0012/char0034".into());
         let id =
             CharacteristicId::new("/org/bluez/hci0/dev_11_22_33_44_55_66/service0012/char0034");
         assert_eq!(
