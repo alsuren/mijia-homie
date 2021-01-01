@@ -218,3 +218,73 @@ impl<'a, T: nonblock::NonblockReply, C: ::std::ops::Deref<Target = T>> OrgBluezA
         )
     }
 }
+
+#[derive(Copy, Clone, Debug)]
+pub struct OrgBluezAdapter1Properties<'a>(
+    pub &'a ::std::collections::HashMap<String, arg::Variant<Box<dyn arg::RefArg>>>,
+);
+
+impl<'a> OrgBluezAdapter1Properties<'a> {
+    pub const INTERFACE_NAME: &'static str = "org.bluez.Adapter1";
+
+    pub fn from_interfaces(
+        interfaces: &'a ::std::collections::HashMap<
+            String,
+            ::std::collections::HashMap<String, arg::Variant<Box<dyn arg::RefArg>>>,
+        >,
+    ) -> Option<Self> {
+        interfaces.get(Self::INTERFACE_NAME).map(Self)
+    }
+
+    pub fn address(&self) -> Option<&String> {
+        arg::prop_cast(self.0, "Address")
+    }
+
+    pub fn address_type(&self) -> Option<&String> {
+        arg::prop_cast(self.0, "AddressType")
+    }
+
+    pub fn name(&self) -> Option<&String> {
+        arg::prop_cast(self.0, "Name")
+    }
+
+    pub fn alias(&self) -> Option<&String> {
+        arg::prop_cast(self.0, "Alias")
+    }
+
+    pub fn class(&self) -> Option<u32> {
+        arg::prop_cast(self.0, "Class").copied()
+    }
+
+    pub fn powered(&self) -> Option<bool> {
+        arg::prop_cast(self.0, "Powered").copied()
+    }
+
+    pub fn discoverable(&self) -> Option<bool> {
+        arg::prop_cast(self.0, "Discoverable").copied()
+    }
+
+    pub fn discoverable_timeout(&self) -> Option<u32> {
+        arg::prop_cast(self.0, "DiscoverableTimeout").copied()
+    }
+
+    pub fn pairable(&self) -> Option<bool> {
+        arg::prop_cast(self.0, "Pairable").copied()
+    }
+
+    pub fn pairable_timeout(&self) -> Option<u32> {
+        arg::prop_cast(self.0, "PairableTimeout").copied()
+    }
+
+    pub fn discovering(&self) -> Option<bool> {
+        arg::prop_cast(self.0, "Discovering").copied()
+    }
+
+    pub fn uuids(&self) -> Option<&Vec<String>> {
+        arg::prop_cast(self.0, "UUIDs")
+    }
+
+    pub fn modalias(&self) -> Option<&String> {
+        arg::prop_cast(self.0, "Modalias")
+    }
+}

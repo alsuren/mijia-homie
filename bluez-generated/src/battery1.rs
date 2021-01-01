@@ -18,3 +18,25 @@ impl<'a, T: nonblock::NonblockReply, C: ::std::ops::Deref<Target = T>> OrgBluezB
         )
     }
 }
+
+#[derive(Copy, Clone, Debug)]
+pub struct OrgBluezBattery1Properties<'a>(
+    pub &'a ::std::collections::HashMap<String, arg::Variant<Box<dyn arg::RefArg>>>,
+);
+
+impl<'a> OrgBluezBattery1Properties<'a> {
+    pub const INTERFACE_NAME: &'static str = "org.bluez.Battery1";
+
+    pub fn from_interfaces(
+        interfaces: &'a ::std::collections::HashMap<
+            String,
+            ::std::collections::HashMap<String, arg::Variant<Box<dyn arg::RefArg>>>,
+        >,
+    ) -> Option<Self> {
+        interfaces.get(Self::INTERFACE_NAME).map(Self)
+    }
+
+    pub fn percentage(&self) -> Option<u8> {
+        arg::prop_cast(self.0, "Percentage").copied()
+    }
+}

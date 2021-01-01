@@ -45,3 +45,37 @@ impl<'a, T: nonblock::NonblockReply, C: ::std::ops::Deref<Target = T>> OrgBluezG
         )
     }
 }
+
+#[derive(Copy, Clone, Debug)]
+pub struct OrgBluezGattService1Properties<'a>(
+    pub &'a ::std::collections::HashMap<String, arg::Variant<Box<dyn arg::RefArg>>>,
+);
+
+impl<'a> OrgBluezGattService1Properties<'a> {
+    pub const INTERFACE_NAME: &'static str = "org.bluez.GattService1";
+
+    pub fn from_interfaces(
+        interfaces: &'a ::std::collections::HashMap<
+            String,
+            ::std::collections::HashMap<String, arg::Variant<Box<dyn arg::RefArg>>>,
+        >,
+    ) -> Option<Self> {
+        interfaces.get(Self::INTERFACE_NAME).map(Self)
+    }
+
+    pub fn uuid(&self) -> Option<&String> {
+        arg::prop_cast(self.0, "UUID")
+    }
+
+    pub fn device(&self) -> Option<&dbus::Path<'static>> {
+        arg::prop_cast(self.0, "Device")
+    }
+
+    pub fn primary(&self) -> Option<bool> {
+        arg::prop_cast(self.0, "Primary").copied()
+    }
+
+    pub fn includes(&self) -> Option<&Vec<dbus::Path<'static>>> {
+        arg::prop_cast(self.0, "Includes")
+    }
+}

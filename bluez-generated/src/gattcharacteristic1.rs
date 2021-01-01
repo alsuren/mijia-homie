@@ -133,3 +133,49 @@ impl<'a, T: nonblock::NonblockReply, C: ::std::ops::Deref<Target = T>> OrgBluezG
         )
     }
 }
+
+#[derive(Copy, Clone, Debug)]
+pub struct OrgBluezGattCharacteristic1Properties<'a>(
+    pub &'a ::std::collections::HashMap<String, arg::Variant<Box<dyn arg::RefArg>>>,
+);
+
+impl<'a> OrgBluezGattCharacteristic1Properties<'a> {
+    pub const INTERFACE_NAME: &'static str = "org.bluez.GattCharacteristic1";
+
+    pub fn from_interfaces(
+        interfaces: &'a ::std::collections::HashMap<
+            String,
+            ::std::collections::HashMap<String, arg::Variant<Box<dyn arg::RefArg>>>,
+        >,
+    ) -> Option<Self> {
+        interfaces.get(Self::INTERFACE_NAME).map(Self)
+    }
+
+    pub fn uuid(&self) -> Option<&String> {
+        arg::prop_cast(self.0, "UUID")
+    }
+
+    pub fn service(&self) -> Option<&dbus::Path<'static>> {
+        arg::prop_cast(self.0, "Service")
+    }
+
+    pub fn value(&self) -> Option<&Vec<u8>> {
+        arg::prop_cast(self.0, "Value")
+    }
+
+    pub fn notifying(&self) -> Option<bool> {
+        arg::prop_cast(self.0, "Notifying").copied()
+    }
+
+    pub fn flags(&self) -> Option<&Vec<String>> {
+        arg::prop_cast(self.0, "Flags")
+    }
+
+    pub fn write_acquired(&self) -> Option<bool> {
+        arg::prop_cast(self.0, "WriteAcquired").copied()
+    }
+
+    pub fn notify_acquired(&self) -> Option<bool> {
+        arg::prop_cast(self.0, "NotifyAcquired").copied()
+    }
+}

@@ -62,3 +62,33 @@ impl<'a, T: nonblock::NonblockReply, C: ::std::ops::Deref<Target = T>> OrgBluezL
         )
     }
 }
+
+#[derive(Copy, Clone, Debug)]
+pub struct OrgBluezLEAdvertisingManager1Properties<'a>(
+    pub &'a ::std::collections::HashMap<String, arg::Variant<Box<dyn arg::RefArg>>>,
+);
+
+impl<'a> OrgBluezLEAdvertisingManager1Properties<'a> {
+    pub const INTERFACE_NAME: &'static str = "org.bluez.LEAdvertisingManager1";
+
+    pub fn from_interfaces(
+        interfaces: &'a ::std::collections::HashMap<
+            String,
+            ::std::collections::HashMap<String, arg::Variant<Box<dyn arg::RefArg>>>,
+        >,
+    ) -> Option<Self> {
+        interfaces.get(Self::INTERFACE_NAME).map(Self)
+    }
+
+    pub fn active_instances(&self) -> Option<u8> {
+        arg::prop_cast(self.0, "ActiveInstances").copied()
+    }
+
+    pub fn supported_instances(&self) -> Option<u8> {
+        arg::prop_cast(self.0, "SupportedInstances").copied()
+    }
+
+    pub fn supported_includes(&self) -> Option<&Vec<String>> {
+        arg::prop_cast(self.0, "SupportedIncludes")
+    }
+}

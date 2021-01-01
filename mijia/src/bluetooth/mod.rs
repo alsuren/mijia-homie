@@ -2,17 +2,15 @@ mod bleuuid;
 mod events;
 mod introspect;
 mod messagestream;
-mod properties;
 
 pub use self::bleuuid::{uuid_from_u16, uuid_from_u32, BleUuid};
 pub use self::events::{AdapterEvent, BluetoothEvent, CharacteristicEvent, DeviceEvent};
 use self::introspect::IntrospectParse;
 use self::messagestream::MessageStream;
-use self::properties::OrgBluezDevice1Properties;
 use bitflags::bitflags;
 use bluez_generated::{
-    OrgBluezAdapter1, OrgBluezDevice1, OrgBluezGattCharacteristic1, OrgBluezGattDescriptor1,
-    OrgBluezGattService1,
+    OrgBluezAdapter1, OrgBluezDevice1, OrgBluezDevice1Properties, OrgBluezGattCharacteristic1,
+    OrgBluezGattDescriptor1, OrgBluezGattService1,
 };
 use dbus::arg::RefArg;
 use dbus::nonblock::stdintf::org_freedesktop_dbus::{Introspectable, ObjectManager, Properties};

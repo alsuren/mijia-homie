@@ -265,3 +265,107 @@ impl<'a, T: nonblock::NonblockReply, C: ::std::ops::Deref<Target = T>> OrgBluezD
         )
     }
 }
+
+#[derive(Copy, Clone, Debug)]
+pub struct OrgBluezDevice1Properties<'a>(
+    pub &'a ::std::collections::HashMap<String, arg::Variant<Box<dyn arg::RefArg>>>,
+);
+
+impl<'a> OrgBluezDevice1Properties<'a> {
+    pub const INTERFACE_NAME: &'static str = "org.bluez.Device1";
+
+    pub fn from_interfaces(
+        interfaces: &'a ::std::collections::HashMap<
+            String,
+            ::std::collections::HashMap<String, arg::Variant<Box<dyn arg::RefArg>>>,
+        >,
+    ) -> Option<Self> {
+        interfaces.get(Self::INTERFACE_NAME).map(Self)
+    }
+
+    pub fn address(&self) -> Option<&String> {
+        arg::prop_cast(self.0, "Address")
+    }
+
+    pub fn address_type(&self) -> Option<&String> {
+        arg::prop_cast(self.0, "AddressType")
+    }
+
+    pub fn name(&self) -> Option<&String> {
+        arg::prop_cast(self.0, "Name")
+    }
+
+    pub fn alias(&self) -> Option<&String> {
+        arg::prop_cast(self.0, "Alias")
+    }
+
+    pub fn class(&self) -> Option<u32> {
+        arg::prop_cast(self.0, "Class").copied()
+    }
+
+    pub fn appearance(&self) -> Option<u16> {
+        arg::prop_cast(self.0, "Appearance").copied()
+    }
+
+    pub fn icon(&self) -> Option<&String> {
+        arg::prop_cast(self.0, "Icon")
+    }
+
+    pub fn paired(&self) -> Option<bool> {
+        arg::prop_cast(self.0, "Paired").copied()
+    }
+
+    pub fn trusted(&self) -> Option<bool> {
+        arg::prop_cast(self.0, "Trusted").copied()
+    }
+
+    pub fn blocked(&self) -> Option<bool> {
+        arg::prop_cast(self.0, "Blocked").copied()
+    }
+
+    pub fn legacy_pairing(&self) -> Option<bool> {
+        arg::prop_cast(self.0, "LegacyPairing").copied()
+    }
+
+    pub fn rssi(&self) -> Option<i16> {
+        arg::prop_cast(self.0, "RSSI").copied()
+    }
+
+    pub fn connected(&self) -> Option<bool> {
+        arg::prop_cast(self.0, "Connected").copied()
+    }
+
+    pub fn uuids(&self) -> Option<&Vec<String>> {
+        arg::prop_cast(self.0, "UUIDs")
+    }
+
+    pub fn modalias(&self) -> Option<&String> {
+        arg::prop_cast(self.0, "Modalias")
+    }
+
+    pub fn adapter(&self) -> Option<&dbus::Path<'static>> {
+        arg::prop_cast(self.0, "Adapter")
+    }
+
+    pub fn manufacturer_data(
+        &self,
+    ) -> Option<&::std::collections::HashMap<u16, arg::Variant<Box<dyn arg::RefArg + 'static>>>>
+    {
+        arg::prop_cast(self.0, "ManufacturerData")
+    }
+
+    pub fn service_data(
+        &self,
+    ) -> Option<&::std::collections::HashMap<String, arg::Variant<Box<dyn arg::RefArg + 'static>>>>
+    {
+        arg::prop_cast(self.0, "ServiceData")
+    }
+
+    pub fn tx_power(&self) -> Option<i16> {
+        arg::prop_cast(self.0, "TxPower").copied()
+    }
+
+    pub fn services_resolved(&self) -> Option<bool> {
+        arg::prop_cast(self.0, "ServicesResolved").copied()
+    }
+}

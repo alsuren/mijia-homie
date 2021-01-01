@@ -61,3 +61,33 @@ impl<'a, T: nonblock::NonblockReply, C: ::std::ops::Deref<Target = T>> OrgBluezG
         )
     }
 }
+
+#[derive(Copy, Clone, Debug)]
+pub struct OrgBluezGattDescriptor1Properties<'a>(
+    pub &'a ::std::collections::HashMap<String, arg::Variant<Box<dyn arg::RefArg>>>,
+);
+
+impl<'a> OrgBluezGattDescriptor1Properties<'a> {
+    pub const INTERFACE_NAME: &'static str = "org.bluez.GattDescriptor1";
+
+    pub fn from_interfaces(
+        interfaces: &'a ::std::collections::HashMap<
+            String,
+            ::std::collections::HashMap<String, arg::Variant<Box<dyn arg::RefArg>>>,
+        >,
+    ) -> Option<Self> {
+        interfaces.get(Self::INTERFACE_NAME).map(Self)
+    }
+
+    pub fn uuid(&self) -> Option<&String> {
+        arg::prop_cast(self.0, "UUID")
+    }
+
+    pub fn characteristic(&self) -> Option<&dbus::Path<'static>> {
+        arg::prop_cast(self.0, "Characteristic")
+    }
+
+    pub fn value(&self) -> Option<&Vec<u8>> {
+        arg::prop_cast(self.0, "Value")
+    }
+}
