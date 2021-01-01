@@ -62,16 +62,21 @@ pub enum CharacteristicEvent {
 
 impl BluetoothEvent {
     /// Return a set of `MatchRule`s which will match all D-Bus messages which represent Bluetooth
-    /// events.
-    pub(crate) fn match_rules() -> Vec<MatchRule<'static>> {
+    /// events, possibly limited to those for a particular object (such as a device, service or
+    /// characteristic).
+    ///
+    /// Note that the match rules for a device will not match the device discovered event for that
+    /// device, as it is considered an event for the system rather than the device itself.
+    pub(crate) fn match_rules(object: Option<impl Into<Path<'static>>>) -> Vec<MatchRule<'static>> {
         // BusName validation just checks that the length and format is valid, so it should never
         // fail for a constant that we know is valid.
         let bus_name = "org.bluez".into();
 
         let mut match_rules = vec![];
 
-        // Match ObjectManager signals so we can get events for new devices being discovered.
-        {
+        // If we aren't filtering to a single device or characteristic, then match ObjectManager
+        // signals so we can get events for new devices being discovered.
+        if object.is_none() {
             let match_rule =
                 ObjectManagerInterfacesAdded::match_rule(Some(&bus_name), None).static_clone();
             match_rules.push(match_rule);
@@ -80,11 +85,12 @@ impl BluetoothEvent {
         // Match PropertiesChanged signals for the given device or characteristic and all objects
         // under it. If no object is specified then this will match PropertiesChanged signals for
         // all BlueZ objects.
-        {
-            let match_rule =
-                PropertiesPropertiesChanged::match_rule(Some(&bus_name), None).static_clone();
-            match_rules.push(match_rule);
-        }
+        let object_path = object.map(|o| o.into());
+        let mut match_rule =
+            PropertiesPropertiesChanged::match_rule(Some(&bus_name), object_path.as_ref())
+                .static_clone();
+        match_rule.path_is_namespace = true;
+        match_rules.push(match_rule);
 
         match_rules
     }
@@ -182,22 +188,15 @@ impl BluetoothEvent {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
-
+    use super::super::ServiceId;
     use dbus::arg::{RefArg, Variant};
+    use std::collections::HashMap;
 
     use super::*;
 
     #[test]
     fn adapter_powered() {
-        let mut changed_properties: HashMap<String, Variant<Box<dyn RefArg>>> = HashMap::new();
-        changed_properties.insert("Powered".to_string(), Variant(Box::new(true)));
-        let properties_changed = PropertiesPropertiesChanged {
-            interface_name: "org.bluez.Adapter1".to_string(),
-            changed_properties,
-            invalidated_properties: vec![],
-        };
-        let message = properties_changed.to_emit_message(&"/org/bluez/hci0".into());
+        let message = adapter_powered_message("/org/bluez/hci0", true);
         let id = AdapterId::new("/org/bluez/hci0");
         assert_eq!(
             BluetoothEvent::message_to_events(message),
@@ -211,15 +210,7 @@ mod tests {
     #[test]
     fn device_rssi() {
         let rssi = 42;
-        let mut changed_properties: HashMap<String, Variant<Box<dyn RefArg>>> = HashMap::new();
-        changed_properties.insert("RSSI".to_string(), Variant(Box::new(rssi)));
-        let properties_changed = PropertiesPropertiesChanged {
-            interface_name: "org.bluez.Device1".to_string(),
-            changed_properties,
-            invalidated_properties: vec![],
-        };
-        let message =
-            properties_changed.to_emit_message(&"/org/bluez/hci0/dev_11_22_33_44_55_66".into());
+        let message = device_rssi_message("/org/bluez/hci0/dev_11_22_33_44_55_66", rssi);
         let id = DeviceId::new("/org/bluez/hci0/dev_11_22_33_44_55_66");
         assert_eq!(
             BluetoothEvent::message_to_events(message),
@@ -232,16 +223,11 @@ mod tests {
 
     #[test]
     fn characteristic_value() {
-        let mut changed_properties: HashMap<String, Variant<Box<dyn RefArg>>> = HashMap::new();
         let value: Vec<u8> = vec![1, 2, 3];
-        changed_properties.insert("Value".to_string(), Variant(Box::new(value.clone())));
-        let properties_changed = PropertiesPropertiesChanged {
-            interface_name: "org.bluez.GattCharacteristic1".to_string(),
-            changed_properties,
-            invalidated_properties: vec![],
-        };
-        let message = properties_changed
-            .to_emit_message(&"/org/bluez/hci0/dev_11_22_33_44_55_66/service0012/char0034".into());
+        let message = characteristic_value_message(
+            "/org/bluez/hci0/dev_11_22_33_44_55_66/service0012/char0034",
+            &value,
+        );
         let id =
             CharacteristicId::new("/org/bluez/hci0/dev_11_22_33_44_55_66/service0012/char0034");
         assert_eq!(
@@ -255,14 +241,7 @@ mod tests {
 
     #[test]
     fn device_discovered() {
-        let properties = HashMap::new();
-        let mut interfaces = HashMap::new();
-        interfaces.insert("org.bluez.Device1".to_string(), properties);
-        let interfaces_added = ObjectManagerInterfacesAdded {
-            object: "/org/bluez/hci0/dev_11_22_33_44_55_66".into(),
-            interfaces,
-        };
-        let message = interfaces_added.to_emit_message(&"/".into());
+        let message = new_device_message("/org/bluez/hci0/dev_11_22_33_44_55_66");
         let id = DeviceId::new("/org/bluez/hci0/dev_11_22_33_44_55_66");
         assert_eq!(
             BluetoothEvent::message_to_events(message),
@@ -271,5 +250,133 @@ mod tests {
                 event: DeviceEvent::Discovered
             }]
         )
+    }
+
+    #[test]
+    fn match_rules_all() {
+        let match_rules = BluetoothEvent::match_rules(None::<DeviceId>);
+
+        let message = new_device_message("/org/bluez/hci0/dev_11_22_33_44_55_66");
+        assert_eq!(match_rules.iter().any(|rule| rule.matches(&message)), true);
+
+        let message = adapter_powered_message("/org/bluez/hci0", true);
+        assert_eq!(match_rules.iter().any(|rule| rule.matches(&message)), true);
+
+        let message = device_rssi_message("/org/bluez/hci0/dev_11_22_33_44_55_66", 42);
+        assert_eq!(match_rules.iter().any(|rule| rule.matches(&message)), true);
+
+        let message = characteristic_value_message(
+            "/org/bluez/hci0/dev_11_22_33_44_55_66/service0012/char0034",
+            &vec![1, 2, 3],
+        );
+        assert_eq!(match_rules.iter().any(|rule| rule.matches(&message)), true);
+    }
+
+    #[test]
+    fn match_rules_device() {
+        let id = DeviceId::new("/org/bluez/hci0/dev_11_22_33_44_55_66");
+        let match_rules = BluetoothEvent::match_rules(Some(id));
+
+        let message = new_device_message("/org/bluez/hci0/dev_11_22_33_44_55_66");
+        assert_eq!(match_rules.iter().any(|rule| rule.matches(&message)), false);
+
+        let message = adapter_powered_message("/org/bluez/hci0", true);
+        assert_eq!(match_rules.iter().any(|rule| rule.matches(&message)), false);
+
+        let message = device_rssi_message("/org/bluez/hci0/dev_11_22_33_44_55_66", 42);
+        assert_eq!(match_rules.iter().any(|rule| rule.matches(&message)), true);
+
+        let message = characteristic_value_message(
+            "/org/bluez/hci0/dev_11_22_33_44_55_66/service0012/char0034",
+            &vec![1, 2, 3],
+        );
+        assert_eq!(match_rules.iter().any(|rule| rule.matches(&message)), true);
+    }
+
+    #[test]
+    fn match_rules_service() {
+        let id = ServiceId::new("/org/bluez/hci0/dev_11_22_33_44_55_66/service0012");
+        let match_rules = BluetoothEvent::match_rules(Some(id));
+
+        let message = new_device_message("/org/bluez/hci0/dev_11_22_33_44_55_66");
+        assert_eq!(match_rules.iter().any(|rule| rule.matches(&message)), false);
+
+        let message = adapter_powered_message("/org/bluez/hci0", true);
+        assert_eq!(match_rules.iter().any(|rule| rule.matches(&message)), false);
+
+        let message = device_rssi_message("/org/bluez/hci0/dev_11_22_33_44_55_66", 42);
+        assert_eq!(match_rules.iter().any(|rule| rule.matches(&message)), false);
+
+        let message = characteristic_value_message(
+            "/org/bluez/hci0/dev_11_22_33_44_55_66/service0012/char0034",
+            &vec![1, 2, 3],
+        );
+        assert_eq!(match_rules.iter().any(|rule| rule.matches(&message)), true);
+    }
+
+    #[test]
+    fn match_rules_characteristic() {
+        let id =
+            CharacteristicId::new("/org/bluez/hci0/dev_11_22_33_44_55_66/service0012/char0034");
+        let match_rules = BluetoothEvent::match_rules(Some(id));
+
+        let message = new_device_message("/org/bluez/hci0/dev_11_22_33_44_55_66");
+        assert_eq!(match_rules.iter().any(|rule| rule.matches(&message)), false);
+
+        let message = adapter_powered_message("/org/bluez/hci0", true);
+        assert_eq!(match_rules.iter().any(|rule| rule.matches(&message)), false);
+
+        let message = device_rssi_message("/org/bluez/hci0/dev_11_22_33_44_55_66", 42);
+        assert_eq!(match_rules.iter().any(|rule| rule.matches(&message)), false);
+
+        let message = characteristic_value_message(
+            "/org/bluez/hci0/dev_11_22_33_44_55_66/service0012/char0034",
+            &vec![1, 2, 3],
+        );
+        assert_eq!(match_rules.iter().any(|rule| rule.matches(&message)), true);
+    }
+
+    fn new_device_message(device_path: &'static str) -> Message {
+        let properties = HashMap::new();
+        let mut interfaces = HashMap::new();
+        interfaces.insert("org.bluez.Device1".to_string(), properties);
+        let interfaces_added = ObjectManagerInterfacesAdded {
+            object: device_path.into(),
+            interfaces,
+        };
+        interfaces_added.to_emit_message(&"/".into())
+    }
+
+    fn adapter_powered_message(adapter_path: &'static str, powered: bool) -> Message {
+        let mut changed_properties: HashMap<String, Variant<Box<dyn RefArg>>> = HashMap::new();
+        changed_properties.insert("Powered".to_string(), Variant(Box::new(powered)));
+        let properties_changed = PropertiesPropertiesChanged {
+            interface_name: "org.bluez.Adapter1".to_string(),
+            changed_properties,
+            invalidated_properties: vec![],
+        };
+        properties_changed.to_emit_message(&adapter_path.into())
+    }
+
+    fn device_rssi_message(device_path: &'static str, rssi: i16) -> Message {
+        let mut changed_properties: HashMap<String, Variant<Box<dyn RefArg>>> = HashMap::new();
+        changed_properties.insert("RSSI".to_string(), Variant(Box::new(rssi)));
+        let properties_changed = PropertiesPropertiesChanged {
+            interface_name: "org.bluez.Device1".to_string(),
+            changed_properties,
+            invalidated_properties: vec![],
+        };
+        properties_changed.to_emit_message(&device_path.into())
+    }
+
+    fn characteristic_value_message(characteristic_path: &'static str, value: &[u8]) -> Message {
+        let mut changed_properties: HashMap<String, Variant<Box<dyn RefArg>>> = HashMap::new();
+        changed_properties.insert("Value".to_string(), Variant(Box::new(value.to_owned())));
+        let properties_changed = PropertiesPropertiesChanged {
+            interface_name: "org.bluez.GattCharacteristic1".to_string(),
+            changed_properties,
+            invalidated_properties: vec![],
+        };
+        properties_changed.to_emit_message(&characteristic_path.into())
     }
 }

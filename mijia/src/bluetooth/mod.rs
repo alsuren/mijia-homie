@@ -99,6 +99,12 @@ impl DeviceId {
     }
 }
 
+impl From<DeviceId> for Path<'static> {
+    fn from(id: DeviceId) -> Self {
+        id.object_path
+    }
+}
+
 /// Opaque identifier for a GATT service on a Bluetooth device.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct ServiceId {
@@ -119,6 +125,12 @@ impl ServiceId {
             .rfind('/')
             .expect("ServiceId object_path must contain a slash.");
         DeviceId::new(&self.object_path[0..index])
+    }
+}
+
+impl From<ServiceId> for Path<'static> {
+    fn from(id: ServiceId) -> Self {
+        id.object_path
     }
 }
 
@@ -143,6 +155,12 @@ impl CharacteristicId {
             .rfind('/')
             .expect("CharacteristicId object_path must contain a slash.");
         ServiceId::new(&self.object_path[0..index])
+    }
+}
+
+impl From<CharacteristicId> for Path<'static> {
+    fn from(id: CharacteristicId) -> Self {
+        id.object_path
     }
 }
 
@@ -534,8 +552,31 @@ impl BluetoothSession {
 
     /// Get a stream of events for all devices.
     pub async fn event_stream(&self) -> Result<impl Stream<Item = BluetoothEvent>, BluetoothError> {
+        self.filtered_event_stream(None::<&DeviceId>).await
+    }
+
+    /// Get a stream of events for a particular device.
+    pub async fn device_event_stream(
+        &self,
+        device: &DeviceId,
+    ) -> Result<impl Stream<Item = BluetoothEvent>, BluetoothError> {
+        self.filtered_event_stream(Some(device)).await
+    }
+
+    /// Get a stream of events for a particular characteristic of a device.
+    pub async fn characteristic_event_stream(
+        &self,
+        characteristic: &CharacteristicId,
+    ) -> Result<impl Stream<Item = BluetoothEvent>, BluetoothError> {
+        self.filtered_event_stream(Some(characteristic)).await
+    }
+
+    async fn filtered_event_stream(
+        &self,
+        object: Option<&(impl Into<Path<'static>> + Clone)>,
+    ) -> Result<impl Stream<Item = BluetoothEvent>, BluetoothError> {
         let mut message_streams = vec![];
-        for match_rule in BluetoothEvent::match_rules() {
+        for match_rule in BluetoothEvent::match_rules(object.cloned()) {
             let msg_match = self.connection.add_match(match_rule).compat().await?;
             message_streams.push(MessageStream::new(msg_match, self.connection.clone()));
         }
