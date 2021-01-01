@@ -3,7 +3,7 @@ use dbus::message::{MatchRule, SignalArgs};
 use dbus::nonblock::stdintf::org_freedesktop_dbus::{
     ObjectManagerInterfacesAdded, PropertiesPropertiesChanged,
 };
-use dbus::{Message, MessageType};
+use dbus::Message;
 
 use super::{AdapterId, CharacteristicId, DeviceId};
 
@@ -74,7 +74,7 @@ impl BluetoothEvent {
         let mut events = vec![];
         // Return events for PropertiesChanged signals.
         if let Some(properties_changed) = PropertiesPropertiesChanged::from_message(&message) {
-            let object_path = message.path().unwrap().to_string();
+            let object_path = message.path().unwrap().into_static();
             log::trace!(
                 "PropertiesChanged for {}: {:?}",
                 object_path,
@@ -127,12 +127,8 @@ impl BluetoothEvent {
             }
         } else if let Some(interfaces_added) = ObjectManagerInterfacesAdded::from_message(&message)
         {
-            let object_path = interfaces_added.object.to_string();
-            log::trace!(
-                "InterfacesAdded for {}: {:#?}",
-                object_path,
-                interfaces_added
-            );
+            log::trace!("InterfacesAdded: {:#?}", interfaces_added);
+            let object_path = interfaces_added.object;
             if let Some(_device) = interfaces_added.interfaces.get("org.bluez.Device1") {
                 let id = DeviceId { object_path };
                 events.push(BluetoothEvent::Device {

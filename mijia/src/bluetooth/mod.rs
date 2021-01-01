@@ -13,6 +13,7 @@ use bluez_generated::{
 use dbus::arg::{RefArg, Variant};
 use dbus::nonblock::stdintf::org_freedesktop_dbus::{Introspectable, ObjectManager, Properties};
 use dbus::nonblock::{Proxy, SyncConnection};
+use dbus::Path;
 use futures::stream::{self, StreamExt};
 use futures::{FutureExt, Stream};
 use itertools::Itertools;
@@ -62,13 +63,13 @@ pub enum SpawnError {
 /// Opaque identifier for a Bluetooth adapter on the system.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct AdapterId {
-    pub(crate) object_path: String,
+    pub(crate) object_path: Path<'static>,
 }
 
 impl AdapterId {
     pub(crate) fn new(object_path: &str) -> Self {
         Self {
-            object_path: object_path.to_owned(),
+            object_path: object_path.to_owned().into(),
         }
     }
 }
@@ -78,13 +79,13 @@ impl AdapterId {
 /// will also happen from that adapter (in case the system has more than one).
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct DeviceId {
-    pub(crate) object_path: String,
+    pub(crate) object_path: Path<'static>,
 }
 
 impl DeviceId {
     pub(crate) fn new(object_path: &str) -> Self {
         Self {
-            object_path: object_path.to_owned(),
+            object_path: object_path.to_owned().into(),
         }
     }
 
@@ -101,13 +102,13 @@ impl DeviceId {
 /// Opaque identifier for a GATT service on a Bluetooth device.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct ServiceId {
-    pub(crate) object_path: String,
+    pub(crate) object_path: Path<'static>,
 }
 
 impl ServiceId {
     pub(crate) fn new(object_path: &str) -> Self {
         Self {
-            object_path: object_path.to_owned(),
+            object_path: object_path.to_owned().into(),
         }
     }
 
@@ -124,14 +125,14 @@ impl ServiceId {
 /// Opaque identifier for a GATT characteristic on a Bluetooth device.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct CharacteristicId {
-    pub(crate) object_path: String,
+    pub(crate) object_path: Path<'static>,
 }
 
 impl CharacteristicId {
     #[cfg(test)]
     pub(crate) fn new(object_path: &str) -> Self {
         Self {
-            object_path: object_path.to_owned(),
+            object_path: object_path.to_owned().into(),
         }
     }
 
@@ -298,7 +299,7 @@ impl BluetoothSession {
 
         let sensors = tree
             .into_iter()
-            .filter_map(|(path, interfaces)| {
+            .filter_map(|(object_path, interfaces)| {
                 // FIXME: can we generate a strongly typed deserialiser for this,
                 // based on the introspection data?
                 let device_properties = interfaces.get("org.bluez.Device1")?;
@@ -320,9 +321,7 @@ impl BluetoothSession {
                 let service_data = get_service_data(device_properties).unwrap_or_default();
 
                 Some(DeviceInfo {
-                    id: DeviceId {
-                        object_path: path.to_string(),
-                    },
+                    id: DeviceId { object_path },
                     mac_address: MacAddress(mac_address),
                     name,
                     service_data,
@@ -345,7 +344,7 @@ impl BluetoothSession {
             let subnode_name = subnode.name.as_ref().unwrap();
             if subnode_name.starts_with("service") {
                 let service_id = ServiceId {
-                    object_path: format!("{}/{}", device.object_path, subnode_name),
+                    object_path: format!("{}/{}", device.object_path, subnode_name).into(),
                 };
                 let service = self.service(&service_id);
                 let uuid = Uuid::parse_str(&service.uuid().compat().await?)?;
@@ -371,7 +370,7 @@ impl BluetoothSession {
             let subnode_name = subnode.name.as_ref().unwrap();
             if subnode_name.starts_with("char") {
                 let characteristic_id = CharacteristicId {
-                    object_path: format!("{}/{}", service.object_path, subnode_name),
+                    object_path: format!("{}/{}", service.object_path, subnode_name).into(),
                 };
                 let uuid = Uuid::parse_str(
                     &self
