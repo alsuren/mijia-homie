@@ -2,17 +2,19 @@ mod bleuuid;
 mod events;
 mod introspect;
 mod messagestream;
+mod properties;
 
 pub use self::bleuuid::{uuid_from_u16, uuid_from_u32, BleUuid};
 pub use self::events::{AdapterEvent, BluetoothEvent, CharacteristicEvent, DeviceEvent};
 use self::introspect::IntrospectParse;
 use self::messagestream::MessageStream;
+use self::properties::OrgBluezDevice1Properties;
 use bitflags::bitflags;
 use bluez_generated::{
     OrgBluezAdapter1, OrgBluezDevice1, OrgBluezGattCharacteristic1, OrgBluezGattDescriptor1,
     OrgBluezGattService1,
 };
-use dbus::arg::{RefArg, Variant};
+use dbus::arg::RefArg;
 use dbus::nonblock::stdintf::org_freedesktop_dbus::{Introspectable, ObjectManager, Properties};
 use dbus::nonblock::{Proxy, SyncConnection};
 use dbus::Path;
@@ -483,30 +485,16 @@ impl BluetoothSession {
         let sensors = tree
             .into_iter()
             .filter_map(|(object_path, interfaces)| {
-                // FIXME: can we generate a strongly typed deserialiser for this,
-                // based on the introspection data?
-                let device_properties = interfaces.get("org.bluez.Device1")?;
+                let device_properties = OrgBluezDevice1Properties::from_interfaces(&interfaces)?;
 
-                let mac_address = device_properties
-                    .get("Address")?
-                    .as_iter()?
-                    .filter_map(|addr| addr.as_str())
-                    .next()?
-                    .to_string();
-                let name = device_properties.get("Name").map(|name| {
-                    name.as_iter()
-                        .unwrap()
-                        .filter_map(|addr| addr.as_str())
-                        .next()
-                        .unwrap()
-                        .to_string()
-                });
+                let mac_address = device_properties.address()?;
+                let name = device_properties.name();
                 let service_data = get_service_data(device_properties).unwrap_or_default();
 
                 Some(DeviceInfo {
                     id: DeviceId { object_path },
-                    mac_address: MacAddress(mac_address),
-                    name,
+                    mac_address: MacAddress(mac_address.to_owned()),
+                    name: name.cloned(),
                     service_data,
                 })
             })
@@ -831,7 +819,7 @@ impl BluetoothSession {
 }
 
 fn get_service_data(
-    device_properties: &HashMap<String, Variant<Box<dyn RefArg>>>,
+    device_properties: OrgBluezDevice1Properties,
 ) -> Option<HashMap<String, Vec<u8>>> {
     // UUIDs don't get populated until we connect. Use:
     //     "ServiceData": Variant(InternalDict { data: [
@@ -840,10 +828,10 @@ fn get_service_data(
     // instead.
     Some(
         device_properties
+            .0
             .get("ServiceData")?
             // Variant(...)
-            .as_iter()?
-            .next()?
+            .0
             // InternalDict(...)
             .as_iter()?
             .tuples::<(_, _)>()
@@ -865,6 +853,8 @@ fn get_service_data(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use dbus::arg::Variant;
 
     #[test]
     fn device_adapter() {
@@ -929,7 +919,7 @@ mod tests {
         expected_service_data.insert("uuid".to_string(), vec![1u8, 2, 3]);
 
         assert_eq!(
-            get_service_data(&device_properties),
+            get_service_data(OrgBluezDevice1Properties(&device_properties)),
             Some(expected_service_data)
         );
     }
