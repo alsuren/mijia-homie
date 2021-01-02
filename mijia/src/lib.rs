@@ -394,30 +394,30 @@ impl MijiaSession {
 
         let mut history = vec![None; history_range.len()];
         while let Some(Ok(event)) = events.next().await {
-            match event {
-                BluetoothEvent::Characteristic {
-                    id: record_id,
-                    event: CharacteristicEvent::Value { value },
-                } => {
-                    let record = HistoryRecord::decode(&value)?;
-                    log::trace!("{:?}: {}", record_id, record);
-                    if record_id == history_record_characteristic.id {
-                        if history_range.contains(&record.index) {
-                            let offset = record.index - history_range.start;
-                            history[offset as usize] = Some(record);
-                        } else {
-                            log::error!(
-                                "Got record {:?} for sensor {:?} out of bounds {:?}",
-                                record,
-                                id,
-                                history_range
-                            );
-                        }
+            if let BluetoothEvent::Characteristic {
+                id: record_id,
+                event: CharacteristicEvent::Value { value },
+            } = event
+            {
+                let record = HistoryRecord::decode(&value)?;
+                log::trace!("{:?}: {}", record_id, record);
+                if record_id == history_record_characteristic.id {
+                    if history_range.contains(&record.index) {
+                        let offset = record.index - history_range.start;
+                        history[offset as usize] = Some(record);
                     } else {
-                        log::warn!("Got record for wrong characteristic {:?}", record_id);
+                        log::error!(
+                            "Got record {:?} for sensor {:?} out of bounds {:?}",
+                            record,
+                            id,
+                            history_range
+                        );
                     }
+                } else {
+                    log::warn!("Got record for wrong characteristic {:?}", record_id);
                 }
-                _ => log::info!("Event: {:?}", event),
+            } else {
+                log::warn!("Unexpected event: {:?}", event);
             }
         }
 
