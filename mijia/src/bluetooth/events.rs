@@ -1,5 +1,6 @@
 use bluez_generated::{
     OrgBluezAdapter1Properties, OrgBluezDevice1Properties, OrgBluezGattCharacteristic1Properties,
+    ORG_BLUEZ_ADAPTER1_NAME, ORG_BLUEZ_DEVICE1_NAME, ORG_BLUEZ_GATT_CHARACTERISTIC1_NAME,
 };
 use dbus::message::{MatchRule, SignalArgs};
 use dbus::nonblock::stdintf::org_freedesktop_dbus::{
@@ -143,7 +144,7 @@ impl BluetoothEvent {
         let mut events = vec![];
         let changed_properties = &properties_changed.changed_properties;
         match properties_changed.interface_name.as_ref() {
-            OrgBluezAdapter1Properties::INTERFACE_NAME => {
+            ORG_BLUEZ_ADAPTER1_NAME => {
                 let id = AdapterId { object_path };
                 let adapter = OrgBluezAdapter1Properties(changed_properties);
                 if let Some(powered) = adapter.powered() {
@@ -159,7 +160,7 @@ impl BluetoothEvent {
                     });
                 }
             }
-            OrgBluezDevice1Properties::INTERFACE_NAME => {
+            ORG_BLUEZ_DEVICE1_NAME => {
                 let id = DeviceId { object_path };
                 let device = OrgBluezDevice1Properties(changed_properties);
                 if let Some(connected) = device.connected() {
@@ -175,7 +176,7 @@ impl BluetoothEvent {
                     });
                 }
             }
-            OrgBluezGattCharacteristic1Properties::INTERFACE_NAME => {
+            ORG_BLUEZ_GATT_CHARACTERISTIC1_NAME => {
                 let id = CharacteristicId { object_path };
                 let characteristic = OrgBluezGattCharacteristic1Properties(changed_properties);
                 if let Some(value) = characteristic.value() {
