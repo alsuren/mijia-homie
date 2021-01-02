@@ -858,6 +858,8 @@ fn get_service_data(
 mod tests {
     use super::*;
 
+    use dbus::arg::Variant;
+
     #[test]
     fn device_adapter() {
         let adapter_id = AdapterId::new("/org/bluez/hci0");
@@ -907,6 +909,22 @@ mod tests {
             vec!["read".to_string(), "invalid flag".to_string()].try_into();
         assert!(
             matches!(flags, Err(BluetoothError::FlagParseError(string)) if string == "invalid flag")
+        );
+    }
+
+    #[test]
+    fn service_data() {
+        let mut service_data: HashMap<String, Variant<Box<dyn RefArg>>> = HashMap::new();
+        service_data.insert("uuid".to_string(), Variant(Box::new(vec![1u8, 2, 3])));
+        let mut device_properties: HashMap<String, Variant<Box<dyn RefArg>>> = HashMap::new();
+        device_properties.insert("ServiceData".to_string(), Variant(Box::new(service_data)));
+
+        let mut expected_service_data = HashMap::new();
+        expected_service_data.insert("uuid".to_string(), vec![1u8, 2, 3]);
+
+        assert_eq!(
+            get_service_data(&device_properties),
+            Some(expected_service_data)
         );
     }
 }
