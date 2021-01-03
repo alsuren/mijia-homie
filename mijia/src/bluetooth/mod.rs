@@ -75,6 +75,19 @@ impl AdapterId {
     }
 }
 
+impl Display for AdapterId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            self.object_path
+                .to_string()
+                .strip_prefix("/org/bluez/")
+                .ok_or(fmt::Error)?
+        )
+    }
+}
+
 /// Opaque identifier for a Bluetooth device which the system knows about. This includes a reference
 /// to which Bluetooth adapter it was discovered on, which means that any attempt to connect to it
 /// will also happen from that adapter (in case the system has more than one).
@@ -103,6 +116,19 @@ impl DeviceId {
 impl From<DeviceId> for Path<'static> {
     fn from(id: DeviceId) -> Self {
         id.object_path
+    }
+}
+
+impl Display for DeviceId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            self.object_path
+                .to_string()
+                .strip_prefix("/org/bluez/")
+                .ok_or(fmt::Error)?
+        )
     }
 }
 
@@ -135,6 +161,19 @@ impl From<ServiceId> for Path<'static> {
     }
 }
 
+impl Display for ServiceId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            self.object_path
+                .to_string()
+                .strip_prefix("/org/bluez/")
+                .ok_or(fmt::Error)?
+        )
+    }
+}
+
 /// Opaque identifier for a GATT characteristic on a Bluetooth device.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct CharacteristicId {
@@ -161,6 +200,19 @@ impl CharacteristicId {
 impl From<CharacteristicId> for Path<'static> {
     fn from(id: CharacteristicId) -> Self {
         id.object_path
+    }
+}
+
+impl Display for CharacteristicId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            self.object_path
+                .to_string()
+                .strip_prefix("/org/bluez/")
+                .ok_or(fmt::Error)?
+        )
     }
 }
 
@@ -191,6 +243,19 @@ impl DescriptorId {
 impl From<DescriptorId> for Path<'static> {
     fn from(id: DescriptorId) -> Self {
         id.object_path
+    }
+}
+
+impl Display for DescriptorId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            self.object_path
+                .to_string()
+                .strip_prefix("/org/bluez/")
+                .ok_or(fmt::Error)?
+        )
     }
 }
 
