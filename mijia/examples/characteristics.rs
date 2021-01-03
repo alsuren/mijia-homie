@@ -14,13 +14,31 @@ async fn main() -> Result<(), eyre::Report> {
         let services = session.get_services(&device.id).await?;
         if !services.is_empty() {
             println!("{}: {:?}", device.mac_address, device.id);
-            println!("Services: {:#?}", services);
             for service in services {
-                let characteristics = session.get_characteristics(&service.id).await?;
                 println!(
-                    "Service {:?} characteristics: {:#?}",
-                    service, characteristics
+                    "Service {} ({}): {:?}",
+                    service.uuid,
+                    if service.primary {
+                        "primary"
+                    } else {
+                        "secondary"
+                    },
+                    service.id
                 );
+                let characteristics = session.get_characteristics(&service.id).await?;
+                for characteristic in characteristics {
+                    println!(
+                        "  Characteristic {}: {:?}",
+                        characteristic.uuid, characteristic.id
+                    );
+                    let descriptors = session.get_descriptors(&characteristic.id).await?;
+                    for descriptor in descriptors {
+                        println!("    Descriptor {} : {:?}", descriptor.uuid, descriptor.id);
+                        if let Ok(value) = session.read_descriptor_value(&descriptor.id).await {
+                            println!("      {:?}", value);
+                        }
+                    }
+                }
             }
         }
     }
