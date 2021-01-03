@@ -11,6 +11,7 @@ categories = ["hardware-support"]
 
 [dependencies]
 async-trait = "0.1.42"
+bitflags = "1.2.1"
 bluez-generated = { version = "0.2.0", path = "../bluez-generated" }
 dbus = { version = "0.9.0", features = ["futures"] }
 dbus-tokio = "0.6.0"
