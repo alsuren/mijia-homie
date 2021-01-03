@@ -1,4 +1,5 @@
 use mijia::bluetooth::{BleUuid, BluetoothSession};
+use std::str;
 
 #[tokio::main]
 async fn main() -> Result<(), eyre::Report> {
@@ -40,7 +41,22 @@ async fn main() -> Result<(), eyre::Report> {
                             descriptor.id
                         );
                         if let Ok(value) = session.read_descriptor_value(&descriptor.id).await {
-                            println!("      {:?}", value);
+                            // Try to guess whether it is supposed to be a string or not.
+                            if value.len() > 1 && value[value.len() - 1] == 0 {
+                                match str::from_utf8(&value[0..value.len() - 1]) {
+                                    Ok(string)
+                                        if value.len() > 1
+                                            && !string.chars().any(|c| c.is_control()) =>
+                                    {
+                                        println!("      {:?}", string);
+                                    }
+                                    _ => {
+                                        println!("      {:?}", value);
+                                    }
+                                }
+                            } else {
+                                println!("      {:?}", value);
+                            }
                         }
                     }
                 }
