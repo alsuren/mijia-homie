@@ -1,8 +1,10 @@
 //! Example of how to subscribe to readings from one or more sensors.
 
 use eyre::Report;
+use eyre::WrapErr;
 use mijia::{MijiaSession, SensorProps};
 use std::collections::HashMap;
+use std::fs::OpenOptions;
 use std::io::Write;
 use std::time::Duration;
 use std::{io::stdin, process::exit};
@@ -16,6 +18,7 @@ async fn main() -> Result<(), Report> {
     pretty_env_logger::init();
 
     let excludes = get_known_sensors()?;
+    println!("ignoring sensors: {:?}", excludes);
 
     let (_, session) = MijiaSession::new().await?;
 
@@ -26,14 +29,19 @@ async fn main() -> Result<(), Report> {
     // Get the list of sensors which are currently known, connect those which match the filter and
     // subscribe to readings.
     let sensors = session.get_sensors().await?;
-    println!("Sensors:");
     for sensor in sensors
         .iter()
         .filter(|sensor| should_include_sensor(sensor, &excludes))
     {
-        println!("Connecting to {} ({:?})", sensor.mac_address, sensor.id);
+        println!("Connecting to {}", sensor.mac_address);
         if let Err(e) = session.bt_session.connect(&sensor.id).await {
             println!("Failed to connect to {}: {:?}", sensor.mac_address, e);
+
+            let mut file = OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(SENSOR_NAMES_FILE)?;
+            writeln!(file, r#""{mac}" = "failed""#, mac = sensor.mac_address,)?;
             continue;
         }
 
@@ -41,34 +49,45 @@ async fn main() -> Result<(), Report> {
             let sensor = sensor.clone();
 
             tokio::task::spawn_blocking(move || {
-                use std::fs::OpenOptions;
-                println!(
-                    "What name do you want to use for {} ({:?})?",
-                    sensor.mac_address, sensor.id
-                );
+                println!("What name do you want to use for {}?", sensor.mac_address);
                 let mut name = String::new();
                 stdin().read_line(&mut name)?;
+                name.truncate(name.trim_end().len());
 
-                let mut file = OpenOptions::new().append(true).open(SENSOR_NAMES_FILE)?;
+                let mut file = OpenOptions::new()
+                    .create(true)
+                    .append(true)
+                    .open(SENSOR_NAMES_FILE)?;
                 writeln!(
                     file,
                     r#""{mac}" = "{name}""#,
                     mac = sensor.mac_address,
                     name = name
                 )?;
+                println!(
+                    r#"written: "{mac}" = "{name}""#,
+                    mac = sensor.mac_address,
+                    name = name
+                );
                 Ok::<_, Report>(())
             })
             .await??;
         }
 
-        session.bt_session.disconnect(&sensor.id).await?;
+        session
+            .bt_session
+            .disconnect(&sensor.id)
+            .await
+            .or_else(|_| Ok::<(), Report>(println!("disconnecting failed")))?;
     }
 
     Ok(())
 }
 
 fn get_known_sensors() -> Result<Vec<String>, Report> {
-    let names = toml::from_str::<HashMap<String, String>>(SENSOR_NAMES_FILE).unwrap_or_default();
+    let sensor_names_contents = std::fs::read_to_string(SENSOR_NAMES_FILE)
+        .wrap_err_with(|| format!("Reading {}", SENSOR_NAMES_FILE))?;
+    let names = toml::from_str::<HashMap<String, String>>(&sensor_names_contents)?;
 
     if names
         .keys()
