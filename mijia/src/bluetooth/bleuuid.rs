@@ -24,6 +24,9 @@ pub trait BleUuid {
     /// If the UUID is a valid 16-bit BLE short UUID then return its short form, otherwise return
     /// `None`.
     fn to_ble_u16(&self) -> Option<u16>;
+
+    /// Convert the UUID to a string, using short format if applicable.
+    fn succinctly(&self) -> String;
 }
 
 impl BleUuid for Uuid {
@@ -42,6 +45,16 @@ impl BleUuid for Uuid {
             Some((value >> 96) as u16)
         } else {
             None
+        }
+    }
+
+    fn succinctly(&self) -> String {
+        if let Some(uuid16) = self.to_ble_u16() {
+            format!("{:#04x}", uuid16)
+        } else if let Some(uuid32) = self.to_ble_u32() {
+            format!("{:#06x}", uuid32)
+        } else {
+            self.to_string()
         }
     }
 }

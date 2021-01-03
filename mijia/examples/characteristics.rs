@@ -1,4 +1,4 @@
-use mijia::bluetooth::BluetoothSession;
+use mijia::bluetooth::{BleUuid, BluetoothSession};
 
 #[tokio::main]
 async fn main() -> Result<(), eyre::Report> {
@@ -17,7 +17,7 @@ async fn main() -> Result<(), eyre::Report> {
             for service in services {
                 println!(
                     "Service {} ({}): {:?}",
-                    service.uuid,
+                    service.uuid.succinctly(),
                     if service.primary {
                         "primary"
                     } else {
@@ -29,11 +29,16 @@ async fn main() -> Result<(), eyre::Report> {
                 for characteristic in characteristics {
                     println!(
                         "  Characteristic {}: {:?}",
-                        characteristic.uuid, characteristic.id
+                        characteristic.uuid.succinctly(),
+                        characteristic.id
                     );
                     let descriptors = session.get_descriptors(&characteristic.id).await?;
                     for descriptor in descriptors {
-                        println!("    Descriptor {} : {:?}", descriptor.uuid, descriptor.id);
+                        println!(
+                            "    Descriptor {}: {:?}",
+                            descriptor.uuid.succinctly(),
+                            descriptor.id
+                        );
                         if let Ok(value) = session.read_descriptor_value(&descriptor.id).await {
                             println!("      {:?}", value);
                         }
