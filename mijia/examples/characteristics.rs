@@ -1,4 +1,5 @@
 use mijia::bluetooth::{BleUuid, BluetoothSession};
+use std::ops::RangeInclusive;
 use std::str;
 
 #[tokio::main]
@@ -51,12 +52,20 @@ async fn main() -> Result<(), eyre::Report> {
     Ok(())
 }
 
+const PRINTABLE_ASCII_RANGE: RangeInclusive<u8> = 0x20..=0x7E;
+
 /// Guesses whether the given descriptor value might be a string, and if returns it formatted either
 /// as a string or as a list of numbers.
 fn debug_format_maybe_string(value: &[u8]) -> String {
-    if value.len() > 1 && value[value.len() - 1] == 0 {
-        match str::from_utf8(&value[0..value.len() - 1]) {
-            Ok(string) if value.len() > 1 && !string.chars().any(|c| c.is_control()) => {
+    // Try to parse as a string if all but the last byte are printable ASCII characters. The last
+    // may be 0, as strings are often NUL-terminated.
+    if value.len() > 1
+        && value[0..value.len() - 1]
+            .iter()
+            .all(|c| PRINTABLE_ASCII_RANGE.contains(c))
+    {
+        match str::from_utf8(value) {
+            Ok(string) => {
                 format!("{:?}", string)
             }
             _ => {
