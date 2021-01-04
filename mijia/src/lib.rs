@@ -376,36 +376,48 @@ impl MijiaSession {
         id: &DeviceId,
     ) -> Result<Vec<Option<HistoryRecord>>, MijiaError> {
         let history_range = self.get_history_range(&id).await?;
-        // TODO: Get event stream that is filtered by D-Bus.
-        let events = self.event_stream().await?;
+
+        let history_record_characteristic = self
+            .bt_session
+            .get_service_characteristic_by_uuid(
+                id,
+                SERVICE_UUID,
+                HISTORY_RECORDS_CHARACTERISTIC_UUID,
+            )
+            .await?;
+        let events = self
+            .bt_session
+            .characteristic_event_stream(&history_record_characteristic.id)
+            .await?;
         let mut events = events.timeout(HISTORY_RECORD_TIMEOUT);
         self.start_notify_history(&id, Some(0)).await?;
 
         let mut history = vec![None; history_range.len()];
         while let Some(Ok(event)) = events.next().await {
-            match event {
-                MijiaEvent::HistoryRecord {
-                    id: record_id,
-                    record,
-                } => {
-                    log::trace!("{:?}: {}", record_id, record);
-                    if record_id == *id {
-                        if history_range.contains(&record.index) {
-                            let offset = record.index - history_range.start;
-                            history[offset as usize] = Some(record);
-                        } else {
-                            log::error!(
-                                "Got record {:?} for sensor {:?} out of bounds {:?}",
-                                record,
-                                id,
-                                history_range
-                            );
-                        }
+            if let BluetoothEvent::Characteristic {
+                id: record_id,
+                event: CharacteristicEvent::Value { value },
+            } = event
+            {
+                let record = HistoryRecord::decode(&value)?;
+                log::trace!("{:?}: {}", record_id, record);
+                if record_id == history_record_characteristic.id {
+                    if history_range.contains(&record.index) {
+                        let offset = record.index - history_range.start;
+                        history[offset as usize] = Some(record);
                     } else {
-                        log::warn!("Got record for wrong sensor {:?}", record_id);
+                        log::error!(
+                            "Got record {:?} for sensor {:?} out of bounds {:?}",
+                            record,
+                            id,
+                            history_range
+                        );
                     }
+                } else {
+                    log::warn!("Got record for wrong characteristic {:?}", record_id);
                 }
-                _ => log::info!("Event: {:?}", event),
+            } else {
+                log::warn!("Unexpected event: {:?}", event);
             }
         }
 
