@@ -1249,6 +1249,7 @@ name = "mijia"
 version = "0.2.0"
 dependencies = [
  "async-trait",
+ "bitflags",
  "bluez-generated",
  "chrono",
  "dbus",

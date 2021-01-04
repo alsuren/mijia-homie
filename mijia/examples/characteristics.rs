@@ -1,4 +1,4 @@
-use mijia::bluetooth::{BleUuid, BluetoothSession};
+use mijia::bluetooth::{BleUuid, BluetoothSession, CharacteristicFlags};
 use std::ops::RangeInclusive;
 use std::str;
 
@@ -30,10 +30,17 @@ async fn main() -> Result<(), eyre::Report> {
                 let characteristics = session.get_characteristics(&service.id).await?;
                 for characteristic in characteristics {
                     println!(
-                        "  Characteristic {}: {}",
+                        "  Characteristic {} ({:?}): {}",
                         characteristic.uuid.succinctly(),
+                        characteristic.flags,
                         characteristic.id
                     );
+                    if characteristic.flags.contains(CharacteristicFlags::READ) {
+                        let value = session
+                            .read_characteristic_value(&characteristic.id)
+                            .await?;
+                        println!("    {}", debug_format_maybe_string(&value));
+                    }
                     let descriptors = session.get_descriptors(&characteristic.id).await?;
                     for descriptor in descriptors {
                         println!(

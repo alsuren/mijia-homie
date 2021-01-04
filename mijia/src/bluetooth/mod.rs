@@ -7,6 +7,7 @@ pub use self::bleuuid::{uuid_from_u16, uuid_from_u32, BleUuid};
 pub use self::events::{AdapterEvent, BluetoothEvent, CharacteristicEvent, DeviceEvent};
 use self::introspect::IntrospectParse;
 use self::messagestream::MessageStream;
+use bitflags::bitflags;
 use bluez_generated::{
     OrgBluezAdapter1, OrgBluezDevice1, OrgBluezGattCharacteristic1, OrgBluezGattDescriptor1,
     OrgBluezGattService1,
@@ -19,6 +20,7 @@ use futures::stream::{self, select_all, StreamExt};
 use futures::{FutureExt, Stream};
 use itertools::Itertools;
 use std::collections::HashMap;
+use std::convert::{TryFrom, TryInto};
 use std::error::Error;
 use std::fmt::{self, Debug, Display, Formatter};
 use std::future::Future;
@@ -50,6 +52,9 @@ pub enum BluetoothError {
     /// Error parsing a UUID from a string.
     #[error("Error parsing UUID string: {0}")]
     UUIDParseError(#[from] uuid::Error),
+    /// Error parsing a characteristic flag from a string.
+    #[error("Invalid characteristic flag {0:?}")]
+    FlagParseError(String),
 }
 
 /// Error type for futures representing tasks spawned by this crate.
@@ -329,6 +334,61 @@ pub struct CharacteristicInfo {
     pub id: CharacteristicId,
     /// The 128-bit UUID of the characteristic.
     pub uuid: Uuid,
+    /// The set of flags (a.k.a. properties) of the characteristic, defining how the characteristic
+    /// can be used.
+    pub flags: CharacteristicFlags,
+}
+
+bitflags! {
+    /// The set of flags (a.k.a. properties) of a characteristic, defining how the characteristic
+    /// can be used.
+    pub struct CharacteristicFlags: u16 {
+        const BROADCAST = 0x01;
+        const READ = 0x02;
+        const WRITE_WITHOUT_RESPONSE = 0x04;
+        const WRITE = 0x08;
+        const NOTIFY = 0x10;
+        const INDICATE = 0x20;
+        const SIGNED_WRITE = 0x40;
+        const EXTENDED_PROPERTIES = 0x80;
+        const RELIABLE_WRITE = 0x100;
+        const WRITABLE_AUXILIARIES = 0x200;
+        const ENCRYPT_READ = 0x400;
+        const ENCRYPT_WRITE = 0x800;
+        const ENCRYPT_AUTHENTICATED_READ = 0x1000;
+        const ENCRYPT_AUTHENTICATED_WRITE = 0x2000;
+        const AUTHORIZE = 0x4000;
+    }
+}
+
+impl TryFrom<Vec<String>> for CharacteristicFlags {
+    type Error = BluetoothError;
+
+    fn try_from(value: Vec<String>) -> Result<Self, BluetoothError> {
+        let mut flags = Self::empty();
+        for flag_string in value {
+            let flag = match flag_string.as_ref() {
+                "broadcast" => Self::BROADCAST,
+                "read" => Self::READ,
+                "write-without-response" => Self::WRITE_WITHOUT_RESPONSE,
+                "write" => Self::WRITE,
+                "notify" => Self::NOTIFY,
+                "indicate" => Self::INDICATE,
+                "authenticated-signed-write" => Self::SIGNED_WRITE,
+                "extended-properties" => Self::EXTENDED_PROPERTIES,
+                "reliable-write" => Self::RELIABLE_WRITE,
+                "writable-auxiliaries" => Self::WRITABLE_AUXILIARIES,
+                "encrypt-read" => Self::ENCRYPT_READ,
+                "encrypt-write" => Self::ENCRYPT_WRITE,
+                "encrypt-authenticated-read" => Self::ENCRYPT_AUTHENTICATED_READ,
+                "encrypt-authenticated-write" => Self::ENCRYPT_AUTHENTICATED_WRITE,
+                "authorize" => Self::AUTHORIZE,
+                _ => return Err(BluetoothError::FlagParseError(flag_string)),
+            };
+            flags.insert(flag);
+        }
+        Ok(flags)
+    }
 }
 
 /// Information about a GATT descriptor on a Bluetooth device.
@@ -499,16 +559,13 @@ impl BluetoothSession {
                 let characteristic_id = CharacteristicId {
                     object_path: format!("{}/{}", service.object_path, subnode_name).into(),
                 };
-                let uuid = Uuid::parse_str(
-                    &self
-                        .characteristic(&characteristic_id)
-                        .uuid()
-                        .compat()
-                        .await?,
-                )?;
+                let characteristic = self.characteristic(&characteristic_id);
+                let uuid = Uuid::parse_str(&characteristic.uuid().compat().await?)?;
+                let flags = characteristic.flags().compat().await?;
                 characteristics.push(CharacteristicInfo {
                     id: characteristic_id,
                     uuid,
+                    flags: flags.try_into()?,
                 });
             }
         }
@@ -606,10 +663,13 @@ impl BluetoothSession {
         &self,
         id: &CharacteristicId,
     ) -> Result<CharacteristicInfo, BluetoothError> {
-        let uuid = Uuid::parse_str(&self.characteristic(&id).uuid().compat().await?)?;
+        let characteristic = self.characteristic(&id);
+        let uuid = Uuid::parse_str(&characteristic.uuid().compat().await?)?;
+        let flags = characteristic.flags().compat().await?;
         Ok(CharacteristicInfo {
             id: id.to_owned(),
             uuid,
+            flags: flags.try_into()?,
         })
     }
 
@@ -836,5 +896,25 @@ mod tests {
             "/org/bluez/hci0/dev_11_22_33_44_55_66/service0022/char0033/desc0034",
         );
         assert_eq!(descriptor_id.characteristic(), characteristic_id);
+    }
+
+    #[test]
+    fn parse_flags() {
+        let flags: CharacteristicFlags = vec!["read".to_string(), "encrypt-write".to_string()]
+            .try_into()
+            .unwrap();
+        assert_eq!(
+            flags,
+            CharacteristicFlags::READ | CharacteristicFlags::ENCRYPT_WRITE
+        )
+    }
+
+    #[test]
+    fn parse_flags_fail() {
+        let flags: Result<CharacteristicFlags, BluetoothError> =
+            vec!["read".to_string(), "invalid flag".to_string()].try_into();
+        assert!(
+            matches!(flags, Err(BluetoothError::FlagParseError(string)) if string == "invalid flag")
+        );
     }
 }
