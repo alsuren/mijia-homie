@@ -465,6 +465,8 @@ impl BluetoothSession {
         let mut services = vec![];
         for subnode in device_node.nodes {
             let subnode_name = subnode.name.as_ref().unwrap();
+            // Service paths are always of the form
+            // /org/bluez/{hci0,hci1,...}/dev_XX_XX_XX_XX_XX_XX/serviceXXXX
             if subnode_name.starts_with("service") {
                 let service_id = ServiceId {
                     object_path: format!("{}/{}", device.object_path, subnode_name).into(),
@@ -491,6 +493,8 @@ impl BluetoothSession {
         let mut characteristics = vec![];
         for subnode in service_node.nodes {
             let subnode_name = subnode.name.as_ref().unwrap();
+            // Characteristic paths are always of the form
+            // /org/bluez/{hci0,hci1,...}/dev_XX_XX_XX_XX_XX_XX/serviceXXXX/charYYYY
             if subnode_name.starts_with("char") {
                 let characteristic_id = CharacteristicId {
                     object_path: format!("{}/{}", service.object_path, subnode_name).into(),
@@ -524,6 +528,8 @@ impl BluetoothSession {
         let mut descriptors = vec![];
         for subnode in characteristic_node.nodes {
             let subnode_name = subnode.name.as_ref().unwrap();
+            // Service paths are always of the form
+            // /org/bluez/{hci0,hci1,...}/dev_XX_XX_XX_XX_XX_XX/serviceXXXX/charYYYY/descZZZZ
             if subnode_name.starts_with("desc") {
                 let descriptor_id = DescriptorId {
                     object_path: format!("{}/{}", characteristic.object_path, subnode_name).into(),
