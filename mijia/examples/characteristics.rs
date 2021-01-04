@@ -1,18 +1,12 @@
-use mijia::bluetooth::BluetoothSession;
-use std::time::Duration;
-use tokio::time;
-
-const SCAN_DURATION: Duration = Duration::from_secs(5);
+use mijia::bluetooth::{BleUuid, BluetoothSession};
+use std::ops::RangeInclusive;
+use std::str;
 
 #[tokio::main]
 async fn main() -> Result<(), eyre::Report> {
     pretty_env_logger::init();
 
     let (_, session) = BluetoothSession::new().await?;
-
-    // Start scanning for Bluetooth devices, and wait a while for some to be discovered.
-    session.start_discovery().await?;
-    time::sleep(SCAN_DURATION).await;
 
     // Get the list of devices whose services are currently known and print them with their
     // characteristics.
@@ -21,17 +15,64 @@ async fn main() -> Result<(), eyre::Report> {
     for device in devices {
         let services = session.get_services(&device.id).await?;
         if !services.is_empty() {
-            println!("{}: {:?}", device.mac_address, device.id);
-            println!("Services: {:#?}", services);
+            println!("{}: {}", device.mac_address, device.id);
             for service in services {
-                let characteristics = session.get_characteristics(&service.id).await?;
                 println!(
-                    "Service {:?} characteristics: {:#?}",
-                    service, characteristics
+                    "Service {} ({}): {}",
+                    service.uuid.succinctly(),
+                    if service.primary {
+                        "primary"
+                    } else {
+                        "secondary"
+                    },
+                    service.id
                 );
+                let characteristics = session.get_characteristics(&service.id).await?;
+                for characteristic in characteristics {
+                    println!(
+                        "  Characteristic {}: {}",
+                        characteristic.uuid.succinctly(),
+                        characteristic.id
+                    );
+                    let descriptors = session.get_descriptors(&characteristic.id).await?;
+                    for descriptor in descriptors {
+                        println!(
+                            "    Descriptor {}: {}",
+                            descriptor.uuid.succinctly(),
+                            descriptor.id
+                        );
+                        let value = session.read_descriptor_value(&descriptor.id).await?;
+                        println!("      {}", debug_format_maybe_string(&value));
+                    }
+                }
             }
         }
     }
 
     Ok(())
+}
+
+const PRINTABLE_ASCII_RANGE: RangeInclusive<u8> = 0x20..=0x7E;
+
+/// Guesses whether the given descriptor value might be a string, and if returns it formatted either
+/// as a string or as a list of numbers.
+fn debug_format_maybe_string(value: &[u8]) -> String {
+    // Try to parse as a string if all but the last byte are printable ASCII characters. The last
+    // may be 0, as strings are often NUL-terminated.
+    if value.len() > 1
+        && value[0..value.len() - 1]
+            .iter()
+            .all(|c| PRINTABLE_ASCII_RANGE.contains(c))
+    {
+        match str::from_utf8(value) {
+            Ok(string) => {
+                format!("{:?}", string)
+            }
+            _ => {
+                format!("{:?}", value)
+            }
+        }
+    } else {
+        format!("{:?}", value)
+    }
 }

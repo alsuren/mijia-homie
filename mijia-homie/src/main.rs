@@ -414,8 +414,8 @@ async fn connect_and_subscribe_sensor_or_disconnect(
             .bt_session
             .disconnect(&id)
             .await
-            .wrap_err_with(|| format!("Disconnecting from {} ({:?})", name, id))?;
-        Err(Report::new(e).wrap_err(format!("Starting notifications on {} ({:?})", name, id)))
+            .wrap_err_with(|| format!("Disconnecting from {} ({})", name, id))?;
+        Err(Report::new(e).wrap_err(format!("Starting notifications on {} ({})", name, id)))
     })
     .await?;
 
@@ -447,7 +447,7 @@ async fn check_for_stale_sensor(
             .bt_session
             .disconnect(id)
             .await
-            .wrap_err_with(|| format!("disconnecting from {:?}", id))?;
+            .wrap_err_with(|| format!("disconnecting from {}", id))?;
     }
     Ok(())
 }
@@ -486,7 +486,7 @@ async fn handle_bluetooth_event(
                     ConnectionStatus::Connected { id: connected_id } => {
                         if id != *connected_id {
                             log::info!(
-                                "Got update from device on unexpected id {:?} (expected {:?})",
+                                "Got update from device on unexpected id {} (expected {})",
                                 id,
                                 connected_id,
                             );
@@ -494,13 +494,13 @@ async fn handle_bluetooth_event(
                     }
                     ConnectionStatus::Connecting { .. } => {}
                     _ => {
-                        println!("Got update from disconnected device {:?}. Connecting.", id);
+                        println!("Got update from disconnected device {}. Connecting.", id);
                         sensor.mark_connected(homie, id).await?;
                         // TODO: Make sure the connection interval is set.
                     }
                 }
             } else {
-                println!("Got update from unknown device {:?}.", id);
+                println!("Got update from unknown device {}.", id);
             }
         }
         MijiaEvent::Disconnected { id } => {
@@ -513,18 +513,18 @@ async fn handle_bluetooth_event(
                         homie.remove_node(&sensor.node_id()).await?;
                     } else {
                         println!(
-                            "{} ({:?}) disconnected but was connected as {:?}.",
+                            "{} ({}) disconnected but was connected as {}.",
                             sensor.name, id, connected_id
                         );
                     }
                 } else {
                     println!(
-                        "{} ({:?}) disconnected but wasn't known to be connected.",
+                        "{} ({}) disconnected but wasn't known to be connected.",
                         sensor.name, id
                     );
                 }
             } else {
-                println!("Unknown device {:?} disconnected.", id);
+                println!("Unknown device {} disconnected.", id);
             }
         }
         _ => {}

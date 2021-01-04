@@ -8,7 +8,8 @@ pub use self::events::{AdapterEvent, BluetoothEvent, CharacteristicEvent, Device
 use self::introspect::IntrospectParse;
 use self::messagestream::MessageStream;
 use bluez_generated::{
-    OrgBluezAdapter1, OrgBluezDevice1, OrgBluezGattCharacteristic1, OrgBluezGattService1,
+    OrgBluezAdapter1, OrgBluezDevice1, OrgBluezGattCharacteristic1, OrgBluezGattDescriptor1,
+    OrgBluezGattService1,
 };
 use dbus::arg::{RefArg, Variant};
 use dbus::nonblock::stdintf::org_freedesktop_dbus::{Introspectable, ObjectManager, Properties};
@@ -74,6 +75,19 @@ impl AdapterId {
     }
 }
 
+impl Display for AdapterId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            self.object_path
+                .to_string()
+                .strip_prefix("/org/bluez/")
+                .ok_or(fmt::Error)?
+        )
+    }
+}
+
 /// Opaque identifier for a Bluetooth device which the system knows about. This includes a reference
 /// to which Bluetooth adapter it was discovered on, which means that any attempt to connect to it
 /// will also happen from that adapter (in case the system has more than one).
@@ -102,6 +116,19 @@ impl DeviceId {
 impl From<DeviceId> for Path<'static> {
     fn from(id: DeviceId) -> Self {
         id.object_path
+    }
+}
+
+impl Display for DeviceId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            self.object_path
+                .to_string()
+                .strip_prefix("/org/bluez/")
+                .ok_or(fmt::Error)?
+        )
     }
 }
 
@@ -134,6 +161,19 @@ impl From<ServiceId> for Path<'static> {
     }
 }
 
+impl Display for ServiceId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            self.object_path
+                .to_string()
+                .strip_prefix("/org/bluez/")
+                .ok_or(fmt::Error)?
+        )
+    }
+}
+
 /// Opaque identifier for a GATT characteristic on a Bluetooth device.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct CharacteristicId {
@@ -141,7 +181,6 @@ pub struct CharacteristicId {
 }
 
 impl CharacteristicId {
-    #[cfg(test)]
     pub(crate) fn new(object_path: &str) -> Self {
         Self {
             object_path: object_path.to_owned().into(),
@@ -161,6 +200,62 @@ impl CharacteristicId {
 impl From<CharacteristicId> for Path<'static> {
     fn from(id: CharacteristicId) -> Self {
         id.object_path
+    }
+}
+
+impl Display for CharacteristicId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            self.object_path
+                .to_string()
+                .strip_prefix("/org/bluez/")
+                .ok_or(fmt::Error)?
+        )
+    }
+}
+
+/// Opaque identifier for a GATT characteristic descriptor on a Bluetooth device.
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct DescriptorId {
+    pub(crate) object_path: Path<'static>,
+}
+
+impl DescriptorId {
+    #[cfg(test)]
+    pub(crate) fn new(object_path: &str) -> Self {
+        Self {
+            object_path: object_path.to_owned().into(),
+        }
+    }
+
+    /// Get the ID of the characteristic on which this descriptor was advertised.
+    pub fn characteristic(&self) -> CharacteristicId {
+        let index = self
+            .object_path
+            .rfind('/')
+            .expect("DescriptorId object_path must contain a slash.");
+        CharacteristicId::new(&self.object_path[0..index])
+    }
+}
+
+impl From<DescriptorId> for Path<'static> {
+    fn from(id: DescriptorId) -> Self {
+        id.object_path
+    }
+}
+
+impl Display for DescriptorId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            self.object_path
+                .to_string()
+                .strip_prefix("/org/bluez/")
+                .ok_or(fmt::Error)?
+        )
     }
 }
 
@@ -233,6 +328,16 @@ pub struct CharacteristicInfo {
     /// adapter it was discovered on.
     pub id: CharacteristicId,
     /// The 128-bit UUID of the characteristic.
+    pub uuid: Uuid,
+}
+
+/// Information about a GATT descriptor on a Bluetooth device.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DescriptorInfo {
+    /// An opaque identifier for the descriptor on the device, including a reference to which
+    /// adapter it was discovered on.
+    pub id: DescriptorId,
+    /// The 128-bit UUID of the descriptor.
     pub uuid: Uuid,
 }
 
@@ -360,6 +465,8 @@ impl BluetoothSession {
         let mut services = vec![];
         for subnode in device_node.nodes {
             let subnode_name = subnode.name.as_ref().unwrap();
+            // Service paths are always of the form
+            // /org/bluez/{hci0,hci1,...}/dev_XX_XX_XX_XX_XX_XX/serviceXXXX
             if subnode_name.starts_with("service") {
                 let service_id = ServiceId {
                     object_path: format!("{}/{}", device.object_path, subnode_name).into(),
@@ -386,6 +493,8 @@ impl BluetoothSession {
         let mut characteristics = vec![];
         for subnode in service_node.nodes {
             let subnode_name = subnode.name.as_ref().unwrap();
+            // Characteristic paths are always of the form
+            // /org/bluez/{hci0,hci1,...}/dev_XX_XX_XX_XX_XX_XX/serviceXXXX/charYYYY
             if subnode_name.starts_with("char") {
                 let characteristic_id = CharacteristicId {
                     object_path: format!("{}/{}", service.object_path, subnode_name).into(),
@@ -404,6 +513,36 @@ impl BluetoothSession {
             }
         }
         Ok(characteristics)
+    }
+
+    /// Get a list of all descriptors on the given GATT characteristic.
+    pub async fn get_descriptors(
+        &self,
+        characteristic: &CharacteristicId,
+    ) -> Result<Vec<DescriptorInfo>, BluetoothError> {
+        let characteristic_node = self
+            .characteristic(characteristic)
+            .introspect_parse()
+            .compat()
+            .await?;
+        let mut descriptors = vec![];
+        for subnode in characteristic_node.nodes {
+            let subnode_name = subnode.name.as_ref().unwrap();
+            // Service paths are always of the form
+            // /org/bluez/{hci0,hci1,...}/dev_XX_XX_XX_XX_XX_XX/serviceXXXX/charYYYY/descZZZZ
+            if subnode_name.starts_with("desc") {
+                let descriptor_id = DescriptorId {
+                    object_path: format!("{}/{}", characteristic.object_path, subnode_name).into(),
+                };
+                let uuid =
+                    Uuid::parse_str(&self.descriptor(&descriptor_id).uuid().compat().await?)?;
+                descriptors.push(DescriptorInfo {
+                    id: descriptor_id,
+                    uuid,
+                });
+            }
+        }
+        Ok(descriptors)
     }
 
     /// Find a GATT service with the given UUID advertised by the given device, if any.
@@ -474,6 +613,18 @@ impl BluetoothSession {
         })
     }
 
+    /// Get information about the given GATT descriptor.
+    pub async fn get_descriptor_info(
+        &self,
+        id: &DescriptorId,
+    ) -> Result<DescriptorInfo, BluetoothError> {
+        let uuid = Uuid::parse_str(&self.descriptor(&id).uuid().compat().await?)?;
+        Ok(DescriptorInfo {
+            id: id.to_owned(),
+            uuid,
+        })
+    }
+
     fn device(&self, id: &DeviceId) -> impl OrgBluezDevice1 + Introspectable + Properties {
         Proxy::new(
             "org.bluez",
@@ -496,6 +647,18 @@ impl BluetoothSession {
         &self,
         id: &CharacteristicId,
     ) -> impl OrgBluezGattCharacteristic1 + Introspectable + Properties {
+        Proxy::new(
+            "org.bluez",
+            id.object_path.to_owned(),
+            DBUS_METHOD_CALL_TIMEOUT,
+            self.connection.clone(),
+        )
+    }
+
+    fn descriptor(
+        &self,
+        id: &DescriptorId,
+    ) -> impl OrgBluezGattDescriptor1 + Introspectable + Properties {
         Proxy::new(
             "org.bluez",
             id.object_path.to_owned(),
@@ -531,6 +694,28 @@ impl BluetoothSession {
     ) -> Result<(), BluetoothError> {
         let characteristic = self.characteristic(id);
         Ok(characteristic
+            .write_value(value.into(), HashMap::new())
+            .compat()
+            .await?)
+    }
+
+    /// Read the value of the given GATT descriptor.
+    pub async fn read_descriptor_value(
+        &self,
+        id: &DescriptorId,
+    ) -> Result<Vec<u8>, BluetoothError> {
+        let descriptor = self.descriptor(id);
+        Ok(descriptor.read_value(HashMap::new()).compat().await?)
+    }
+
+    /// Write the given value to the given GATT descriptor.
+    pub async fn write_descriptor_value(
+        &self,
+        id: &DescriptorId,
+        value: impl Into<Vec<u8>>,
+    ) -> Result<(), BluetoothError> {
+        let descriptor = self.descriptor(id);
+        Ok(descriptor
             .write_value(value.into(), HashMap::new())
             .compat()
             .await?)
@@ -641,5 +826,15 @@ mod tests {
         let characteristic_id =
             CharacteristicId::new("/org/bluez/hci0/dev_11_22_33_44_55_66/service0022/char0033");
         assert_eq!(characteristic_id.service(), service_id);
+    }
+
+    #[test]
+    fn descriptor_characteristic() {
+        let characteristic_id =
+            CharacteristicId::new("/org/bluez/hci0/dev_11_22_33_44_55_66/service0022/char0033");
+        let descriptor_id = DescriptorId::new(
+            "/org/bluez/hci0/dev_11_22_33_44_55_66/service0022/char0033/desc0034",
+        );
+        assert_eq!(descriptor_id.characteristic(), characteristic_id);
     }
 }
