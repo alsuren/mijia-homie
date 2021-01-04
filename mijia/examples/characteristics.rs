@@ -40,24 +40,8 @@ async fn main() -> Result<(), eyre::Report> {
                             descriptor.uuid.succinctly(),
                             descriptor.id
                         );
-                        if let Ok(value) = session.read_descriptor_value(&descriptor.id).await {
-                            // Try to guess whether it is supposed to be a string or not.
-                            if value.len() > 1 && value[value.len() - 1] == 0 {
-                                match str::from_utf8(&value[0..value.len() - 1]) {
-                                    Ok(string)
-                                        if value.len() > 1
-                                            && !string.chars().any(|c| c.is_control()) =>
-                                    {
-                                        println!("      {:?}", string);
-                                    }
-                                    _ => {
-                                        println!("      {:?}", value);
-                                    }
-                                }
-                            } else {
-                                println!("      {:?}", value);
-                            }
-                        }
+                        let value = session.read_descriptor_value(&descriptor.id).await?;
+                        println!("      {}", debug_format_maybe_string(&value));
                     }
                 }
             }
@@ -65,4 +49,21 @@ async fn main() -> Result<(), eyre::Report> {
     }
 
     Ok(())
+}
+
+/// Guesses whether the given descriptor value might be a string, and if returns it formatted either
+/// as a string or as a list of numbers.
+fn debug_format_maybe_string(value: &[u8]) -> String {
+    if value.len() > 1 && value[value.len() - 1] == 0 {
+        match str::from_utf8(&value[0..value.len() - 1]) {
+            Ok(string) if value.len() > 1 && !string.chars().any(|c| c.is_control()) => {
+                format!("{:?}", string)
+            }
+            _ => {
+                format!("{:?}", value)
+            }
+        }
+    } else {
+        format!("{:?}", value)
+    }
 }
