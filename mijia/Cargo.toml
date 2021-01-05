@@ -23,7 +23,6 @@ serde_derive = "1.0.118"
 serde-xml-rs = "0.4.0"
 thiserror = "1.0.23"
 tokio = "1.0.1"
-tokio-compat-02 = "0.2.0"
 tokio-stream = "0.1.1"
 uuid = "0.8.1"
 

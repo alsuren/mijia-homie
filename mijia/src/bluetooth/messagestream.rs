@@ -5,7 +5,6 @@ use futures::Stream;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
-use tokio_compat_02::FutureExt as _;
 
 /// Wrapper for a stream of D-Bus messages which automatically removes the `MsgMatch` from the D-Bus
 /// connection when it is dropped.
@@ -38,12 +37,6 @@ impl Drop for MessageStream {
     fn drop(&mut self) {
         let connection = self.connection.clone();
         let msg_match = self.msg_match.take().unwrap();
-        tokio::spawn(async move {
-            connection
-                .remove_match(msg_match.token())
-                .compat()
-                .await
-                .unwrap()
-        });
+        tokio::spawn(async move { connection.remove_match(msg_match.token()).await.unwrap() });
     }
 }
