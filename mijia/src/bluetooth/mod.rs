@@ -12,14 +12,13 @@ use bluez_generated::{
     OrgBluezAdapter1, OrgBluezDevice1, OrgBluezDevice1Properties, OrgBluezGattCharacteristic1,
     OrgBluezGattDescriptor1, OrgBluezGattService1, ORG_BLUEZ_ADAPTER1_NAME,
 };
-use dbus::arg::RefArg;
+use dbus::arg::cast;
 use dbus::nonblock::stdintf::org_freedesktop_dbus::{Introspectable, ObjectManager, Properties};
 use dbus::nonblock::{Proxy, SyncConnection};
 use dbus::Path;
 use dbus_tokio::connection::IOResourceError;
 use futures::stream::{self, select_all, StreamExt};
 use futures::{FutureExt, Stream};
-use itertools::Itertools;
 use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
 use std::fmt::{self, Debug, Display, Formatter};
@@ -818,23 +817,11 @@ fn get_service_data(
     // instead.
     Some(
         device_properties
-            .0
-            .get("ServiceData")?
-            // Variant(...)
-            .0
-            // InternalDict(...)
-            .as_iter()?
-            .tuples::<(_, _)>()
+            .service_data()?
+            .iter()
             .filter_map(|(k, v)| {
-                let k = k.as_str()?.into();
-                let v: Option<Vec<u8>> = v
-                    .box_clone()
-                    .as_static_inner(0)?
-                    .as_iter()?
-                    .map(|el| Some(el.as_u64()? as u8))
-                    .collect();
-                let v = v?;
-                Some((k, v))
+                let v = cast::<Vec<u8>>(&v.0)?;
+                Some((k.to_owned(), v.to_owned()))
             })
             .collect(),
     )
@@ -844,7 +831,7 @@ fn get_service_data(
 mod tests {
     use super::*;
 
-    use dbus::arg::Variant;
+    use dbus::arg::{RefArg, Variant};
 
     #[test]
     fn device_adapter() {
