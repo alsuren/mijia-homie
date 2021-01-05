@@ -7,13 +7,13 @@ pub trait OrgBluezMedia1 {
     fn register_endpoint(
         &self,
         endpoint: dbus::Path,
-        properties: ::std::collections::HashMap<&str, arg::Variant<Box<dyn arg::RefArg>>>,
+        properties: arg::PropMap,
     ) -> nonblock::MethodReply<()>;
     fn unregister_endpoint(&self, endpoint: dbus::Path) -> nonblock::MethodReply<()>;
     fn register_player(
         &self,
         player: dbus::Path,
-        properties: ::std::collections::HashMap<&str, arg::Variant<Box<dyn arg::RefArg>>>,
+        properties: arg::PropMap,
     ) -> nonblock::MethodReply<()>;
     fn unregister_player(&self, player: dbus::Path) -> nonblock::MethodReply<()>;
 }
@@ -24,7 +24,7 @@ impl<'a, T: nonblock::NonblockReply, C: ::std::ops::Deref<Target = T>> OrgBluezM
     fn register_endpoint(
         &self,
         endpoint: dbus::Path,
-        properties: ::std::collections::HashMap<&str, arg::Variant<Box<dyn arg::RefArg>>>,
+        properties: arg::PropMap,
     ) -> nonblock::MethodReply<()> {
         self.method_call(
             "org.bluez.Media1",
@@ -40,7 +40,7 @@ impl<'a, T: nonblock::NonblockReply, C: ::std::ops::Deref<Target = T>> OrgBluezM
     fn register_player(
         &self,
         player: dbus::Path,
-        properties: ::std::collections::HashMap<&str, arg::Variant<Box<dyn arg::RefArg>>>,
+        properties: arg::PropMap,
     ) -> nonblock::MethodReply<()> {
         self.method_call("org.bluez.Media1", "RegisterPlayer", (player, properties))
     }

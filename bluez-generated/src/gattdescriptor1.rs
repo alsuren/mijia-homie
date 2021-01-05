@@ -4,15 +4,8 @@ use dbus::arg;
 use dbus::nonblock;
 
 pub trait OrgBluezGattDescriptor1 {
-    fn read_value(
-        &self,
-        options: ::std::collections::HashMap<&str, arg::Variant<Box<dyn arg::RefArg>>>,
-    ) -> nonblock::MethodReply<Vec<u8>>;
-    fn write_value(
-        &self,
-        value: Vec<u8>,
-        options: ::std::collections::HashMap<&str, arg::Variant<Box<dyn arg::RefArg>>>,
-    ) -> nonblock::MethodReply<()>;
+    fn read_value(&self, options: arg::PropMap) -> nonblock::MethodReply<Vec<u8>>;
+    fn write_value(&self, value: Vec<u8>, options: arg::PropMap) -> nonblock::MethodReply<()>;
     fn uuid(&self) -> nonblock::MethodReply<String>;
     fn characteristic(&self) -> nonblock::MethodReply<dbus::Path<'static>>;
     fn value(&self) -> nonblock::MethodReply<Vec<u8>>;
@@ -21,19 +14,12 @@ pub trait OrgBluezGattDescriptor1 {
 impl<'a, T: nonblock::NonblockReply, C: ::std::ops::Deref<Target = T>> OrgBluezGattDescriptor1
     for nonblock::Proxy<'a, C>
 {
-    fn read_value(
-        &self,
-        options: ::std::collections::HashMap<&str, arg::Variant<Box<dyn arg::RefArg>>>,
-    ) -> nonblock::MethodReply<Vec<u8>> {
+    fn read_value(&self, options: arg::PropMap) -> nonblock::MethodReply<Vec<u8>> {
         self.method_call("org.bluez.GattDescriptor1", "ReadValue", (options,))
             .and_then(|r: (Vec<u8>,)| Ok(r.0))
     }
 
-    fn write_value(
-        &self,
-        value: Vec<u8>,
-        options: ::std::collections::HashMap<&str, arg::Variant<Box<dyn arg::RefArg>>>,
-    ) -> nonblock::MethodReply<()> {
+    fn write_value(&self, value: Vec<u8>, options: arg::PropMap) -> nonblock::MethodReply<()> {
         self.method_call("org.bluez.GattDescriptor1", "WriteValue", (value, options))
     }
 

@@ -6,7 +6,7 @@ use dbus::nonblock;
 pub trait OrgBluezHealthManager1 {
     fn create_application(
         &self,
-        config: ::std::collections::HashMap<&str, arg::Variant<Box<dyn arg::RefArg>>>,
+        config: arg::PropMap,
     ) -> nonblock::MethodReply<dbus::Path<'static>>;
     fn destroy_application(&self, application: dbus::Path) -> nonblock::MethodReply<()>;
 }
@@ -16,7 +16,7 @@ impl<'a, T: nonblock::NonblockReply, C: ::std::ops::Deref<Target = T>> OrgBluezH
 {
     fn create_application(
         &self,
-        config: ::std::collections::HashMap<&str, arg::Variant<Box<dyn arg::RefArg>>>,
+        config: arg::PropMap,
     ) -> nonblock::MethodReply<dbus::Path<'static>> {
         self.method_call("org.bluez.HealthManager1", "CreateApplication", (config,))
             .and_then(|r: (dbus::Path<'static>,)| Ok(r.0))

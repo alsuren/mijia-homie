@@ -34,11 +34,7 @@ pub trait OrgBluezDevice1 {
     ) -> nonblock::MethodReply<
         ::std::collections::HashMap<u16, arg::Variant<Box<dyn arg::RefArg + 'static>>>,
     >;
-    fn service_data(
-        &self,
-    ) -> nonblock::MethodReply<
-        ::std::collections::HashMap<String, arg::Variant<Box<dyn arg::RefArg + 'static>>>,
-    >;
+    fn service_data(&self) -> nonblock::MethodReply<arg::PropMap>;
     fn tx_power(&self) -> nonblock::MethodReply<i16>;
     fn services_resolved(&self) -> nonblock::MethodReply<bool>;
 }
@@ -210,11 +206,7 @@ impl<'a, T: nonblock::NonblockReply, C: ::std::ops::Deref<Target = T>> OrgBluezD
         )
     }
 
-    fn service_data(
-        &self,
-    ) -> nonblock::MethodReply<
-        ::std::collections::HashMap<String, arg::Variant<Box<dyn arg::RefArg + 'static>>>,
-    > {
+    fn service_data(&self) -> nonblock::MethodReply<arg::PropMap> {
         <Self as nonblock::stdintf::org_freedesktop_dbus::Properties>::get(
             &self,
             "org.bluez.Device1",

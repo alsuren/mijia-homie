@@ -7,7 +7,7 @@ pub trait OrgBluezLEAdvertisingManager1 {
     fn register_advertisement(
         &self,
         advertisement: dbus::Path,
-        options: ::std::collections::HashMap<&str, arg::Variant<Box<dyn arg::RefArg>>>,
+        options: arg::PropMap,
     ) -> nonblock::MethodReply<()>;
     fn unregister_advertisement(&self, service: dbus::Path) -> nonblock::MethodReply<()>;
     fn active_instances(&self) -> nonblock::MethodReply<u8>;
@@ -21,7 +21,7 @@ impl<'a, T: nonblock::NonblockReply, C: ::std::ops::Deref<Target = T>> OrgBluezL
     fn register_advertisement(
         &self,
         advertisement: dbus::Path,
-        options: ::std::collections::HashMap<&str, arg::Variant<Box<dyn arg::RefArg>>>,
+        options: arg::PropMap,
     ) -> nonblock::MethodReply<()> {
         self.method_call(
             "org.bluez.LEAdvertisingManager1",

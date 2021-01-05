@@ -7,7 +7,7 @@ pub trait OrgBluezGattManager1 {
     fn register_application(
         &self,
         application: dbus::Path,
-        options: ::std::collections::HashMap<&str, arg::Variant<Box<dyn arg::RefArg>>>,
+        options: arg::PropMap,
     ) -> nonblock::MethodReply<()>;
     fn unregister_application(&self, application: dbus::Path) -> nonblock::MethodReply<()>;
 }
@@ -18,7 +18,7 @@ impl<'a, T: nonblock::NonblockReply, C: ::std::ops::Deref<Target = T>> OrgBluezG
     fn register_application(
         &self,
         application: dbus::Path,
-        options: ::std::collections::HashMap<&str, arg::Variant<Box<dyn arg::RefArg>>>,
+        options: arg::PropMap,
     ) -> nonblock::MethodReply<()> {
         self.method_call(
             "org.bluez.GattManager1",

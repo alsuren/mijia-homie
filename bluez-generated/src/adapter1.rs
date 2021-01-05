@@ -5,10 +5,7 @@ use dbus::nonblock;
 
 pub trait OrgBluezAdapter1 {
     fn start_discovery(&self) -> nonblock::MethodReply<()>;
-    fn set_discovery_filter(
-        &self,
-        properties: ::std::collections::HashMap<&str, arg::Variant<Box<dyn arg::RefArg>>>,
-    ) -> nonblock::MethodReply<()>;
+    fn set_discovery_filter(&self, properties: arg::PropMap) -> nonblock::MethodReply<()>;
     fn stop_discovery(&self) -> nonblock::MethodReply<()>;
     fn remove_device(&self, device: dbus::Path) -> nonblock::MethodReply<()>;
     fn get_discovery_filters(&self) -> nonblock::MethodReply<Vec<String>>;
@@ -40,10 +37,7 @@ impl<'a, T: nonblock::NonblockReply, C: ::std::ops::Deref<Target = T>> OrgBluezA
         self.method_call("org.bluez.Adapter1", "StartDiscovery", ())
     }
 
-    fn set_discovery_filter(
-        &self,
-        properties: ::std::collections::HashMap<&str, arg::Variant<Box<dyn arg::RefArg>>>,
-    ) -> nonblock::MethodReply<()> {
+    fn set_discovery_filter(&self, properties: arg::PropMap) -> nonblock::MethodReply<()> {
         self.method_call("org.bluez.Adapter1", "SetDiscoveryFilter", (properties,))
     }
 

@@ -8,7 +8,7 @@ pub trait OrgBluezProfileManager1 {
         &self,
         profile: dbus::Path,
         uuid: &str,
-        options: ::std::collections::HashMap<&str, arg::Variant<Box<dyn arg::RefArg>>>,
+        options: arg::PropMap,
     ) -> nonblock::MethodReply<()>;
     fn unregister_profile(&self, profile: dbus::Path) -> nonblock::MethodReply<()>;
 }
@@ -20,7 +20,7 @@ impl<'a, T: nonblock::NonblockReply, C: ::std::ops::Deref<Target = T>> OrgBluezP
         &self,
         profile: dbus::Path,
         uuid: &str,
-        options: ::std::collections::HashMap<&str, arg::Variant<Box<dyn arg::RefArg>>>,
+        options: arg::PropMap,
     ) -> nonblock::MethodReply<()> {
         self.method_call(
             "org.bluez.ProfileManager1",
