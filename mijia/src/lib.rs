@@ -5,7 +5,8 @@ use futures::Stream;
 use std::ops::Range;
 use std::time::{Duration, SystemTime};
 use thiserror::Error;
-use tokio::stream::StreamExt;
+use tokio::pin;
+use tokio_stream::StreamExt;
 use uuid::Uuid;
 
 pub mod bluetooth;
@@ -389,7 +390,8 @@ impl MijiaSession {
             .bt_session
             .characteristic_event_stream(&history_record_characteristic.id)
             .await?;
-        let mut events = events.timeout(HISTORY_RECORD_TIMEOUT);
+        let events = events.timeout(HISTORY_RECORD_TIMEOUT);
+        pin!(events);
         self.start_notify_history(&id, Some(0)).await?;
 
         let mut history = vec![None; history_range.len()];

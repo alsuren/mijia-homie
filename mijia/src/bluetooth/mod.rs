@@ -16,12 +16,12 @@ use dbus::arg::{RefArg, Variant};
 use dbus::nonblock::stdintf::org_freedesktop_dbus::{Introspectable, ObjectManager, Properties};
 use dbus::nonblock::{Proxy, SyncConnection};
 use dbus::Path;
+use dbus_tokio::connection::IOResourceError;
 use futures::stream::{self, select_all, StreamExt};
 use futures::{FutureExt, Stream};
 use itertools::Itertools;
 use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
-use std::error::Error;
 use std::fmt::{self, Debug, Display, Formatter};
 use std::future::Future;
 use std::str::FromStr;
@@ -58,10 +58,10 @@ pub enum BluetoothError {
 }
 
 /// Error type for futures representing tasks spawned by this crate.
-#[derive(Error, Debug)]
+#[derive(Debug, Error)]
 pub enum SpawnError {
     #[error("D-Bus connection lost: {0}")]
-    DbusConnectionLost(#[source] Box<dyn Error + Send + Sync>),
+    DbusConnectionLost(#[source] IOResourceError),
     #[error("Task failed: {0}")]
     Join(#[from] JoinError),
 }
