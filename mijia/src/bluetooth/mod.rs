@@ -309,7 +309,7 @@ pub struct DeviceInfo {
     pub name: Option<String>,
     /// The GATT service data from the device's advertisement, if any. This is a map from the
     /// service UUID to its data.
-    pub service_data: HashMap<String, Vec<u8>>,
+    pub service_data: HashMap<Uuid, Vec<u8>>,
 }
 
 /// Information about a GATT service on a Bluetooth device.
@@ -809,7 +809,7 @@ impl BluetoothSession {
 
 fn get_service_data(
     device_properties: OrgBluezDevice1Properties,
-) -> Option<HashMap<String, Vec<u8>>> {
+) -> Option<HashMap<Uuid, Vec<u8>>> {
     // UUIDs don't get populated until we connect. Use:
     //     "ServiceData": Variant(InternalDict { data: [
     //         ("0000fe95-0000-1000-8000-00805f9b34fb", Variant([48, 88, 91, 5, 1, 23, 33, 215, 56, 193, 164, 40, 1, 0])
@@ -819,9 +819,15 @@ fn get_service_data(
         device_properties
             .service_data()?
             .iter()
-            .filter_map(|(k, v)| {
-                let v = cast::<Vec<u8>>(&v.0)?;
-                Some((k.to_owned(), v.to_owned()))
+            .filter_map(|(k, v)| match Uuid::parse_str(k) {
+                Ok(uuid) => {
+                    let v = cast::<Vec<u8>>(&v.0)?;
+                    Some((uuid, v.to_owned()))
+                }
+                Err(err) => {
+                    log::warn!("Error parsing service data UUID: {}", err);
+                    None
+                }
             })
             .collect(),
     )
@@ -887,13 +893,14 @@ mod tests {
 
     #[test]
     fn service_data() {
+        let uuid = uuid_from_u32(0x11223344);
         let mut service_data: HashMap<String, Variant<Box<dyn RefArg>>> = HashMap::new();
-        service_data.insert("uuid".to_string(), Variant(Box::new(vec![1u8, 2, 3])));
+        service_data.insert(uuid.to_string(), Variant(Box::new(vec![1u8, 2, 3])));
         let mut device_properties: HashMap<String, Variant<Box<dyn RefArg>>> = HashMap::new();
         device_properties.insert("ServiceData".to_string(), Variant(Box::new(service_data)));
 
         let mut expected_service_data = HashMap::new();
-        expected_service_data.insert("uuid".to_string(), vec![1u8, 2, 3]);
+        expected_service_data.insert(uuid, vec![1u8, 2, 3]);
 
         assert_eq!(
             get_service_data(OrgBluezDevice1Properties(&device_properties)),
