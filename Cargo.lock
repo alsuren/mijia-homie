@@ -862,9 +862,9 @@ dependencies = [
  "pretty_env_logger",
  "rumqttc",
  "rumqttd",
+ "rumqttlog",
  "thiserror",
  "tokio 1.0.1",
- "toml",
 ]
 
 [[package]]
