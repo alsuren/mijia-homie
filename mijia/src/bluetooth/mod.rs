@@ -16,12 +16,12 @@ use dbus::arg::{RefArg, Variant};
 use dbus::nonblock::stdintf::org_freedesktop_dbus::{Introspectable, ObjectManager, Properties};
 use dbus::nonblock::{Proxy, SyncConnection};
 use dbus::Path;
+use dbus_tokio::connection::IOResourceError;
 use futures::stream::{self, select_all, StreamExt};
 use futures::{FutureExt, Stream};
 use itertools::Itertools;
 use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
-use std::error::Error;
 use std::fmt::{self, Debug, Display, Formatter};
 use std::future::Future;
 use std::str::FromStr;
@@ -29,7 +29,6 @@ use std::sync::Arc;
 use std::time::Duration;
 use thiserror::Error;
 use tokio::task::JoinError;
-use tokio_compat_02::FutureExt as _;
 use uuid::Uuid;
 
 const DBUS_METHOD_CALL_TIMEOUT: Duration = Duration::from_secs(30);
@@ -58,10 +57,10 @@ pub enum BluetoothError {
 }
 
 /// Error type for futures representing tasks spawned by this crate.
-#[derive(Error, Debug)]
+#[derive(Debug, Error)]
 pub enum SpawnError {
     #[error("D-Bus connection lost: {0}")]
-    DbusConnectionLost(#[source] Box<dyn Error + Send + Sync>),
+    DbusConnectionLost(#[source] IOResourceError),
     #[error("Task failed: {0}")]
     Join(#[from] JoinError),
 }
@@ -425,7 +424,7 @@ impl BluetoothSession {
         // The resource is a task that should be spawned onto a tokio compatible
         // reactor ASAP. If the resource ever finishes, you lost connection to D-Bus.
         let dbus_handle = tokio::spawn(async {
-            let err = dbus_resource.compat().await;
+            let err = dbus_resource.await;
             Err(SpawnError::DbusConnectionLost(err))
         });
         Ok((
@@ -442,7 +441,7 @@ impl BluetoothSession {
             DBUS_METHOD_CALL_TIMEOUT,
             self.connection.clone(),
         );
-        let tree = bluez_root.get_managed_objects().compat().await?;
+        let tree = bluez_root.get_managed_objects().await?;
         let adapters: Vec<_> = tree
             .into_iter()
             .filter_map(|(path, interfaces)| interfaces.get("org.bluez.Adapter1").map(|_| path))
@@ -460,10 +459,9 @@ impl BluetoothSession {
                 DBUS_METHOD_CALL_TIMEOUT,
                 self.connection.clone(),
             );
-            adapter.set_powered(true).compat().await?;
+            adapter.set_powered(true).await?;
             adapter
                 .start_discovery()
-                .compat()
                 .await
                 .unwrap_or_else(|err| println!("starting discovery failed {:?}", err));
         }
@@ -478,7 +476,7 @@ impl BluetoothSession {
             DBUS_METHOD_CALL_TIMEOUT,
             self.connection.clone(),
         );
-        let tree = bluez_root.get_managed_objects().compat().await?;
+        let tree = bluez_root.get_managed_objects().await?;
 
         let sensors = tree
             .into_iter()
@@ -521,7 +519,7 @@ impl BluetoothSession {
         &self,
         device: &DeviceId,
     ) -> Result<Vec<ServiceInfo>, BluetoothError> {
-        let device_node = self.device(device).introspect_parse().compat().await?;
+        let device_node = self.device(device).introspect_parse().await?;
         let mut services = vec![];
         for subnode in device_node.nodes {
             let subnode_name = subnode.name.as_ref().unwrap();
@@ -532,8 +530,8 @@ impl BluetoothSession {
                     object_path: format!("{}/{}", device.object_path, subnode_name).into(),
                 };
                 let service = self.service(&service_id);
-                let uuid = Uuid::parse_str(&service.uuid().compat().await?)?;
-                let primary = service.primary().compat().await?;
+                let uuid = Uuid::parse_str(&service.uuid().await?)?;
+                let primary = service.primary().await?;
                 services.push(ServiceInfo {
                     id: service_id,
                     uuid,
@@ -549,7 +547,7 @@ impl BluetoothSession {
         &self,
         service: &ServiceId,
     ) -> Result<Vec<CharacteristicInfo>, BluetoothError> {
-        let service_node = self.service(service).introspect_parse().compat().await?;
+        let service_node = self.service(service).introspect_parse().await?;
         let mut characteristics = vec![];
         for subnode in service_node.nodes {
             let subnode_name = subnode.name.as_ref().unwrap();
@@ -560,8 +558,8 @@ impl BluetoothSession {
                     object_path: format!("{}/{}", service.object_path, subnode_name).into(),
                 };
                 let characteristic = self.characteristic(&characteristic_id);
-                let uuid = Uuid::parse_str(&characteristic.uuid().compat().await?)?;
-                let flags = characteristic.flags().compat().await?;
+                let uuid = Uuid::parse_str(&characteristic.uuid().await?)?;
+                let flags = characteristic.flags().await?;
                 characteristics.push(CharacteristicInfo {
                     id: characteristic_id,
                     uuid,
@@ -580,7 +578,6 @@ impl BluetoothSession {
         let characteristic_node = self
             .characteristic(characteristic)
             .introspect_parse()
-            .compat()
             .await?;
         let mut descriptors = vec![];
         for subnode in characteristic_node.nodes {
@@ -591,8 +588,7 @@ impl BluetoothSession {
                 let descriptor_id = DescriptorId {
                     object_path: format!("{}/{}", characteristic.object_path, subnode_name).into(),
                 };
-                let uuid =
-                    Uuid::parse_str(&self.descriptor(&descriptor_id).uuid().compat().await?)?;
+                let uuid = Uuid::parse_str(&self.descriptor(&descriptor_id).uuid().await?)?;
                 descriptors.push(DescriptorInfo {
                     id: descriptor_id,
                     uuid,
@@ -649,8 +645,8 @@ impl BluetoothSession {
     /// Get information about the given GATT service.
     pub async fn get_service_info(&self, id: &ServiceId) -> Result<ServiceInfo, BluetoothError> {
         let service = self.service(&id);
-        let uuid = Uuid::parse_str(&service.uuid().compat().await?)?;
-        let primary = service.primary().compat().await?;
+        let uuid = Uuid::parse_str(&service.uuid().await?)?;
+        let primary = service.primary().await?;
         Ok(ServiceInfo {
             id: id.to_owned(),
             uuid,
@@ -664,8 +660,8 @@ impl BluetoothSession {
         id: &CharacteristicId,
     ) -> Result<CharacteristicInfo, BluetoothError> {
         let characteristic = self.characteristic(&id);
-        let uuid = Uuid::parse_str(&characteristic.uuid().compat().await?)?;
-        let flags = characteristic.flags().compat().await?;
+        let uuid = Uuid::parse_str(&characteristic.uuid().await?)?;
+        let flags = characteristic.flags().await?;
         Ok(CharacteristicInfo {
             id: id.to_owned(),
             uuid,
@@ -678,7 +674,7 @@ impl BluetoothSession {
         &self,
         id: &DescriptorId,
     ) -> Result<DescriptorInfo, BluetoothError> {
-        let uuid = Uuid::parse_str(&self.descriptor(&id).uuid().compat().await?)?;
+        let uuid = Uuid::parse_str(&self.descriptor(&id).uuid().await?)?;
         Ok(DescriptorInfo {
             id: id.to_owned(),
             uuid,
@@ -729,12 +725,12 @@ impl BluetoothSession {
 
     /// Connect to the Bluetooth device with the given D-Bus object path.
     pub async fn connect(&self, id: &DeviceId) -> Result<(), BluetoothError> {
-        Ok(self.device(id).connect().compat().await?)
+        Ok(self.device(id).connect().await?)
     }
 
     /// Disconnect from the Bluetooth device with the given D-Bus object path.
     pub async fn disconnect(&self, id: &DeviceId) -> Result<(), BluetoothError> {
-        Ok(self.device(id).disconnect().compat().await?)
+        Ok(self.device(id).disconnect().await?)
     }
 
     /// Read the value of the given GATT characteristic.
@@ -743,7 +739,7 @@ impl BluetoothSession {
         id: &CharacteristicId,
     ) -> Result<Vec<u8>, BluetoothError> {
         let characteristic = self.characteristic(id);
-        Ok(characteristic.read_value(HashMap::new()).compat().await?)
+        Ok(characteristic.read_value(HashMap::new()).await?)
     }
 
     /// Write the given value to the given GATT characteristic.
@@ -755,7 +751,6 @@ impl BluetoothSession {
         let characteristic = self.characteristic(id);
         Ok(characteristic
             .write_value(value.into(), HashMap::new())
-            .compat()
             .await?)
     }
 
@@ -765,7 +760,7 @@ impl BluetoothSession {
         id: &DescriptorId,
     ) -> Result<Vec<u8>, BluetoothError> {
         let descriptor = self.descriptor(id);
-        Ok(descriptor.read_value(HashMap::new()).compat().await?)
+        Ok(descriptor.read_value(HashMap::new()).await?)
     }
 
     /// Write the given value to the given GATT descriptor.
@@ -775,23 +770,20 @@ impl BluetoothSession {
         value: impl Into<Vec<u8>>,
     ) -> Result<(), BluetoothError> {
         let descriptor = self.descriptor(id);
-        Ok(descriptor
-            .write_value(value.into(), HashMap::new())
-            .compat()
-            .await?)
+        Ok(descriptor.write_value(value.into(), HashMap::new()).await?)
     }
 
     /// Start notifications on the given GATT characteristic.
     pub async fn start_notify(&self, id: &CharacteristicId) -> Result<(), BluetoothError> {
         let characteristic = self.characteristic(id);
-        characteristic.start_notify().compat().await?;
+        characteristic.start_notify().await?;
         Ok(())
     }
 
     /// Stop notifications on the given GATT characteristic.
     pub async fn stop_notify(&self, id: &CharacteristicId) -> Result<(), BluetoothError> {
         let characteristic = self.characteristic(id);
-        characteristic.stop_notify().compat().await?;
+        characteristic.stop_notify().await?;
         Ok(())
     }
 
@@ -822,7 +814,7 @@ impl BluetoothSession {
     ) -> Result<impl Stream<Item = BluetoothEvent>, BluetoothError> {
         let mut message_streams = vec![];
         for match_rule in BluetoothEvent::match_rules(object.cloned()) {
-            let msg_match = self.connection.add_match(match_rule).compat().await?;
+            let msg_match = self.connection.add_match(match_rule).await?;
             message_streams.push(MessageStream::new(msg_match, self.connection.clone()));
         }
         Ok(select_all(message_streams)

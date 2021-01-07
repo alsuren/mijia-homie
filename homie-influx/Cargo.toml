@@ -17,16 +17,16 @@ homie-controller = { version = "0.2.0", path = "../homie-controller" }
 influx_db_client = "0.4.5"
 log = "0.4.11"
 pretty_env_logger = "0.4.0"
-rumqttc = "0.3.0"
-rustls = "0.18.1"
-rustls-native-certs = "0.4.0"
+rumqttc = "0.4.0"
+rustls = "0.19.0"
+rustls-native-certs = "0.5.0"
 serde_derive = "1.0.118"
 serde = "1.0.118"
 stable-eyre = "0.2.1"
-tokio = "0.3.6"
+tokio = "1.0.1"
 toml = "0.5.8"
 url = { version = "2.2.0", features = ["serde"] }
-tokio-compat-02 = "0.1.2"
+tokio-compat-02 = "0.2.0"
 
 [package.metadata.deb]
 # $auto doesn't work because we don't build packages in the same container as we build the binaries.

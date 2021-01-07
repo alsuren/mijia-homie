@@ -18,6 +18,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::Mutex;
 use tokio::{time, try_join};
+use tokio_compat_02::FutureExt;
 
 const SCAN_INTERVAL: Duration = Duration::from_secs(15);
 const CONNECT_INTERVAL: Duration = Duration::from_secs(1);
@@ -417,6 +418,7 @@ async fn connect_and_subscribe_sensor_or_disconnect(
             .wrap_err_with(|| format!("Disconnecting from {} ({})", name, id))?;
         Err(Report::new(e).wrap_err(format!("Starting notifications on {} ({})", name, id)))
     })
+    .compat()
     .await?;
 
     Ok(id)

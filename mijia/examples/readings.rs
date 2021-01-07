@@ -4,8 +4,8 @@ use eyre::Report;
 use mijia::{MijiaEvent, MijiaSession, SensorProps};
 use std::process::exit;
 use std::time::Duration;
-use tokio::stream::StreamExt;
 use tokio::time;
+use tokio_stream::StreamExt;
 
 const SCAN_DURATION: Duration = Duration::from_secs(5);
 

@@ -5,8 +5,9 @@
 use futures::future::ready;
 use homie_controller::{Event, HomieController, State};
 use homie_device::{HomieDevice, Node, Property, SpawnError};
-use librumqttd::{Broker, Config};
+use librumqttd::{Broker, Config, ConnectionSettings, ServerSettings};
 use rumqttc::{ConnectionError, MqttOptions, StateError};
+use std::collections::HashMap;
 use std::env;
 use std::io::ErrorKind;
 use std::sync::mpsc;
@@ -201,36 +202,35 @@ async fn test_device() {
 
 /// Spawn an MQTT broker listening on the given port.
 fn spawn_mqtt_broker(port: u16) {
-    // TODO: Construct Config directly once fields are made public.
-    let broker_config = toml::from_str::<Config>(&format!(
-        r#"
-    id = 0
-
-    [router]
-    id = 0
-    dir = "/tmp/integration/rumqttd"
-    max_segment_size = 10240
-    max_segment_count = 10
-    max_connections = 20
-
-    [servers.1]
-    port = {}
-    next_connection_delay_ms = 1
-
-    [servers.1.connections]
-    connection_timeout_ms = 100
-    max_client_id_len = 100
-    throttle_delay_ms = 0
-    max_payload_size = 2048
-    max_inflight_count = 500
-    max_inflight_size = 1024
-
-    [console]
-    port = 0
-    "#,
-        port
-    ))
-    .unwrap();
+    let mut servers = HashMap::new();
+    servers.insert(
+        "1".to_string(),
+        ServerSettings {
+            port,
+            ca_path: None,
+            cert_path: None,
+            key_path: None,
+            next_connection_delay_ms: 1,
+            connections: ConnectionSettings {
+                connection_timeout_ms: 100,
+                max_client_id_len: 100,
+                throttle_delay_ms: 0,
+                max_payload_size: 2048,
+                max_inflight_count: 500,
+                max_inflight_size: 1024,
+                username: None,
+                password: None,
+            },
+        },
+    );
+    let broker_config = Config {
+        id: 0,
+        router: Default::default(),
+        servers,
+        cluster: None,
+        replicator: None,
+        console: None,
+    };
     let mut broker = Broker::new(broker_config);
     thread::spawn(move || {
         broker.start().expect(&format!(
