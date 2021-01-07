@@ -78,6 +78,7 @@ if [ "$GENERATE" = 1 ]; then
             --interfaces="$interface" \
             --client=nonblock \
             --methodtype=none \
+            --prop-newtype \
             | grep -v '^use dbus as dbus;$' \
             | rustfmt \
             > "src/$modname.rs"

@@ -9,17 +9,16 @@ use self::introspect::IntrospectParse;
 use self::messagestream::MessageStream;
 use bitflags::bitflags;
 use bluez_generated::{
-    OrgBluezAdapter1, OrgBluezDevice1, OrgBluezGattCharacteristic1, OrgBluezGattDescriptor1,
-    OrgBluezGattService1,
+    OrgBluezAdapter1, OrgBluezDevice1, OrgBluezDevice1Properties, OrgBluezGattCharacteristic1,
+    OrgBluezGattDescriptor1, OrgBluezGattService1, ORG_BLUEZ_ADAPTER1_NAME,
 };
-use dbus::arg::{RefArg, Variant};
+use dbus::arg::cast;
 use dbus::nonblock::stdintf::org_freedesktop_dbus::{Introspectable, ObjectManager, Properties};
 use dbus::nonblock::{Proxy, SyncConnection};
 use dbus::Path;
 use dbus_tokio::connection::IOResourceError;
 use futures::stream::{self, select_all, StreamExt};
 use futures::{FutureExt, Stream};
-use itertools::Itertools;
 use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
 use std::fmt::{self, Debug, Display, Formatter};
@@ -310,7 +309,7 @@ pub struct DeviceInfo {
     pub name: Option<String>,
     /// The GATT service data from the device's advertisement, if any. This is a map from the
     /// service UUID to its data.
-    pub service_data: HashMap<String, Vec<u8>>,
+    pub service_data: HashMap<Uuid, Vec<u8>>,
 }
 
 /// Information about a GATT service on a Bluetooth device.
@@ -444,7 +443,7 @@ impl BluetoothSession {
         let tree = bluez_root.get_managed_objects().await?;
         let adapters: Vec<_> = tree
             .into_iter()
-            .filter_map(|(path, interfaces)| interfaces.get("org.bluez.Adapter1").map(|_| path))
+            .filter_map(|(path, interfaces)| interfaces.get(ORG_BLUEZ_ADAPTER1_NAME).map(|_| path))
             .collect();
 
         if adapters.is_empty() {
@@ -481,30 +480,16 @@ impl BluetoothSession {
         let sensors = tree
             .into_iter()
             .filter_map(|(object_path, interfaces)| {
-                // FIXME: can we generate a strongly typed deserialiser for this,
-                // based on the introspection data?
-                let device_properties = interfaces.get("org.bluez.Device1")?;
+                let device_properties = OrgBluezDevice1Properties::from_interfaces(&interfaces)?;
 
-                let mac_address = device_properties
-                    .get("Address")?
-                    .as_iter()?
-                    .filter_map(|addr| addr.as_str())
-                    .next()?
-                    .to_string();
-                let name = device_properties.get("Name").map(|name| {
-                    name.as_iter()
-                        .unwrap()
-                        .filter_map(|addr| addr.as_str())
-                        .next()
-                        .unwrap()
-                        .to_string()
-                });
+                let mac_address = device_properties.address()?;
+                let name = device_properties.name();
                 let service_data = get_service_data(device_properties).unwrap_or_default();
 
                 Some(DeviceInfo {
                     id: DeviceId { object_path },
-                    mac_address: MacAddress(mac_address),
-                    name,
+                    mac_address: MacAddress(mac_address.to_owned()),
+                    name: name.cloned(),
                     service_data,
                 })
             })
@@ -823,8 +808,8 @@ impl BluetoothSession {
 }
 
 fn get_service_data(
-    device_properties: &HashMap<String, Variant<Box<dyn RefArg>>>,
-) -> Option<HashMap<String, Vec<u8>>> {
+    device_properties: OrgBluezDevice1Properties,
+) -> Option<HashMap<Uuid, Vec<u8>>> {
     // UUIDs don't get populated until we connect. Use:
     //     "ServiceData": Variant(InternalDict { data: [
     //         ("0000fe95-0000-1000-8000-00805f9b34fb", Variant([48, 88, 91, 5, 1, 23, 33, 215, 56, 193, 164, 40, 1, 0])
@@ -832,23 +817,21 @@ fn get_service_data(
     // instead.
     Some(
         device_properties
-            .get("ServiceData")?
-            // Variant(...)
-            .as_iter()?
-            .next()?
-            // InternalDict(...)
-            .as_iter()?
-            .tuples::<(_, _)>()
-            .filter_map(|(k, v)| {
-                let k = k.as_str()?.into();
-                let v: Option<Vec<u8>> = v
-                    .box_clone()
-                    .as_static_inner(0)?
-                    .as_iter()?
-                    .map(|el| Some(el.as_u64()? as u8))
-                    .collect();
-                let v = v?;
-                Some((k, v))
+            .service_data()?
+            .iter()
+            .filter_map(|(k, v)| match Uuid::parse_str(k) {
+                Ok(uuid) => {
+                    if let Some(v) = cast::<Vec<u8>>(&v.0) {
+                        Some((uuid, v.to_owned()))
+                    } else {
+                        log::warn!("Service data had wrong type: {:?}", &v.0);
+                        None
+                    }
+                }
+                Err(err) => {
+                    log::warn!("Error parsing service data UUID: {}", err);
+                    None
+                }
             })
             .collect(),
     )
@@ -857,6 +840,8 @@ fn get_service_data(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use dbus::arg::{RefArg, Variant};
 
     #[test]
     fn device_adapter() {
@@ -907,6 +892,23 @@ mod tests {
             vec!["read".to_string(), "invalid flag".to_string()].try_into();
         assert!(
             matches!(flags, Err(BluetoothError::FlagParseError(string)) if string == "invalid flag")
+        );
+    }
+
+    #[test]
+    fn service_data() {
+        let uuid = uuid_from_u32(0x11223344);
+        let mut service_data: HashMap<String, Variant<Box<dyn RefArg>>> = HashMap::new();
+        service_data.insert(uuid.to_string(), Variant(Box::new(vec![1u8, 2, 3])));
+        let mut device_properties: HashMap<String, Variant<Box<dyn RefArg>>> = HashMap::new();
+        device_properties.insert("ServiceData".to_string(), Variant(Box::new(service_data)));
+
+        let mut expected_service_data = HashMap::new();
+        expected_service_data.insert(uuid, vec![1u8, 2, 3]);
+
+        assert_eq!(
+            get_service_data(OrgBluezDevice1Properties(&device_properties)),
+            Some(expected_service_data)
         );
     }
 }
