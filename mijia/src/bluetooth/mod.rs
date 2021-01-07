@@ -821,8 +821,12 @@ fn get_service_data(
             .iter()
             .filter_map(|(k, v)| match Uuid::parse_str(k) {
                 Ok(uuid) => {
-                    let v = cast::<Vec<u8>>(&v.0)?;
-                    Some((uuid, v.to_owned()))
+                    if let Some(v) = cast::<Vec<u8>>(&v.0) {
+                        Some((uuid, v.to_owned()))
+                    } else {
+                        log::warn!("Service data had wrong type: {:?}", &v.0);
+                        None
+                    }
                 }
                 Err(err) => {
                     log::warn!("Error parsing service data UUID: {}", err);
