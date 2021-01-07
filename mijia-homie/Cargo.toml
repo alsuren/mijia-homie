@@ -12,10 +12,10 @@ categories = ["network-programming"]
 [dependencies]
 backoff = { version = "0.2.1", features = ["tokio"] }
 color-backtrace = "0.5.0"
-eyre = "0.6.3"
+eyre = "0.6.5"
 futures = "0.3.8"
 futures-channel = "0.3.8"
-homie-device = { version = "0.3.1", path = "../homie-device" }
+homie-device = { version = "0.4.0", path = "../homie-device" }
 itertools = "0.10.0"
 log = "0.4.11"
 mijia = { version = "0.2.0", path = "../mijia" }
@@ -28,7 +28,7 @@ serde = "1.0.118"
 stable-eyre = "0.2.1"
 tokio = { version = "1.0.1", features = ["macros", "rt-multi-thread"] }
 tokio-compat-02 = "0.2.0"
-toml = "0.5.7"
+toml = "0.5.8"
 
 [package.metadata.deb]
 # $auto doesn't work because we don't build packages in the same container as we build the binaries.

@@ -12,7 +12,7 @@ categories = ["api-bindings", "hardware-support", "os::linux-apis"]
 [dependencies]
 async-trait = "0.1.42"
 bitflags = "1.2.1"
-bluez-generated = { version = "0.2.0", path = "../bluez-generated" }
+bluez-generated = { version = "0.2.1", path = "../bluez-generated" }
 dbus = { version = "0.9.1", features = ["futures"] }
 dbus-tokio = "0.7.3"
 futures = "0.3.8"
@@ -26,6 +26,6 @@ tokio = "1.0.1"
 uuid = "0.8.1"
 
 [dev-dependencies]
-eyre = "0.6.3"
+eyre = "0.6.5"
 pretty_env_logger = "0.4.0"
 tokio = { version = "1.0.1", features = ["macros", "rt", "rt-multi-thread", "time"] }
