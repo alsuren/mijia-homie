@@ -1251,7 +1251,7 @@ dependencies = [
 
 [[package]]
 name = "mijia"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "bluez-async",
  "chrono",
