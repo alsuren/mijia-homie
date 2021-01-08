@@ -1,4 +1,4 @@
-use mijia::bluetooth::{BleUuid, BluetoothSession, CharacteristicFlags};
+use bluez_async::{BleUuid, BluetoothSession, CharacteristicFlags};
 use std::ops::RangeInclusive;
 use std::str;
 

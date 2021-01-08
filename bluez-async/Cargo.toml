@@ -1,0 +1,31 @@
+[package]
+name = "bluez-async"
+version = "0.1.0"
+authors = ["Andrew Walbran <qwandor@google.com>", "David Laban <alsuren@gmail.com>"]
+edition = "2018"
+license = "MIT OR Apache-2.0"
+description = "An async wrapper around the D-Bus interface of BlueZ (the Linux Bluetooth daemon), supporting GATT client (central) functionality."
+repository = "https://github.com/alsuren/mijia-homie/"
+keywords = ["ble", "bluetooth", "bluez"]
+categories = ["api-bindings", "hardware-support", "os::linux-apis"]
+
+[dependencies]
+async-trait = "0.1.42"
+bitflags = "1.2.1"
+bluez-generated = { version = "0.2.0", path = "../bluez-generated" }
+dbus = { version = "0.9.1", features = ["futures"] }
+dbus-tokio = "0.7.3"
+futures = "0.3.8"
+itertools = "0.10.0"
+log = "0.4.11"
+serde = "1.0.118"
+serde_derive = "1.0.118"
+serde-xml-rs = "0.4.0"
+thiserror = "1.0.23"
+tokio = "1.0.1"
+uuid = "0.8.1"
+
+[dev-dependencies]
+eyre = "0.6.3"
+pretty_env_logger = "0.4.0"
+tokio = { version = "1.0.1", features = ["macros", "rt", "rt-multi-thread", "time"] }

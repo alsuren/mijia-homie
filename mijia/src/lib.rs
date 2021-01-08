@@ -9,9 +9,9 @@ use tokio::pin;
 use tokio_stream::StreamExt;
 use uuid::Uuid;
 
-pub mod bluetooth;
 mod decode;
-use bluetooth::{
+pub use bluez_async as bluetooth;
+use bluez_async::{
     BluetoothError, BluetoothEvent, BluetoothSession, CharacteristicEvent, DeviceEvent, DeviceId,
     MacAddress, SpawnError,
 };

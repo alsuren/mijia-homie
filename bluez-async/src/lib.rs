@@ -67,11 +67,11 @@ pub enum SpawnError {
 /// Opaque identifier for a Bluetooth adapter on the system.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct AdapterId {
-    pub(crate) object_path: Path<'static>,
+    object_path: Path<'static>,
 }
 
 impl AdapterId {
-    pub(crate) fn new(object_path: &str) -> Self {
+    fn new(object_path: &str) -> Self {
         Self {
             object_path: object_path.to_owned().into(),
         }
@@ -96,11 +96,11 @@ impl Display for AdapterId {
 /// will also happen from that adapter (in case the system has more than one).
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct DeviceId {
-    pub(crate) object_path: Path<'static>,
+    object_path: Path<'static>,
 }
 
 impl DeviceId {
-    pub(crate) fn new(object_path: &str) -> Self {
+    fn new(object_path: &str) -> Self {
         Self {
             object_path: object_path.to_owned().into(),
         }
@@ -138,11 +138,11 @@ impl Display for DeviceId {
 /// Opaque identifier for a GATT service on a Bluetooth device.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct ServiceId {
-    pub(crate) object_path: Path<'static>,
+    object_path: Path<'static>,
 }
 
 impl ServiceId {
-    pub(crate) fn new(object_path: &str) -> Self {
+    fn new(object_path: &str) -> Self {
         Self {
             object_path: object_path.to_owned().into(),
         }
@@ -180,11 +180,11 @@ impl Display for ServiceId {
 /// Opaque identifier for a GATT characteristic on a Bluetooth device.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct CharacteristicId {
-    pub(crate) object_path: Path<'static>,
+    object_path: Path<'static>,
 }
 
 impl CharacteristicId {
-    pub(crate) fn new(object_path: &str) -> Self {
+    fn new(object_path: &str) -> Self {
         Self {
             object_path: object_path.to_owned().into(),
         }
@@ -222,12 +222,12 @@ impl Display for CharacteristicId {
 /// Opaque identifier for a GATT characteristic descriptor on a Bluetooth device.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct DescriptorId {
-    pub(crate) object_path: Path<'static>,
+    object_path: Path<'static>,
 }
 
 impl DescriptorId {
     #[cfg(test)]
-    pub(crate) fn new(object_path: &str) -> Self {
+    fn new(object_path: &str) -> Self {
         Self {
             object_path: object_path.to_owned().into(),
         }

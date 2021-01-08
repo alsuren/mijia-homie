@@ -1,5 +1,5 @@
+use bluez_async::BluetoothSession;
 use futures::stream::StreamExt;
-use mijia::bluetooth::BluetoothSession;
 
 #[tokio::main]
 async fn main() -> Result<(), eyre::Report> {
