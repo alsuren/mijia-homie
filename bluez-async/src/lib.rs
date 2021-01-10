@@ -307,6 +307,11 @@ pub struct DeviceInfo {
     pub mac_address: MacAddress,
     /// The human-readable name of the device, if available.
     pub name: Option<String>,
+    /// The GATT service UUIDs (if any) from the device's advertisement or service discovery.
+    ///
+    /// Note that service discovery only happens after a connection has been made to the device, but
+    /// BlueZ may cache the list of services after it is disconnected.
+    pub services: Vec<Uuid>,
     /// The GATT service data from the device's advertisement, if any. This is a map from the
     /// service UUID to its data.
     pub service_data: HashMap<Uuid, Vec<u8>>,
@@ -484,12 +489,14 @@ impl BluetoothSession {
 
                 let mac_address = device_properties.address()?;
                 let name = device_properties.name();
+                let services = get_services(device_properties);
                 let service_data = get_service_data(device_properties).unwrap_or_default();
 
                 Some(DeviceInfo {
                     id: DeviceId { object_path },
                     mac_address: MacAddress(mac_address.to_owned()),
                     name: name.cloned(),
+                    services,
                     service_data,
                 })
             })
@@ -837,6 +844,24 @@ fn get_service_data(
     )
 }
 
+fn get_services(device_properties: OrgBluezDevice1Properties) -> Vec<Uuid> {
+    if let Some(uuids) = device_properties.uuids() {
+        uuids
+            .iter()
+            .filter_map(|uuid| {
+                Uuid::parse_str(uuid)
+                    .map_err(|err| {
+                        log::warn!("Error parsing service data UUID: {}", err);
+                        err
+                    })
+                    .ok()
+            })
+            .collect()
+    } else {
+        vec![]
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -910,5 +935,28 @@ mod tests {
             get_service_data(OrgBluezDevice1Properties(&device_properties)),
             Some(expected_service_data)
         );
+    }
+
+    #[test]
+    fn get_services_none() {
+        let device_properties: HashMap<String, Variant<Box<dyn RefArg>>> = HashMap::new();
+
+        assert_eq!(
+            get_services(OrgBluezDevice1Properties(&device_properties)),
+            vec![]
+        )
+    }
+
+    #[test]
+    fn get_services_some() {
+        let uuid = uuid_from_u32(0x11223344);
+        let uuids = vec![uuid.to_string()];
+        let mut device_properties: HashMap<String, Variant<Box<dyn RefArg>>> = HashMap::new();
+        device_properties.insert("UUIDs".to_string(), Variant(Box::new(uuids)));
+
+        assert_eq!(
+            get_services(OrgBluezDevice1Properties(&device_properties)),
+            vec![uuid]
+        )
     }
 }
