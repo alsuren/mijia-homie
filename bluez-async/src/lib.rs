@@ -307,14 +307,24 @@ pub struct DeviceInfo {
     pub mac_address: MacAddress,
     /// The human-readable name of the device, if available.
     pub name: Option<String>,
+    /// The appearance of the device, as defined by GAP.
+    pub appearance: Option<u16>,
     /// The GATT service UUIDs (if any) from the device's advertisement or service discovery.
     ///
     /// Note that service discovery only happens after a connection has been made to the device, but
     /// BlueZ may cache the list of services after it is disconnected.
     pub services: Vec<Uuid>,
+    /// Whether the device is currently paired with the adapter.
+    pub paired: bool,
+    /// Whether the device is currently connected to the adapter.
+    pub connected: bool,
+    /// The Received Signal Strength Indicator of the device advertisement or inquiry.
+    pub rssi: Option<i16>,
     /// The GATT service data from the device's advertisement, if any. This is a map from the
     /// service UUID to its data.
     pub service_data: HashMap<Uuid, Vec<u8>>,
+    /// Whether service discovery has finished for the device.
+    pub services_resolved: bool,
 }
 
 /// Information about a GATT service on a Bluetooth device.
@@ -488,16 +498,20 @@ impl BluetoothSession {
                 let device_properties = OrgBluezDevice1Properties::from_interfaces(&interfaces)?;
 
                 let mac_address = device_properties.address()?;
-                let name = device_properties.name();
                 let services = get_services(device_properties);
                 let service_data = get_service_data(device_properties).unwrap_or_default();
 
                 Some(DeviceInfo {
                     id: DeviceId { object_path },
                     mac_address: MacAddress(mac_address.to_owned()),
-                    name: name.cloned(),
+                    name: device_properties.name().cloned(),
+                    appearance: device_properties.appearance(),
                     services,
+                    paired: device_properties.paired()?,
+                    connected: device_properties.connected()?,
+                    rssi: device_properties.rssi(),
                     service_data,
+                    services_resolved: device_properties.services_resolved()?,
                 })
             })
             .collect();
