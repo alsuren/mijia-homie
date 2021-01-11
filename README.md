@@ -1,14 +1,20 @@
 # About this project
 
-This is a project for capturing BLE data from a Xiaomi Mijia 2
-hygrometer-thermometer and publishing it. The repository includes:
+This is a project for capturing BLE data from a Xiaomi Mijia 2 hygrometer-thermometer and publishing
+it. The repository includes a number of related crates:
 
-- [A service](./mijia-homie) to connect to a number of Mijia sensors over BLE and publish their readings to an MQTT broker following the [Homie convention](https://homieiot.github.io/).
-- [A service](./homie-influx) to discover devices on an MQTT broker following the [Homie convention](https://homieiot.github.io/) and record their property value changes to an InfluxDB database.
-- [A library](./homie-device) for implementing Homie devices.
-- [A library](./homie-controller) for implementing Homie controllers.
-- [A library](./mijia) for reading Mijia sensors.
-- [Generated bindings](./bluez-generated) for talking to BlueZ on Linux.
+- [mijia-homie](./mijia-homie), a service to connect to a number of Mijia sensors over BLE and
+  publish their readings to an MQTT broker following the
+  [Homie convention](https://homieiot.github.io/).
+- [homie-influx](./homie-influx), a service to discover devices on an MQTT broker following the
+  [Homie convention](https://homieiot.github.io/) and record their property value changes to an
+  InfluxDB database.
+- [homie-device](./homie-device), a library for implementing Homie devices.
+- [homie-controller](./homie-controller), a library for implementing Homie controllers.
+- [mijia](./mijia), a library for reading Mijia sensors.
+- [bluez-generated](./bluez-generated), generated D-Bus bindings for talking to BlueZ on Linux.
+- [bluez-async](./bluez-async), a library built on top of `bluez-generated` providing a convenient
+  and safe interface to Bluetooth GATT client functionality.
 
 The project originated from a
 [blog post](https://dev.to/lcsfelix/using-rust-blurz-to-capture-bluetooth-messages-9f-temp-slug-3838740?preview=259783675da772c58dae7c7ec5e06fd3e9746205826a13f6c39fcdefba2e37713113f2b21f1aeade314f556d37c2bc59e2c0b128499dd616d3622327),
