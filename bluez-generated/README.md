@@ -22,5 +22,5 @@ your project.
 Only async bindings are generated. Blocking bindings could also be generated, but I'm unlikely
 to use them, so they would need to be contributed by someone else.
 
-It would be nice to generate some strongly typed bindings around `get_managed_objects()` for
-bulk-fetching properties and `add_match()` for subscribing to events.
+It would be nice to generate some strongly typed bindings around `add_match()` for subscribing to
+`PropertiesChanged` signals as as stream for a particular property.
