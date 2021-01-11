@@ -3,10 +3,11 @@
 [![crates.io page](https://img.shields.io/crates/v/bluez-generated.svg)](https://crates.io/crates/bluez-generated)
 [![docs.rs page](https://docs.rs/bluez-generated/badge.svg)](https://docs.rs/bluez-generated)
 
-This crate contains async bindings for Bluez.
+Generated async D-Bus bindings for talking to BlueZ on Linux.
 
-Bindings are generated from introspection data, using `dbus-codegen`. This means that it is
-relatively easy to maintain, but it only covers interfaces that I have the devices for.
+Bindings are generated from introspection data, using
+[`dbus-codegen`](https://crates.io/crates/dbus-codegen). This means that it is relatively easy to
+maintain, but it only covers interfaces that I have the devices for.
 
 ## Adding Interfaces
 
