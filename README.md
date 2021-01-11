@@ -22,7 +22,8 @@ and some ideas came from a
 [Python utility for talking to the same sensors](https://github.com/JsBergbau/MiTemperature2),
 especially [this issue thread](https://github.com/JsBergbau/MiTemperature2/issues/1).
 
-If you want a bit more back-story, there is also a [slide deck](https://alsuren.github.io/mijia-homie/docs/presentation/).
+If you want a bit more back-story, there is also a
+[slide deck](https://alsuren.github.io/mijia-homie/docs/presentation/).
 
 ![Serving Suggestion](./docs/presentation/title.jpg)
 
@@ -32,8 +33,10 @@ To run this code on your Raspberry Pi, you will need:
 
 - Some Xiaomi Mijia version 2 Bluetooth temperature and humidity sensors.
 - A working Rust toolchain and Docker on your laptop.
-- An MQTT broker to connect to (test.mosquitto.org works okay for testing, but you will want to deploy your own if you're monitoring your house).
-- Something to read the measurements from MQTT. [Homie Device Discovery](https://rroemhild.github.io/hodd/) is probably easiest for debugging.
+- An MQTT broker to connect to (test.mosquitto.org works okay for testing, but you will want to
+  deploy your own if you're monitoring your house).
+- Something to read the measurements from MQTT.
+  [Homie Device Discovery](https://rroemhild.github.io/hodd/) is probably easiest for debugging.
 
 After following these steps, you should end up with something that looks like this:
 
@@ -43,13 +46,15 @@ After following these steps, you should end up with something that looks like th
 
       TARGET_SSH=pi@raspberrypi.local EXAMPLE=list-sensors ./run.sh
 
-- Add each of the sensors to `/home/pi/sensor-names.toml` on the Raspberry Pi. Each line should be of the form:
+- Add each of the sensors to `/home/pi/sensor-names.toml` on the Raspberry Pi. Each line should be
+  of the form:
 
       "A4:C1:38:D7:21:17"="Landing"
 
   If you don't know the sensor names yet, just make some names up for now.
 
-- You will also want to copy `mijia-homie/mijia-homie.example.toml` to `/home/pi/mijia-homie.example.toml` and edit it to suit your needs.
+- You will also want to copy `mijia-homie/mijia-homie.example.toml` to
+  `/home/pi/mijia-homie.example.toml` and edit it to suit your needs.
 
 - You should then be able to run the publisher using `run.sh` with default arguments:
 
@@ -57,9 +62,13 @@ After following these steps, you should end up with something that looks like th
 
   This will start the publisher under systemd and show you the logs.
 
-- It takes a while to connect to all of the sensors and start getting readings. Once everything is running, you can use HoDD to see your readings.
+- It takes a while to connect to all of the sensors and start getting readings. Once everything is
+  running, you can use HoDD to see your readings.
 
-- If everything is visible in HoDD then you can add other integrations. Anything that understands Homie should be able to read your sensors. OpenHAB is what we're using, but take a look at the [Homie Implementations page](https://homieiot.github.io/implementations/) and see if anything inspires you.
+- If everything is visible in HoDD then you can add other integrations. Anything that understands
+  Homie should be able to read your sensors. OpenHAB is what we're using, but take a look at the
+  [Homie Implementations page](https://homieiot.github.io/implementations/) and see if anything
+  inspires you.
 
 ## License
 
@@ -74,6 +83,6 @@ at your option.
 
 ## Contribution
 
-Unless you explicitly state otherwise, any contribution intentionally submitted
-for inclusion in the work by you, as defined in the Apache-2.0 license, shall be
-dual licensed as above, without any additional terms or conditions.
+Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in the
+work by you, as defined in the Apache-2.0 license, shall be dual licensed as above, without any
+additional terms or conditions.

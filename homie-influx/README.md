@@ -3,9 +3,12 @@
 [![crates.io page](https://img.shields.io/crates/v/homie-influx.svg)](https://crates.io/crates/homie-influx)
 [![Download](https://api.bintray.com/packages/homie-rs/homie-rs/homie-influx/images/download.svg) ](https://bintray.com/homie-rs/homie-rs/homie-influx/_latestVersion)
 
-`homie-influx` is a service to connect to an MQTT broker, discover devices following the [Homie convention](https://homieiot.github.io/), and record their property value changes to an InfluxDB database.
+`homie-influx` is a service to connect to an MQTT broker, discover devices following the
+[Homie convention](https://homieiot.github.io/), and record their property value changes to an
+InfluxDB database.
 
-See [the main project readme](https://github.com/alsuren/mijia-homie#readme) for more details and background.
+See [the main project readme](https://github.com/alsuren/mijia-homie#readme) for more details and
+background.
 
 ## Installation
 
@@ -25,12 +28,19 @@ $ cargo install homie-influx
 
 ## Usage
 
-If you have installed the Debian package, the service will be set up with systemd for you already. Otherwise, copy the `homie-influx` binary to `/usr/bin`, copy `debian-scripts/homie-influx.service` to `/lib/systemd/system`, create a `homie-influx` user to run as, and create `/etc/homie-influx` for configuration files.
+If you have installed the Debian package, the service will be set up with systemd for you already.
+Otherwise, copy the `homie-influx` binary to `/usr/bin`, copy `debian-scripts/homie-influx.service`
+to `/lib/systemd/system`, create a `homie-influx` user to run as, and create `/etc/homie-influx` for
+configuration files.
 
 There should be two config files under `/etc/homie-influx`:
 
-- `homie-influx.toml` contains the main configuration for the service, such as which MQTT broker and InfluxDB server to connect to. See [homie-influx.example.toml](homie-influx.example.toml) for an example of the settings that are supported.
-- `mappings.toml` contains a map of Homie base topics to InfluxDB databases. By default it will look for devices under the standard `homie` base topic and write to an InfluxDB database called `test`. You can add multiple base topics to handle multiple users.
+- `homie-influx.toml` contains the main configuration for the service, such as which MQTT broker and
+  InfluxDB server to connect to. See [homie-influx.example.toml](homie-influx.example.toml) for an
+  example of the settings that are supported.
+- `mappings.toml` contains a map of Homie base topics to InfluxDB databases. By default it will look
+  for devices under the standard `homie` base topic and write to an InfluxDB database called `test`.
+  You can add multiple base topics to handle multiple users.
 
 After editing these config files you will need to restart the service:
 
@@ -55,6 +65,6 @@ at your option.
 
 ## Contribution
 
-Unless you explicitly state otherwise, any contribution intentionally submitted
-for inclusion in the work by you, as defined in the Apache-2.0 license, shall be
-dual licensed as above, without any additional terms or conditions.
+Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in the
+work by you, as defined in the Apache-2.0 license, shall be dual licensed as above, without any
+additional terms or conditions.
