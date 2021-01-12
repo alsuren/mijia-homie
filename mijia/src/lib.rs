@@ -1,4 +1,10 @@
 //! A library for connecting to Xiaomi Mijia 2 Bluetooth temperature/humidity sensors.
+//!
+//! Currently only supports running on Linux, as it depends on BlueZ for Bluetooth.
+//!
+//! Start by creating a [`MijiaSession`].
+//!
+//! [`MijiaSession']: struct.MijiaSession.html
 
 use core::future::Future;
 use futures::Stream;
@@ -138,9 +144,32 @@ impl MijiaEvent {
 }
 
 /// A wrapper around a Bluetooth session which adds some methods for dealing with Mijia sensors.
-/// The underlying Bluetooth session may still be accessed.
+/// This is the main entry point to the library.
+///
+/// The underlying Bluetooth session may still be accessed. For example, to scan for sensors:
+/// ```rust
+/// # use std::error::Error;
+/// # use std::time::Duration;
+/// # use tokio::time;
+/// # use mijia::MijiaSession;
+/// # async fn example() -> Result<(), Box<dyn Error>> {
+/// // Create a new session. This establishes the D-Bus connection. In this case we ignore the join
+/// // handle, as we don't intend to run indefinitely.
+/// let (_, session) = MijiaSession::new().await?;
+///
+/// // Start scanning for Bluetooth devices, and wait a few seconds for some to be discovered.
+/// session.bt_session.start_discovery().await?;
+/// time::sleep(Duration::from_secs(5)).await;
+///
+/// // Get the list of sensors which are currently known.
+/// let sensors = session.get_sensors().await?;
+/// # Ok(())
+/// # }
+/// ```
 #[derive(Debug)]
 pub struct MijiaSession {
+    /// The underlying `BluetoothSession`. You can use this for Bluetooth operations which are not
+    /// specific to Mijia sensors, such as connecting and disconnecting.
     pub bt_session: BluetoothSession,
 }
 
