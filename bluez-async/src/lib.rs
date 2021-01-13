@@ -1,3 +1,12 @@
+//! An async wrapper around the D-Bus interface of BlueZ, the Linux Bluetooth daemon. This provides
+//! type-safe interfaces to a subset of the Bluetooth client (i.e. central, in Bluetooth
+//! terminology) interfaces exposed by BlueZ, focussing on the Generic Attribute Profile (GATT) of
+//! Bluetooth Low Energy (BLE).
+//!
+//! Start by creating a [`BluetoothSession`].
+//!
+//! [`BluetoothSession']: struct.BluetoothSession.html
+
 mod bleuuid;
 mod events;
 mod introspect;
@@ -415,7 +424,7 @@ pub struct DescriptorInfo {
 }
 
 /// A connection to the Bluetooth daemon. This can be cheaply cloned and passed around to be used
-/// from different places.
+/// from different places. It is the main entry point to the library.
 #[derive(Clone)]
 pub struct BluetoothSession {
     pub connection: Arc<SyncConnection>,
@@ -428,6 +437,8 @@ impl Debug for BluetoothSession {
 }
 
 impl BluetoothSession {
+    /// Establish a new D-Bus connection to communicate with BlueZ.
+    ///
     /// Returns a tuple of (join handle, Self).
     /// If the join handle ever completes then you're in trouble and should
     /// probably restart the process.
@@ -798,7 +809,8 @@ impl BluetoothSession {
         self.filtered_event_stream(None::<&DeviceId>).await
     }
 
-    /// Get a stream of events for a particular device.
+    /// Get a stream of events for a particular device. This includes events for all its
+    /// characteristics.
     pub async fn device_event_stream(
         &self,
         device: &DeviceId,

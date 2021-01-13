@@ -30,7 +30,7 @@ async fn main() -> Result<(), Report> {
         .iter()
         .filter(|sensor| should_include_sensor(sensor, &filters))
     {
-        println!("Connecting to {} ({:?})", sensor.mac_address, sensor.id);
+        println!("Connecting to {} ({})", sensor.mac_address, sensor.id);
         if let Err(e) = session.bt_session.connect(&sensor.id).await {
             println!("Failed to connect to {}: {:?}", sensor.mac_address, e);
         } else {
@@ -42,7 +42,7 @@ async fn main() -> Result<(), Report> {
     while let Some(event) = events.next().await {
         match event {
             MijiaEvent::Readings { id, readings } => {
-                println!("{:?}: {}", id, readings);
+                println!("{}: {}", id, readings);
             }
             _ => println!("Event: {:?}", event),
         }

@@ -18,7 +18,7 @@ async fn main() -> Result<(), eyre::Report> {
     let sensors = session.get_sensors().await?;
     println!("Sensors:");
     for sensor in sensors {
-        println!("{}: {:?}", sensor.mac_address, sensor.id);
+        println!("{}: {}", sensor.mac_address, sensor.id);
     }
 
     Ok(())

@@ -27,7 +27,7 @@ async fn main() -> Result<(), Report> {
             println!("Skipping {}", sensor.mac_address);
             continue;
         }
-        println!("Connecting to {} ({:?})", sensor.mac_address, sensor.id);
+        println!("Connecting to {} ({})", sensor.mac_address, sensor.id);
         if let Err(e) = session.bt_session.connect(&sensor.id).await {
             println!("Failed to connect to {}: {:?}", sensor.mac_address, e);
         } else {

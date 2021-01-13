@@ -3,9 +3,12 @@
 [![crates.io page](https://img.shields.io/crates/v/mijia-homie.svg)](https://crates.io/crates/mijia-homie)
 [![Download](https://api.bintray.com/packages/homie-rs/homie-rs/mijia-homie/images/download.svg) ](https://bintray.com/homie-rs/homie-rs/mijia-homie/_latestVersion)
 
-`mijia-homie` is a service for connecting to Xiaomi Mijia 2 Bluetooth temperature/humidity sensors and publishing their readings to an MQTT broker following the [Homie convention](https://homieiot.github.io/).
+`mijia-homie` is a service for connecting to Xiaomi Mijia 2 Bluetooth temperature/humidity sensors
+and publishing their readings to an MQTT broker following the
+[Homie convention](https://homieiot.github.io/).
 
-See [the main project readme](https://github.com/alsuren/mijia-homie#readme) for more details and background.
+See [the main project readme](https://github.com/alsuren/mijia-homie#readme) for more details and
+background.
 
 ## Installation
 
@@ -25,12 +28,20 @@ $ cargo install mijia-homie
 
 ## Usage
 
-If you have installed the Debian package, the service will be set up with systemd for you already. Otherwise, copy the `mijia-homie` binary to `/usr/bin`, copy `debian-scripts/mijia-homie.service` to `/lib/systemd/system`, create a `mijia-homie` user to run as, and create `/etc/mijia-homie` for configuration files.
+If you have installed the Debian package, the service will be set up with systemd for you already.
+Otherwise, copy the `mijia-homie` binary to `/usr/bin`, copy `debian-scripts/mijia-homie.service` to
+`/lib/systemd/system`, create a `mijia-homie` user to run as, and create `/etc/mijia-homie` for
+configuration files.
 
 There should be two config files under `/etc/mijia-homie`:
 
-- `mijia-homie.toml` contains the main configuration for the service, such as which MQTT broker to connect to and the name and ID of the Homie device. See [mijia-homie.example.toml](mijia-homie.example.toml) for an example of the settings that are supported.
-- `sensor-names.toml` contains a map of sensor MAC addresses to human-readable names. Only the sensors listed in this file will be connected to, so you will need to fill it in before `mijia-homie` does anything useful. Each line should be of the form:
+- `mijia-homie.toml` contains the main configuration for the service, such as which MQTT broker to
+  connect to and the name and ID of the Homie device. See
+  [mijia-homie.example.toml](mijia-homie.example.toml) for an example of the settings that are
+  supported.
+- `sensor-names.toml` contains a map of sensor MAC addresses to human-readable names. Only the
+  sensors listed in this file will be connected to, so you will need to fill it in before
+  `mijia-homie` does anything useful. Each line should be of the form:
 
       "A4:C1:38:D7:21:17"="Landing"
 
@@ -46,7 +57,10 @@ You may find it helpful to watch the logs to see whether it is managing to conne
 $ sudo journalctl -u mijia-homie.service --output=cat --follow
 ```
 
-Once it is running, try connecting to your MQTT broker with a [Homie controller](https://homieiot.github.io/implementations/#controller) such as [HoDD](https://rroemhild.github.io/hodd/) or [openHAB](https://www.openhab.org/) to see your sensors.
+Once it is running, try connecting to your MQTT broker with a
+[Homie controller](https://homieiot.github.io/implementations/#controller) such as
+[HoDD](https://rroemhild.github.io/hodd/) or [openHAB](https://www.openhab.org/) to see your
+sensors.
 
 ## License
 
@@ -59,6 +73,6 @@ at your option.
 
 ## Contribution
 
-Unless you explicitly state otherwise, any contribution intentionally submitted
-for inclusion in the work by you, as defined in the Apache-2.0 license, shall be
-dual licensed as above, without any additional terms or conditions.
+Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in the
+work by you, as defined in the Apache-2.0 license, shall be dual licensed as above, without any
+additional terms or conditions.
