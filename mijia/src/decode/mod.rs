@@ -40,7 +40,7 @@ fn decode_temperature(bytes: [u8; 2]) -> f32 {
 }
 
 fn encode_temperature(temperature: f32) -> Result<[u8; 2], EncodeError> {
-    if temperature < TEMPERATURE_MIN || temperature > TEMPERATURE_MAX {
+    if !(TEMPERATURE_MIN..=TEMPERATURE_MAX).contains(&temperature) {
         return Err(EncodeError::TemperatureOutOfRange(temperature));
     }
     let temperature_fixed = (temperature * 100.0) as i16;

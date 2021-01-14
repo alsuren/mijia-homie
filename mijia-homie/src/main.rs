@@ -403,12 +403,12 @@ async fn connect_and_subscribe_sensor_or_disconnect(
         .map_err(|e| eyre!("Error connecting to {}: {:?}", name, e))?;
 
     // We managed to connect to the sensor via some id, now try to start notifications for readings.
-    let mut backoff = ExponentialBackoff::default();
-    backoff.max_elapsed_time = Some(SENSOR_CONNECT_RETRY_TIMEOUT);
-
     FutureOperation::retry(
         || session.start_notify_sensor(&id).map_err(Into::into),
-        backoff,
+        ExponentialBackoff {
+            max_elapsed_time: Some(SENSOR_CONNECT_RETRY_TIMEOUT),
+            ..Default::default()
+        },
     )
     .or_else(|e| async {
         session
