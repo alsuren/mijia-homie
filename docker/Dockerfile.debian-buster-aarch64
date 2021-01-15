@@ -1,5 +1,5 @@
 # Built from https://github.com/qwandor/cross/blob/context/docker/Dockerfile.context
-FROM ghcr.io/qwandor/cross-context:latest as context
+FROM ghcr.io/qwandor/cross-context:0.2.1 as context
 
 FROM debian:buster
 
