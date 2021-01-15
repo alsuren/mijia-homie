@@ -2,8 +2,7 @@
 # Based on https://www.collabora.com/news-and-blog/blog/2020/06/23/cross-building-rust-gstreamer-plugins-for-the-raspberry-pi/
 # but with `RUN apt-get install -y libdbus-1-dev:armhf` thrown in to get the dependency we need.
 # This image has been pushed to dockerhub.
-image = "alsuren/cross-dbus:armv7-unknown-linux-gnu-0.2.1"
-
+image = "ghcr.io/qwandor/cross-dbus-debian-buster-armv7:0.2.1"
 
 # Once https://github.com/rust-embedded/cross/pull/446 gets somewhere, you
 # will be able to use `context` and `dockerfile` to achieve the same result.
@@ -11,16 +10,16 @@ image = "alsuren/cross-dbus:armv7-unknown-linux-gnu-0.2.1"
 # cargo install --git=https://github.com/alsuren/cross --branch=docker-build-context
 # and then comment out `image`, above and uncomment the following two lines:
 # context = "./docker"
-# dockerfile = "./docker/Dockerfile.dbus.armv7-unknown-linux-gnueabihf"
+# dockerfile = "./docker/Dockerfile.debian-buster-armv7"
 
 [target.aarch64-unknown-linux-gnu]
-image = "alsuren/cross-dbus:aarch64-unknown-linux-gnu-0.2.1"
+image = "ghcr.io/qwandor/cross-dbus-debian-buster-aarch64:0.2.1"
 
 # context = "./docker"
-# dockerfile = "./docker/Dockerfile.dbus.aarch64-unknown-linux-gnu"
+# dockerfile = "./docker/Dockerfile.debian-buster-aarch64"
 
 [target.x86_64-unknown-linux-gnu]
-image = "alsuren/cross-dbus:x86_64-unknown-linux-gnu-0.2.1"
+image = "ghcr.io/qwandor/cross-dbus-debian-buster-x86_64:0.2.1"
 
 # context = "./docker"
-# dockerfile = "./docker/Dockerfile.dbus.x86_64-unknown-linux-gnu"
+# dockerfile = "./docker/Dockerfile.debian-buster-x86_64"
