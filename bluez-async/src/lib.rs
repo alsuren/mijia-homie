@@ -19,7 +19,7 @@ use self::messagestream::MessageStream;
 use bitflags::bitflags;
 use bluez_generated::{
     OrgBluezAdapter1, OrgBluezDevice1, OrgBluezDevice1Properties, OrgBluezGattCharacteristic1,
-    OrgBluezGattDescriptor1, OrgBluezGattService1, ORG_BLUEZ_ADAPTER1_NAME,
+    OrgBluezGattDescriptor1, OrgBluezGattService1, ORG_BLUEZ_ADAPTER1_NAME, ORG_BLUEZ_DEVICE1_NAME,
 };
 use dbus::arg::cast;
 use dbus::nonblock::stdintf::org_freedesktop_dbus::{Introspectable, ObjectManager, Properties};
@@ -62,6 +62,9 @@ pub enum BluetoothError {
     /// Error parsing a characteristic flag from a string.
     #[error("Invalid characteristic flag {0:?}")]
     FlagParseError(String),
+    /// A required property of some device or other object was not found.
+    #[error("Required property {0} missing.")]
+    RequiredPropertyMissing(String),
 }
 
 /// Error type for futures representing tasks spawned by this crate.
@@ -338,6 +341,40 @@ pub struct DeviceInfo {
     pub services_resolved: bool,
 }
 
+impl DeviceInfo {
+    fn from_properties(
+        id: DeviceId,
+        device_properties: OrgBluezDevice1Properties,
+    ) -> Result<DeviceInfo, BluetoothError> {
+        let mac_address = device_properties
+            .address()
+            .ok_or_else(|| BluetoothError::RequiredPropertyMissing("Address".to_string()))?;
+        let services = get_services(device_properties);
+        let manufacturer_data = get_manufacturer_data(device_properties).unwrap_or_default();
+        let service_data = get_service_data(device_properties).unwrap_or_default();
+
+        Ok(DeviceInfo {
+            id,
+            mac_address: MacAddress(mac_address.to_owned()),
+            name: device_properties.name().cloned(),
+            appearance: device_properties.appearance(),
+            services,
+            paired: device_properties
+                .paired()
+                .ok_or_else(|| BluetoothError::RequiredPropertyMissing("Paired".to_string()))?,
+            connected: device_properties
+                .connected()
+                .ok_or_else(|| BluetoothError::RequiredPropertyMissing("Connected".to_string()))?,
+            rssi: device_properties.rssi(),
+            manufacturer_data,
+            service_data,
+            services_resolved: device_properties.services_resolved().ok_or_else(|| {
+                BluetoothError::RequiredPropertyMissing("ServicesResolved".to_string())
+            })?,
+        })
+    }
+}
+
 /// Information about a GATT service on a Bluetooth device.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ServiceInfo {
@@ -509,26 +546,7 @@ impl BluetoothSession {
             .into_iter()
             .filter_map(|(object_path, interfaces)| {
                 let device_properties = OrgBluezDevice1Properties::from_interfaces(&interfaces)?;
-
-                let mac_address = device_properties.address()?;
-                let services = get_services(device_properties);
-                let manufacturer_data =
-                    get_manufacturer_data(device_properties).unwrap_or_default();
-                let service_data = get_service_data(device_properties).unwrap_or_default();
-
-                Some(DeviceInfo {
-                    id: DeviceId { object_path },
-                    mac_address: MacAddress(mac_address.to_owned()),
-                    name: device_properties.name().cloned(),
-                    appearance: device_properties.appearance(),
-                    services,
-                    paired: device_properties.paired()?,
-                    connected: device_properties.connected()?,
-                    rssi: device_properties.rssi(),
-                    manufacturer_data,
-                    service_data,
-                    services_resolved: device_properties.services_resolved()?,
-                })
+                DeviceInfo::from_properties(DeviceId { object_path }, device_properties).ok()
             })
             .collect();
         Ok(devices)
@@ -662,6 +680,13 @@ impl BluetoothSession {
         let service = self.get_service_by_uuid(device, service_uuid).await?;
         self.get_characteristic_by_uuid(&service.id, characteristic_uuid)
             .await
+    }
+
+    /// Get information about the given Bluetooth device.
+    pub async fn get_device_info(&self, id: &DeviceId) -> Result<DeviceInfo, BluetoothError> {
+        let device = self.device(&id);
+        let properties = device.get_all(ORG_BLUEZ_DEVICE1_NAME).await?;
+        DeviceInfo::from_properties(id.to_owned(), OrgBluezDevice1Properties(&properties))
     }
 
     /// Get information about the given GATT service.
@@ -1005,6 +1030,39 @@ mod tests {
             get_manufacturer_data(OrgBluezDevice1Properties(&device_properties)),
             Some(expected_manufacturer_data)
         );
+    }
+
+    #[test]
+    fn device_info_minimal() {
+        let id = DeviceId::new("/org/bluez/hci0/dev_11_22_33_44_55_66");
+        let mut device_properties: HashMap<String, Variant<Box<dyn RefArg>>> = HashMap::new();
+        device_properties.insert(
+            "Address".to_string(),
+            Variant(Box::new("00:11:22:33:44:55".to_string())),
+        );
+        device_properties.insert("Paired".to_string(), Variant(Box::new(false)));
+        device_properties.insert("Connected".to_string(), Variant(Box::new(false)));
+        device_properties.insert("ServicesResolved".to_string(), Variant(Box::new(false)));
+
+        let device =
+            DeviceInfo::from_properties(id.clone(), OrgBluezDevice1Properties(&device_properties))
+                .unwrap();
+        assert_eq!(
+            device,
+            DeviceInfo {
+                id,
+                mac_address: MacAddress("00:11:22:33:44:55".to_string()),
+                name: None,
+                appearance: None,
+                services: vec![],
+                paired: false,
+                connected: false,
+                rssi: None,
+                manufacturer_data: HashMap::new(),
+                service_data: HashMap::new(),
+                services_resolved: false,
+            }
+        )
     }
 
     #[test]
