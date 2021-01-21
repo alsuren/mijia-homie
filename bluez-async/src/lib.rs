@@ -505,7 +505,7 @@ impl BluetoothSession {
         );
         let tree = bluez_root.get_managed_objects().await?;
 
-        let sensors = tree
+        let devices = tree
             .into_iter()
             .filter_map(|(object_path, interfaces)| {
                 let device_properties = OrgBluezDevice1Properties::from_interfaces(&interfaces)?;
@@ -531,7 +531,7 @@ impl BluetoothSession {
                 })
             })
             .collect();
-        Ok(sensors)
+        Ok(devices)
     }
 
     /// Get a list of all GATT services which the given Bluetooth device offers.
