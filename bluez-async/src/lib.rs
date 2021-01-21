@@ -799,12 +799,12 @@ impl BluetoothSession {
         )
     }
 
-    /// Connect to the Bluetooth device with the given D-Bus object path.
+    /// Connect to the given Bluetooth device.
     pub async fn connect(&self, id: &DeviceId) -> Result<(), BluetoothError> {
         Ok(self.device(id).connect().await?)
     }
 
-    /// Disconnect from the Bluetooth device with the given D-Bus object path.
+    /// Disconnect from the given Bluetooth device.
     pub async fn disconnect(&self, id: &DeviceId) -> Result<(), BluetoothError> {
         Ok(self.device(id).disconnect().await?)
     }
