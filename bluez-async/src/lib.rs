@@ -499,30 +499,14 @@ impl BluetoothSession {
 
     /// Power on all Bluetooth adapters and start scanning for devices.
     pub async fn start_discovery(&self) -> Result<(), BluetoothError> {
-        let bluez_root = Proxy::new(
-            "org.bluez",
-            "/",
-            DBUS_METHOD_CALL_TIMEOUT,
-            self.connection.clone(),
-        );
-        let tree = bluez_root.get_managed_objects().await?;
-        let adapters: Vec<_> = tree
-            .into_iter()
-            .filter_map(|(path, interfaces)| interfaces.get(ORG_BLUEZ_ADAPTER1_NAME).map(|_| path))
-            .collect();
-
+        let adapters = self.get_adapters().await?;
         if adapters.is_empty() {
             return Err(BluetoothError::NoBluetoothAdapters);
         }
 
-        for path in adapters {
-            log::trace!("Starting discovery on adapter {}", path);
-            let adapter = Proxy::new(
-                "org.bluez",
-                path,
-                DBUS_METHOD_CALL_TIMEOUT,
-                self.connection.clone(),
-            );
+        for adapter_id in adapters {
+            log::trace!("Starting discovery on adapter {}", adapter_id);
+            let adapter = self.adapter(&adapter_id);
             adapter.set_powered(true).await?;
             adapter
                 .start_discovery()
@@ -530,6 +514,42 @@ impl BluetoothSession {
                 .unwrap_or_else(|err| println!("starting discovery failed {:?}", err));
         }
         Ok(())
+    }
+
+    /// Stop scanning for devices on all Bluetooth adapters.
+    pub async fn stop_discovery(&self) -> Result<(), BluetoothError> {
+        let adapters = self.get_adapters().await?;
+        if adapters.is_empty() {
+            return Err(BluetoothError::NoBluetoothAdapters);
+        }
+
+        for adapter_id in adapters {
+            let adapter = self.adapter(&adapter_id);
+            adapter.stop_discovery().await?;
+        }
+
+        Ok(())
+    }
+
+    /// Get a list of all Bluetooth adapters on the system.
+    async fn get_adapters(&self) -> Result<Vec<AdapterId>, dbus::Error> {
+        let bluez_root = Proxy::new(
+            "org.bluez",
+            "/",
+            DBUS_METHOD_CALL_TIMEOUT,
+            self.connection.clone(),
+        );
+        // TODO: See whether there is a way to do this with introspection instead, rather than
+        // getting lots of objects we don't care about.
+        let tree = bluez_root.get_managed_objects().await?;
+        Ok(tree
+            .into_iter()
+            .filter_map(|(object_path, interfaces)| {
+                interfaces
+                    .get(ORG_BLUEZ_ADAPTER1_NAME)
+                    .map(|_| AdapterId { object_path })
+            })
+            .collect())
     }
 
     /// Get a list of all Bluetooth devices which have been discovered so far.
@@ -726,6 +746,15 @@ impl BluetoothSession {
             id: id.to_owned(),
             uuid,
         })
+    }
+
+    fn adapter(&self, id: &AdapterId) -> impl OrgBluezAdapter1 + Introspectable + Properties {
+        Proxy::new(
+            "org.bluez",
+            id.object_path.to_owned(),
+            DBUS_METHOD_CALL_TIMEOUT,
+            self.connection.clone(),
+        )
     }
 
     fn device(&self, id: &DeviceId) -> impl OrgBluezDevice1 + Introspectable + Properties {

@@ -13,6 +13,7 @@ async fn main() -> Result<(), eyre::Report> {
     // Start scanning for Bluetooth devices, and wait a while for some to be discovered.
     session.start_discovery().await?;
     time::sleep(SCAN_DURATION).await;
+    session.stop_discovery().await?;
 
     // Get the list of all devices which BlueZ knows about.
     let devices = session.get_devices().await?;

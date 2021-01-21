@@ -20,6 +20,7 @@ let (_, session) = BluetoothSession::new().await?;
 // Start scanning for Bluetooth devices, and wait a few seconds for some to be discovered.
 session.start_discovery().await?;
 time::sleep(Duration::from_secs(5)).await;
+session.stop_discovery().await?;
 
 // Get a list of devices which are currently known.
 let devices = session.get_devices().await?;
