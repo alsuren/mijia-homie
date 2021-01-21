@@ -329,6 +329,8 @@ pub struct DeviceInfo {
     pub connected: bool,
     /// The Received Signal Strength Indicator of the device advertisement or inquiry.
     pub rssi: Option<i16>,
+    /// Manufacturer-specific advertisement data, if any. The keys are 'manufacturer IDs'.
+    pub manufacturer_data: HashMap<u16, Vec<u8>>,
     /// The GATT service data from the device's advertisement, if any. This is a map from the
     /// service UUID to its data.
     pub service_data: HashMap<Uuid, Vec<u8>>,
@@ -510,6 +512,8 @@ impl BluetoothSession {
 
                 let mac_address = device_properties.address()?;
                 let services = get_services(device_properties);
+                let manufacturer_data =
+                    get_manufacturer_data(device_properties).unwrap_or_default();
                 let service_data = get_service_data(device_properties).unwrap_or_default();
 
                 Some(DeviceInfo {
@@ -521,6 +525,7 @@ impl BluetoothSession {
                     paired: device_properties.paired()?,
                     connected: device_properties.connected()?,
                     rssi: device_properties.rssi(),
+                    manufacturer_data,
                     service_data,
                     services_resolved: device_properties.services_resolved()?,
                 })
@@ -840,6 +845,25 @@ impl BluetoothSession {
     }
 }
 
+fn get_manufacturer_data(
+    device_properties: OrgBluezDevice1Properties,
+) -> Option<HashMap<u16, Vec<u8>>> {
+    Some(
+        device_properties
+            .manufacturer_data()?
+            .iter()
+            .filter_map(|(&k, v)| {
+                if let Some(v) = cast::<Vec<u8>>(&v.0) {
+                    Some((k, v.to_owned()))
+                } else {
+                    log::warn!("Manufacturer data had wrong type: {:?}", &v.0);
+                    None
+                }
+            })
+            .collect(),
+    )
+}
+
 fn get_service_data(
     device_properties: OrgBluezDevice1Properties,
 ) -> Option<HashMap<Uuid, Vec<u8>>> {
@@ -960,6 +984,26 @@ mod tests {
         assert_eq!(
             get_service_data(OrgBluezDevice1Properties(&device_properties)),
             Some(expected_service_data)
+        );
+    }
+
+    #[test]
+    fn manufacturer_data() {
+        let manufacturer_id = 0x1122;
+        let mut manufacturer_data: HashMap<u16, Variant<Box<dyn RefArg>>> = HashMap::new();
+        manufacturer_data.insert(manufacturer_id, Variant(Box::new(vec![1u8, 2, 3])));
+        let mut device_properties: HashMap<String, Variant<Box<dyn RefArg>>> = HashMap::new();
+        device_properties.insert(
+            "ManufacturerData".to_string(),
+            Variant(Box::new(manufacturer_data)),
+        );
+
+        let mut expected_manufacturer_data = HashMap::new();
+        expected_manufacturer_data.insert(manufacturer_id, vec![1u8, 2, 3]);
+
+        assert_eq!(
+            get_manufacturer_data(OrgBluezDevice1Properties(&device_properties)),
+            Some(expected_manufacturer_data)
         );
     }
 
