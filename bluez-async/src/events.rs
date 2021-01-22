@@ -39,6 +39,7 @@ pub enum BluetoothEvent {
 
 /// Details of an event related to a Bluetooth adapter.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum AdapterEvent {
     /// The adapter has been powered on or off.
     Powered { powered: bool },
@@ -48,6 +49,7 @@ pub enum AdapterEvent {
 
 /// Details of an event related to a Bluetooth device.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum DeviceEvent {
     /// A new device has been discovered.
     Discovered,
@@ -63,6 +65,7 @@ pub enum DeviceEvent {
 
 /// Details of an event related to a GATT characteristic.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum CharacteristicEvent {
     /// A new value of the characteristic has been received. This may be from a notification.
     Value { value: Vec<u8> },
