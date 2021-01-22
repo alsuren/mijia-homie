@@ -21,7 +21,7 @@ use bluez_generated::{
     OrgBluezAdapter1, OrgBluezDevice1, OrgBluezDevice1Properties, OrgBluezGattCharacteristic1,
     OrgBluezGattDescriptor1, OrgBluezGattService1, ORG_BLUEZ_ADAPTER1_NAME, ORG_BLUEZ_DEVICE1_NAME,
 };
-use dbus::arg::cast;
+use dbus::arg::{cast, RefArg, Variant};
 use dbus::nonblock::stdintf::org_freedesktop_dbus::{Introspectable, ObjectManager, Properties};
 use dbus::nonblock::{Proxy, SyncConnection};
 use dbus::Path;
@@ -902,20 +902,24 @@ impl BluetoothSession {
 fn get_manufacturer_data(
     device_properties: OrgBluezDevice1Properties,
 ) -> Option<HashMap<u16, Vec<u8>>> {
-    Some(
-        device_properties
-            .manufacturer_data()?
-            .iter()
-            .filter_map(|(&k, v)| {
-                if let Some(v) = cast::<Vec<u8>>(&v.0) {
-                    Some((k, v.to_owned()))
-                } else {
-                    log::warn!("Manufacturer data had wrong type: {:?}", &v.0);
-                    None
-                }
-            })
-            .collect(),
-    )
+    Some(convert_manufacturer_data(
+        device_properties.manufacturer_data()?,
+    ))
+}
+
+pub(crate) fn convert_manufacturer_data(
+    data: &HashMap<u16, Variant<Box<dyn RefArg>>>,
+) -> HashMap<u16, Vec<u8>> {
+    data.iter()
+        .filter_map(|(&k, v)| {
+            if let Some(v) = cast::<Vec<u8>>(&v.0) {
+                Some((k, v.to_owned()))
+            } else {
+                log::warn!("Manufacturer data had wrong type: {:?}", &v.0);
+                None
+            }
+        })
+        .collect()
 }
 
 fn get_service_data(
@@ -969,8 +973,6 @@ fn get_services(device_properties: OrgBluezDevice1Properties) -> Vec<Uuid> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    use dbus::arg::{RefArg, Variant};
 
     #[test]
     fn device_adapter() {
