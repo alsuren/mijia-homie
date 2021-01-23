@@ -21,7 +21,7 @@ use bluez_generated::{
     OrgBluezAdapter1, OrgBluezDevice1, OrgBluezDevice1Properties, OrgBluezGattCharacteristic1,
     OrgBluezGattDescriptor1, OrgBluezGattService1, ORG_BLUEZ_ADAPTER1_NAME, ORG_BLUEZ_DEVICE1_NAME,
 };
-use dbus::arg::{cast, RefArg, Variant};
+use dbus::arg::{cast, PropMap, RefArg, Variant};
 use dbus::nonblock::stdintf::org_freedesktop_dbus::{Introspectable, ObjectManager, Properties};
 use dbus::nonblock::{Proxy, SyncConnection};
 use dbus::Path;
@@ -462,6 +462,95 @@ pub struct DescriptorInfo {
     pub uuid: Uuid,
 }
 
+/// The type of transport to use for a scan.
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum Transport {
+    /// Interleaved scan, both BLE and Bluetooth Classic (if they are both enabled on the adapter).
+    Auto,
+    /// BR/EDR inquiry, i.e. Bluetooth Classic.
+    BrEdr,
+    /// LE scan only.
+    Le,
+}
+
+impl Transport {
+    fn as_str(&self) -> &'static str {
+        match self {
+            Self::Auto => "auto",
+            Self::BrEdr => "bredr",
+            Self::Le => "le",
+        }
+    }
+}
+
+impl Display for Transport {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+/// A set of filter parameters for discovery. Parameters may be set to `None` to use the BlueZ
+/// defaults.
+///
+/// If no parameters are set then there is a default filter on the RSSI values, where only values
+/// which have changed more than a certain amount will be reported.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct DiscoveryFilter {
+    /// If non-empty, only report devices which advertise at least one of these service UUIDs.
+    pub service_uuids: Vec<Uuid>,
+    /// Only report devices with RSSI values greater than the given threshold.
+    pub rssi_threshold: Option<i16>,
+    pub pathloss_threshold: Option<u16>,
+    /// The type of scan.
+    pub transport: Option<Transport>,
+    /// Whether to include duplicate advertisements. If this is set to true then there will be an
+    /// event whenever an advertisement containing manufacturer-specific data for a device is
+    /// received.
+    pub duplicate_data: Option<bool>,
+    /// Whether to make the adapter discoverable while discovering.
+    pub discoverable: Option<bool>,
+    /// Only report devices whose address or name starts with the given pattern.
+    pub pattern: Option<String>,
+}
+
+impl Into<PropMap> for &DiscoveryFilter {
+    fn into(self) -> PropMap {
+        let mut map: PropMap = HashMap::new();
+        if !self.service_uuids.is_empty() {
+            let uuids: Vec<String> = self.service_uuids.iter().map(Uuid::to_string).collect();
+            map.insert("UUIDs".to_string(), Variant(Box::new(uuids)));
+        }
+        if let Some(rssi_threshold) = self.rssi_threshold {
+            map.insert("RSSI".to_string(), Variant(Box::new(rssi_threshold)));
+        }
+        if let Some(pathloss_threshold) = self.pathloss_threshold {
+            map.insert(
+                "Pathloss".to_string(),
+                Variant(Box::new(pathloss_threshold)),
+            );
+        }
+        if let Some(transport) = self.transport {
+            map.insert(
+                "Transport".to_string(),
+                Variant(Box::new(transport.to_string())),
+            );
+        }
+        if let Some(duplicate_data) = self.duplicate_data {
+            map.insert(
+                "DuplicateData".to_string(),
+                Variant(Box::new(duplicate_data)),
+            );
+        }
+        if let Some(discoverable) = self.discoverable {
+            map.insert("Discoverable".to_string(), Variant(Box::new(discoverable)));
+        }
+        if let Some(pattern) = &self.pattern {
+            map.insert("Pattern".to_string(), Variant(Box::new(pattern.to_owned())));
+        }
+        map
+    }
+}
+
 /// A connection to the Bluetooth daemon. This can be cheaply cloned and passed around to be used
 /// from different places. It is the main entry point to the library.
 #[derive(Clone)]
@@ -497,8 +586,27 @@ impl BluetoothSession {
         ))
     }
 
-    /// Power on all Bluetooth adapters and start scanning for devices.
+    /// Power on all Bluetooth adapters, remove any discovery filter, and then start scanning for
+    /// devices.
+    ///
+    /// This is equivalent to calling `start_discovery_with_filter(&DiscoveryFilter::default())`.
     pub async fn start_discovery(&self) -> Result<(), BluetoothError> {
+        self.start_discovery_with_filter(&DiscoveryFilter::default())
+            .await
+    }
+
+    /// Power on all Bluetooth adapters, set the given discovery filter, and then start scanning for
+    /// devices.
+    ///
+    /// Note that BlueZ combines discovery filters from all clients and sends events matching any
+    /// filter to all clients, so you may receive unexpected discovery events if there are other
+    /// clients on the system using Bluetooth as well.
+    ///
+    /// In most common cases, `DiscoveryFilter::default()` is fine.
+    pub async fn start_discovery_with_filter(
+        &self,
+        discovery_filter: &DiscoveryFilter,
+    ) -> Result<(), BluetoothError> {
         let adapters = self.get_adapters().await?;
         if adapters.is_empty() {
             return Err(BluetoothError::NoBluetoothAdapters);
@@ -508,6 +616,9 @@ impl BluetoothSession {
             log::trace!("Starting discovery on adapter {}", adapter_id);
             let adapter = self.adapter(&adapter_id);
             adapter.set_powered(true).await?;
+            adapter
+                .set_discovery_filter(discovery_filter.into())
+                .await?;
             adapter
                 .start_discovery()
                 .await
