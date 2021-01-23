@@ -9,7 +9,8 @@ use dbus::nonblock::stdintf::org_freedesktop_dbus::{
 use dbus::{Message, Path};
 use std::collections::HashMap;
 
-use super::{convert_manufacturer_data, AdapterId, CharacteristicId, DeviceId};
+use super::device::convert_manufacturer_data;
+use super::{AdapterId, CharacteristicId, DeviceId};
 
 /// An event relating to a Bluetooth device or adapter.
 #[derive(Clone, Debug, Eq, PartialEq)]
