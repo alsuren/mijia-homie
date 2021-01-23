@@ -1,3 +1,5 @@
+//! Example to log Bluetooth events, including duplicate manufacturer-specific advertisement data.
+
 use bluez_async::{BluetoothSession, DiscoveryFilter};
 use futures::stream::StreamExt;
 

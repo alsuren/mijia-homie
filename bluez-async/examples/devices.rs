@@ -1,3 +1,5 @@
+//! Example to scan for a short time and then list all known devices.
+
 use bluez_async::{BluetoothSession, DiscoveryFilter};
 use std::time::Duration;
 use tokio::time;
