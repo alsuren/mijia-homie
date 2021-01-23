@@ -1,3 +1,6 @@
+//! Example to dump information about the services and characteristics of all devices for which we
+//! know them, i.e. connected devices.
+
 use bluez_async::{BleUuid, BluetoothSession, CharacteristicFlags};
 use std::ops::RangeInclusive;
 use std::str;
