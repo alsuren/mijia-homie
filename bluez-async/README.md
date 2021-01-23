@@ -18,7 +18,7 @@ This crate is incomplete, experimental, and may not be supported.
 let (_, session) = BluetoothSession::new().await?;
 
 // Start scanning for Bluetooth devices, and wait a few seconds for some to be discovered.
-session.start_discovery().await?;
+session.start_discovery(&DiscoveryFilter::default()).await?;
 time::sleep(Duration::from_secs(5)).await;
 session.stop_discovery().await?;
 

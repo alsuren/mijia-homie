@@ -317,7 +317,10 @@ async fn check_for_sensors(
     session: &MijiaSession,
     sensor_names: &HashMap<MacAddress, String>,
 ) -> Result<(), eyre::Report> {
-    session.bt_session.start_discovery().await?;
+    session
+        .bt_session
+        .start_discovery(&Default::default())
+        .await?;
 
     let sensors = session.get_sensors().await?;
     let state = &mut *state.lock().await;

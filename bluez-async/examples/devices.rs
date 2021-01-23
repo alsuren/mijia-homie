@@ -1,4 +1,4 @@
-use bluez_async::BluetoothSession;
+use bluez_async::{BluetoothSession, DiscoveryFilter};
 use std::time::Duration;
 use tokio::time;
 
@@ -11,7 +11,7 @@ async fn main() -> Result<(), eyre::Report> {
     let (_, session) = BluetoothSession::new().await?;
 
     // Start scanning for Bluetooth devices, and wait a while for some to be discovered.
-    session.start_discovery().await?;
+    session.start_discovery(&DiscoveryFilter::default()).await?;
     time::sleep(SCAN_DURATION).await;
     session.stop_discovery().await?;
 

@@ -19,7 +19,10 @@ async fn main() -> Result<(), Report> {
     let mut events = session.event_stream().await?;
 
     // Start scanning for Bluetooth devices, and wait a while for some to be discovered.
-    session.bt_session.start_discovery().await?;
+    session
+        .bt_session
+        .start_discovery(&Default::default())
+        .await?;
     time::sleep(SCAN_DURATION).await;
 
     // Get the list of sensors which are currently known, connect those which match the filter and

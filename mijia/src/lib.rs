@@ -158,7 +158,7 @@ impl MijiaEvent {
 /// let (_, session) = MijiaSession::new().await?;
 ///
 /// // Start scanning for Bluetooth devices, and wait a few seconds for some to be discovered.
-/// session.bt_session.start_discovery().await?;
+/// session.bt_session.start_discovery(&Default::default()).await?;
 /// time::sleep(Duration::from_secs(5)).await;
 ///
 /// // Get the list of sensors which are currently known.
