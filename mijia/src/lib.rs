@@ -83,6 +83,8 @@ pub struct SensorProps {
 #[non_exhaustive]
 #[derive(Clone, Debug)]
 pub enum MijiaEvent {
+    /// A new sensor has been discovered.
+    Discovered { id: DeviceId },
     /// A sensor has sent a new set of readings.
     Readings { id: DeviceId, readings: Readings },
     /// A sensor has sent a new historical record.
@@ -138,6 +140,22 @@ impl MijiaEvent {
                 id,
                 event: DeviceEvent::Connected { connected: false },
             } => Some(MijiaEvent::Disconnected { id }),
+            BluetoothEvent::Device {
+                id,
+                event: DeviceEvent::Discovered,
+            } => {
+                // Only pass through discovery events for sensors we recognise.
+                let device = session
+                    .get_device_info(&id)
+                    .await
+                    .map_err(|e| log::error!("Error getting device info: {:?}", e))
+                    .ok()?;
+                if device.name.as_deref() == Some(MIJIA_NAME) {
+                    Some(MijiaEvent::Discovered { id })
+                } else {
+                    None
+                }
+            }
             _ => None,
         }
     }
