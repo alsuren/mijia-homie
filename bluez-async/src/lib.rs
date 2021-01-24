@@ -28,7 +28,7 @@ use self::messagestream::MessageStream;
 pub use self::service::{ServiceId, ServiceInfo};
 use bluez_generated::{
     OrgBluezAdapter1, OrgBluezDevice1, OrgBluezDevice1Properties, OrgBluezGattCharacteristic1,
-    OrgBluezGattDescriptor1, OrgBluezGattService1, ORG_BLUEZ_ADAPTER1_NAME, ORG_BLUEZ_DEVICE1_NAME,
+    OrgBluezGattDescriptor1, OrgBluezGattService1, ORG_BLUEZ_DEVICE1_NAME,
 };
 use dbus::arg::{PropMap, Variant};
 use dbus::nonblock::stdintf::org_freedesktop_dbus::{Introspectable, ObjectManager, Properties};
@@ -412,19 +412,23 @@ impl BluetoothSession {
     pub async fn get_adapters(&self) -> Result<Vec<AdapterId>, BluetoothError> {
         let bluez_root = Proxy::new(
             "org.bluez",
-            "/",
+            "/org/bluez",
             DBUS_METHOD_CALL_TIMEOUT,
             self.connection.clone(),
         );
-        // TODO: See whether there is a way to do this with introspection instead, rather than
-        // getting lots of objects we don't care about.
-        let tree = bluez_root.get_managed_objects().await?;
-        Ok(tree
-            .into_iter()
-            .filter_map(|(object_path, interfaces)| {
-                interfaces
-                    .get(ORG_BLUEZ_ADAPTER1_NAME)
-                    .map(|_| AdapterId { object_path })
+        let root_node = bluez_root.introspect_parse().await?;
+        Ok(root_node
+            .nodes
+            .iter()
+            .filter_map(|subnode| {
+                let subnode_name = subnode.name.as_ref().unwrap();
+                if subnode_name.starts_with("hci") {
+                    Some(AdapterId {
+                        object_path: format!("/org/bluez/{}", subnode_name).into(),
+                    })
+                } else {
+                    None
+                }
             })
             .collect())
     }
