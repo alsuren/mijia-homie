@@ -6,6 +6,11 @@
 //!
 //! [`MijiaSession']: struct.MijiaSession.html
 
+pub use bluez_async as bluetooth;
+use bluez_async::{
+    BluetoothError, BluetoothEvent, BluetoothSession, CharacteristicEvent, DeviceEvent, DeviceId,
+    DeviceInfo, MacAddress, SpawnError,
+};
 use core::future::Future;
 use futures::Stream;
 use std::ops::Range;
@@ -16,11 +21,6 @@ use tokio_stream::StreamExt;
 use uuid::Uuid;
 
 mod decode;
-pub use bluez_async as bluetooth;
-use bluez_async::{
-    BluetoothError, BluetoothEvent, BluetoothSession, CharacteristicEvent, DeviceEvent, DeviceId,
-    MacAddress, SpawnError,
-};
 pub use decode::comfort_level::ComfortLevel;
 use decode::history::decode_range;
 pub use decode::history::HistoryRecord;
@@ -150,7 +150,7 @@ impl MijiaEvent {
                     .await
                     .map_err(|e| log::error!("Error getting device info: {:?}", e))
                     .ok()?;
-                if device.name.as_deref() == Some(MIJIA_NAME) {
+                if is_mijia_sensor(&device) {
                     Some(MijiaEvent::Discovered { id })
                 } else {
                     None
@@ -214,7 +214,7 @@ impl MijiaSession {
                     device.name,
                     device.service_data
                 );
-                if device.name.as_deref() == Some(MIJIA_NAME) {
+                if is_mijia_sensor(&device) {
                     Some(SensorProps {
                         id: device.id,
                         mac_address: device.mac_address,
@@ -514,4 +514,9 @@ impl MijiaSession {
             move |event| MijiaEvent::from(event, session.clone()),
         )))
     }
+}
+
+/// Check whether the given Bluetooth device is a Mijia sensor which we support.
+fn is_mijia_sensor(device: &DeviceInfo) -> bool {
+    device.name.as_deref() == Some(MIJIA_NAME)
 }
