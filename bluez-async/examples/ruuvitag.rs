@@ -1,11 +1,10 @@
 //! Example to log sensor measurements of [RuuviTag]s.
 //!
-//! RuuviTags broadcast their sensors' measurements via the manufacturer
-//! specific data advertisements. Accordingly, duplicate data must be accepted.
+//! RuuviTags broadcast their sensors' measurements via the manufacturer-specific data
+//! advertisements. Accordingly, duplicate data must be accepted.
 //!
-//! In detail this example looks for RuuviTags in reach and writes temperature,
-//! humidity and air pressure to `stdout` for each measurement.
-//!
+//! In detail this example looks for RuuviTags in reach and writes temperature, humidity and air
+//! pressure to `stdout` for each measurement.
 //!
 //! [RuuviTag]: https://ruuvi.com/ruuvitag-specs/
 
@@ -14,10 +13,12 @@ use std::collections::HashMap;
 use bluez_async::{BluetoothEvent, BluetoothSession, DeviceEvent, DiscoveryFilter};
 use futures::stream::StreamExt;
 
-/// The [Bluetooth company identifier](https://www.bluetooth.com/specifications/assigned-numbers/company-identifiers/) of Ruuvi Innovations Ltd.
+/// The [Bluetooth company identifier](https://www.bluetooth.com/specifications/assigned-numbers/company-identifiers/)
+/// of Ruuvi Innovations Ltd.
 const RUUVI_ID: u16 = 0x0499;
 
-/// Protocol version of RuuviTags' data format [RAWv2](https://github.com/ruuvi/ruuvi-sensor-protocols/blob/master/dataformat_05.md)
+/// Protocol version of RuuviTags' data format
+/// [RAWv2](https://github.com/ruuvi/ruuvi-sensor-protocols/blob/master/dataformat_05.md)
 const PROTOCOL_VERSION: u8 = 0x05;
 
 /// Search for manufacturer data from a Ruuvi device with protocol version 5.
