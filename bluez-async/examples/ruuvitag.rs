@@ -32,7 +32,7 @@ fn temperature(data: &[u8]) -> f64 {
     (value as f64) * 0.005
 }
 
-/// Temperature in `%`.
+/// Humidity in `%`.
 fn humidity(data: &[u8]) -> f64 {
     assert!(data.len() >= 5);
     let value = [data[3], data[4]];
@@ -40,7 +40,7 @@ fn humidity(data: &[u8]) -> f64 {
     (value as f64) * 0.0025
 }
 
-/// Temperature in `%`.
+/// Pressure in `Pa`.
 fn pressure(data: &[u8]) -> f64 {
     assert!(data.len() >= 7);
     let value = [data[5], data[6]];
