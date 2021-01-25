@@ -7,8 +7,9 @@ use dbus::nonblock::stdintf::org_freedesktop_dbus::{
     ObjectManagerInterfacesAdded, PropertiesPropertiesChanged,
 };
 use dbus::{Message, Path};
+use std::collections::HashMap;
 
-use super::{AdapterId, CharacteristicId, DeviceId};
+use super::{convert_manufacturer_data, AdapterId, CharacteristicId, DeviceId};
 
 /// An event relating to a Bluetooth device or adapter.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -38,6 +39,7 @@ pub enum BluetoothEvent {
 
 /// Details of an event related to a Bluetooth adapter.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum AdapterEvent {
     /// The adapter has been powered on or off.
     Powered { powered: bool },
@@ -47,6 +49,7 @@ pub enum AdapterEvent {
 
 /// Details of an event related to a Bluetooth device.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum DeviceEvent {
     /// A new device has been discovered.
     Discovered,
@@ -54,10 +57,15 @@ pub enum DeviceEvent {
     Connected { connected: bool },
     /// A new value is available for the RSSI of the device.
     RSSI { rssi: i16 },
+    /// A new value is available for the manufacturer-specific advertisement data of the device.
+    ManufacturerData {
+        manufacturer_data: HashMap<u16, Vec<u8>>,
+    },
 }
 
 /// Details of an event related to a GATT characteristic.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum CharacteristicEvent {
     /// A new value of the characteristic has been received. This may be from a notification.
     Value { value: Vec<u8> },
@@ -171,9 +179,17 @@ impl BluetoothEvent {
                 }
                 if let Some(rssi) = device.rssi() {
                     events.push(BluetoothEvent::Device {
-                        id,
+                        id: id.clone(),
                         event: DeviceEvent::RSSI { rssi },
                     });
+                }
+                if let Some(manufacturer_data) = device.manufacturer_data() {
+                    events.push(BluetoothEvent::Device {
+                        id,
+                        event: DeviceEvent::ManufacturerData {
+                            manufacturer_data: convert_manufacturer_data(manufacturer_data),
+                        },
+                    })
                 }
             }
             ORG_BLUEZ_GATT_CHARACTERISTIC1_NAME => {
@@ -198,7 +214,6 @@ impl BluetoothEvent {
 mod tests {
     use super::super::ServiceId;
     use dbus::arg::{RefArg, Variant};
-    use std::collections::HashMap;
 
     use super::*;
 
@@ -225,6 +240,24 @@ mod tests {
             vec![BluetoothEvent::Device {
                 id,
                 event: DeviceEvent::RSSI { rssi }
+            }]
+        )
+    }
+
+    #[test]
+    fn device_manufacturer_data() {
+        let mut manufacturer_data = HashMap::new();
+        manufacturer_data.insert(42, vec![1u8, 2, 3]);
+        let message = device_manufacturer_data_message(
+            "/org/bluez/hci0/dev_11_22_33_44_55_66",
+            manufacturer_data.clone(),
+        );
+        let id = DeviceId::new("/org/bluez/hci0/dev_11_22_33_44_55_66");
+        assert_eq!(
+            BluetoothEvent::message_to_events(message),
+            vec![BluetoothEvent::Device {
+                id,
+                event: DeviceEvent::ManufacturerData { manufacturer_data }
             }]
         )
     }
@@ -369,6 +402,27 @@ mod tests {
     fn device_rssi_message(device_path: &'static str, rssi: i16) -> Message {
         let mut changed_properties: HashMap<String, Variant<Box<dyn RefArg>>> = HashMap::new();
         changed_properties.insert("RSSI".to_string(), Variant(Box::new(rssi)));
+        let properties_changed = PropertiesPropertiesChanged {
+            interface_name: "org.bluez.Device1".to_string(),
+            changed_properties,
+            invalidated_properties: vec![],
+        };
+        properties_changed.to_emit_message(&device_path.into())
+    }
+
+    fn device_manufacturer_data_message(
+        device_path: &'static str,
+        manufacturer_data: HashMap<u16, Vec<u8>>,
+    ) -> Message {
+        let manufacturer_data: HashMap<_, _> = manufacturer_data
+            .into_iter()
+            .map::<(u16, Variant<Box<dyn RefArg>>), _>(|(k, v)| (k, Variant(Box::new(v))))
+            .collect();
+        let mut changed_properties: HashMap<String, Variant<Box<dyn RefArg>>> = HashMap::new();
+        changed_properties.insert(
+            "ManufacturerData".to_string(),
+            Variant(Box::new(manufacturer_data)),
+        );
         let properties_changed = PropertiesPropertiesChanged {
             interface_name: "org.bluez.Device1".to_string(),
             changed_properties,

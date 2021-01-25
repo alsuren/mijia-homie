@@ -19,9 +19,9 @@ use self::messagestream::MessageStream;
 use bitflags::bitflags;
 use bluez_generated::{
     OrgBluezAdapter1, OrgBluezDevice1, OrgBluezDevice1Properties, OrgBluezGattCharacteristic1,
-    OrgBluezGattDescriptor1, OrgBluezGattService1, ORG_BLUEZ_ADAPTER1_NAME,
+    OrgBluezGattDescriptor1, OrgBluezGattService1, ORG_BLUEZ_ADAPTER1_NAME, ORG_BLUEZ_DEVICE1_NAME,
 };
-use dbus::arg::cast;
+use dbus::arg::{cast, PropMap, RefArg, Variant};
 use dbus::nonblock::stdintf::org_freedesktop_dbus::{Introspectable, ObjectManager, Properties};
 use dbus::nonblock::{Proxy, SyncConnection};
 use dbus::Path;
@@ -62,6 +62,9 @@ pub enum BluetoothError {
     /// Error parsing a characteristic flag from a string.
     #[error("Invalid characteristic flag {0:?}")]
     FlagParseError(String),
+    /// A required property of some device or other object was not found.
+    #[error("Required property {0} missing.")]
+    RequiredPropertyMissing(String),
 }
 
 /// Error type for futures representing tasks spawned by this crate.
@@ -329,11 +332,47 @@ pub struct DeviceInfo {
     pub connected: bool,
     /// The Received Signal Strength Indicator of the device advertisement or inquiry.
     pub rssi: Option<i16>,
+    /// Manufacturer-specific advertisement data, if any. The keys are 'manufacturer IDs'.
+    pub manufacturer_data: HashMap<u16, Vec<u8>>,
     /// The GATT service data from the device's advertisement, if any. This is a map from the
     /// service UUID to its data.
     pub service_data: HashMap<Uuid, Vec<u8>>,
     /// Whether service discovery has finished for the device.
     pub services_resolved: bool,
+}
+
+impl DeviceInfo {
+    fn from_properties(
+        id: DeviceId,
+        device_properties: OrgBluezDevice1Properties,
+    ) -> Result<DeviceInfo, BluetoothError> {
+        let mac_address = device_properties
+            .address()
+            .ok_or_else(|| BluetoothError::RequiredPropertyMissing("Address".to_string()))?;
+        let services = get_services(device_properties);
+        let manufacturer_data = get_manufacturer_data(device_properties).unwrap_or_default();
+        let service_data = get_service_data(device_properties).unwrap_or_default();
+
+        Ok(DeviceInfo {
+            id,
+            mac_address: MacAddress(mac_address.to_owned()),
+            name: device_properties.name().cloned(),
+            appearance: device_properties.appearance(),
+            services,
+            paired: device_properties
+                .paired()
+                .ok_or_else(|| BluetoothError::RequiredPropertyMissing("Paired".to_string()))?,
+            connected: device_properties
+                .connected()
+                .ok_or_else(|| BluetoothError::RequiredPropertyMissing("Connected".to_string()))?,
+            rssi: device_properties.rssi(),
+            manufacturer_data,
+            service_data,
+            services_resolved: device_properties.services_resolved().ok_or_else(|| {
+                BluetoothError::RequiredPropertyMissing("ServicesResolved".to_string())
+            })?,
+        })
+    }
 }
 
 /// Information about a GATT service on a Bluetooth device.
@@ -423,11 +462,100 @@ pub struct DescriptorInfo {
     pub uuid: Uuid,
 }
 
+/// The type of transport to use for a scan.
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum Transport {
+    /// Interleaved scan, both BLE and Bluetooth Classic (if they are both enabled on the adapter).
+    Auto,
+    /// BR/EDR inquiry, i.e. Bluetooth Classic.
+    BrEdr,
+    /// LE scan only.
+    Le,
+}
+
+impl Transport {
+    fn as_str(&self) -> &'static str {
+        match self {
+            Self::Auto => "auto",
+            Self::BrEdr => "bredr",
+            Self::Le => "le",
+        }
+    }
+}
+
+impl Display for Transport {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+/// A set of filter parameters for discovery. Parameters may be set to `None` to use the BlueZ
+/// defaults.
+///
+/// If no parameters are set then there is a default filter on the RSSI values, where only values
+/// which have changed more than a certain amount will be reported.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct DiscoveryFilter {
+    /// If non-empty, only report devices which advertise at least one of these service UUIDs.
+    pub service_uuids: Vec<Uuid>,
+    /// Only report devices with RSSI values greater than the given threshold.
+    pub rssi_threshold: Option<i16>,
+    pub pathloss_threshold: Option<u16>,
+    /// The type of scan.
+    pub transport: Option<Transport>,
+    /// Whether to include duplicate advertisements. If this is set to true then there will be an
+    /// event whenever an advertisement containing manufacturer-specific data for a device is
+    /// received.
+    pub duplicate_data: Option<bool>,
+    /// Whether to make the adapter discoverable while discovering.
+    pub discoverable: Option<bool>,
+    /// Only report devices whose address or name starts with the given pattern.
+    pub pattern: Option<String>,
+}
+
+impl Into<PropMap> for &DiscoveryFilter {
+    fn into(self) -> PropMap {
+        let mut map: PropMap = HashMap::new();
+        if !self.service_uuids.is_empty() {
+            let uuids: Vec<String> = self.service_uuids.iter().map(Uuid::to_string).collect();
+            map.insert("UUIDs".to_string(), Variant(Box::new(uuids)));
+        }
+        if let Some(rssi_threshold) = self.rssi_threshold {
+            map.insert("RSSI".to_string(), Variant(Box::new(rssi_threshold)));
+        }
+        if let Some(pathloss_threshold) = self.pathloss_threshold {
+            map.insert(
+                "Pathloss".to_string(),
+                Variant(Box::new(pathloss_threshold)),
+            );
+        }
+        if let Some(transport) = self.transport {
+            map.insert(
+                "Transport".to_string(),
+                Variant(Box::new(transport.to_string())),
+            );
+        }
+        if let Some(duplicate_data) = self.duplicate_data {
+            map.insert(
+                "DuplicateData".to_string(),
+                Variant(Box::new(duplicate_data)),
+            );
+        }
+        if let Some(discoverable) = self.discoverable {
+            map.insert("Discoverable".to_string(), Variant(Box::new(discoverable)));
+        }
+        if let Some(pattern) = &self.pattern {
+            map.insert("Pattern".to_string(), Variant(Box::new(pattern.to_owned())));
+        }
+        map
+    }
+}
+
 /// A connection to the Bluetooth daemon. This can be cheaply cloned and passed around to be used
 /// from different places. It is the main entry point to the library.
 #[derive(Clone)]
 pub struct BluetoothSession {
-    pub connection: Arc<SyncConnection>,
+    connection: Arc<SyncConnection>,
 }
 
 impl Debug for BluetoothSession {
@@ -458,39 +586,81 @@ impl BluetoothSession {
         ))
     }
 
-    /// Power on all Bluetooth adapters and start scanning for devices.
+    /// Power on all Bluetooth adapters, remove any discovery filter, and then start scanning for
+    /// devices.
+    ///
+    /// This is equivalent to calling `start_discovery_with_filter(&DiscoveryFilter::default())`.
     pub async fn start_discovery(&self) -> Result<(), BluetoothError> {
-        let bluez_root = Proxy::new(
-            "org.bluez",
-            "/",
-            DBUS_METHOD_CALL_TIMEOUT,
-            self.connection.clone(),
-        );
-        let tree = bluez_root.get_managed_objects().await?;
-        let adapters: Vec<_> = tree
-            .into_iter()
-            .filter_map(|(path, interfaces)| interfaces.get(ORG_BLUEZ_ADAPTER1_NAME).map(|_| path))
-            .collect();
+        self.start_discovery_with_filter(&DiscoveryFilter::default())
+            .await
+    }
 
+    /// Power on all Bluetooth adapters, set the given discovery filter, and then start scanning for
+    /// devices.
+    ///
+    /// Note that BlueZ combines discovery filters from all clients and sends events matching any
+    /// filter to all clients, so you may receive unexpected discovery events if there are other
+    /// clients on the system using Bluetooth as well.
+    ///
+    /// In most common cases, `DiscoveryFilter::default()` is fine.
+    pub async fn start_discovery_with_filter(
+        &self,
+        discovery_filter: &DiscoveryFilter,
+    ) -> Result<(), BluetoothError> {
+        let adapters = self.get_adapters().await?;
         if adapters.is_empty() {
             return Err(BluetoothError::NoBluetoothAdapters);
         }
 
-        for path in adapters {
-            log::trace!("Starting discovery on adapter {}", path);
-            let adapter = Proxy::new(
-                "org.bluez",
-                path,
-                DBUS_METHOD_CALL_TIMEOUT,
-                self.connection.clone(),
-            );
+        for adapter_id in adapters {
+            log::trace!("Starting discovery on adapter {}", adapter_id);
+            let adapter = self.adapter(&adapter_id);
             adapter.set_powered(true).await?;
+            adapter
+                .set_discovery_filter(discovery_filter.into())
+                .await?;
             adapter
                 .start_discovery()
                 .await
                 .unwrap_or_else(|err| println!("starting discovery failed {:?}", err));
         }
         Ok(())
+    }
+
+    /// Stop scanning for devices on all Bluetooth adapters.
+    pub async fn stop_discovery(&self) -> Result<(), BluetoothError> {
+        let adapters = self.get_adapters().await?;
+        if adapters.is_empty() {
+            return Err(BluetoothError::NoBluetoothAdapters);
+        }
+
+        for adapter_id in adapters {
+            let adapter = self.adapter(&adapter_id);
+            adapter.stop_discovery().await?;
+        }
+
+        Ok(())
+    }
+
+    /// Get a list of all Bluetooth adapters on the system.
+    async fn get_adapters(&self) -> Result<Vec<AdapterId>, dbus::Error> {
+        let bluez_root = Proxy::new(
+            "org.bluez",
+            "/",
+            DBUS_METHOD_CALL_TIMEOUT,
+            self.connection.clone(),
+        );
+        // TODO: See whether there is a way to do this with introspection instead, rather than
+        // getting lots of objects we don't care about.
+        let tree = bluez_root.get_managed_objects().await?;
+        Ok(tree
+            .into_iter()
+            .filter_map(|(object_path, interfaces)| {
+                interfaces
+                    .get(ORG_BLUEZ_ADAPTER1_NAME)
+                    .map(|_| AdapterId { object_path })
+            })
+            .collect())
     }
 
     /// Get a list of all Bluetooth devices which have been discovered so far.
@@ -503,30 +673,14 @@ impl BluetoothSession {
         );
         let tree = bluez_root.get_managed_objects().await?;
 
-        let sensors = tree
+        let devices = tree
             .into_iter()
             .filter_map(|(object_path, interfaces)| {
                 let device_properties = OrgBluezDevice1Properties::from_interfaces(&interfaces)?;
-
-                let mac_address = device_properties.address()?;
-                let services = get_services(device_properties);
-                let service_data = get_service_data(device_properties).unwrap_or_default();
-
-                Some(DeviceInfo {
-                    id: DeviceId { object_path },
-                    mac_address: MacAddress(mac_address.to_owned()),
-                    name: device_properties.name().cloned(),
-                    appearance: device_properties.appearance(),
-                    services,
-                    paired: device_properties.paired()?,
-                    connected: device_properties.connected()?,
-                    rssi: device_properties.rssi(),
-                    service_data,
-                    services_resolved: device_properties.services_resolved()?,
-                })
+                DeviceInfo::from_properties(DeviceId { object_path }, device_properties).ok()
             })
             .collect();
-        Ok(sensors)
+        Ok(devices)
     }
 
     /// Get a list of all GATT services which the given Bluetooth device offers.
@@ -659,6 +813,13 @@ impl BluetoothSession {
             .await
     }
 
+    /// Get information about the given Bluetooth device.
+    pub async fn get_device_info(&self, id: &DeviceId) -> Result<DeviceInfo, BluetoothError> {
+        let device = self.device(&id);
+        let properties = device.get_all(ORG_BLUEZ_DEVICE1_NAME).await?;
+        DeviceInfo::from_properties(id.to_owned(), OrgBluezDevice1Properties(&properties))
+    }
+
     /// Get information about the given GATT service.
     pub async fn get_service_info(&self, id: &ServiceId) -> Result<ServiceInfo, BluetoothError> {
         let service = self.service(&id);
@@ -696,6 +857,15 @@ impl BluetoothSession {
             id: id.to_owned(),
             uuid,
         })
+    }
+
+    fn adapter(&self, id: &AdapterId) -> impl OrgBluezAdapter1 + Introspectable + Properties {
+        Proxy::new(
+            "org.bluez",
+            id.object_path.to_owned(),
+            DBUS_METHOD_CALL_TIMEOUT,
+            self.connection.clone(),
+        )
     }
 
     fn device(&self, id: &DeviceId) -> impl OrgBluezDevice1 + Introspectable + Properties {
@@ -740,12 +910,12 @@ impl BluetoothSession {
         )
     }
 
-    /// Connect to the Bluetooth device with the given D-Bus object path.
+    /// Connect to the given Bluetooth device.
     pub async fn connect(&self, id: &DeviceId) -> Result<(), BluetoothError> {
         Ok(self.device(id).connect().await?)
     }
 
-    /// Disconnect from the Bluetooth device with the given D-Bus object path.
+    /// Disconnect from the given Bluetooth device.
     pub async fn disconnect(&self, id: &DeviceId) -> Result<(), BluetoothError> {
         Ok(self.device(id).disconnect().await?)
     }
@@ -840,6 +1010,29 @@ impl BluetoothSession {
     }
 }
 
+fn get_manufacturer_data(
+    device_properties: OrgBluezDevice1Properties,
+) -> Option<HashMap<u16, Vec<u8>>> {
+    Some(convert_manufacturer_data(
+        device_properties.manufacturer_data()?,
+    ))
+}
+
+pub(crate) fn convert_manufacturer_data(
+    data: &HashMap<u16, Variant<Box<dyn RefArg>>>,
+) -> HashMap<u16, Vec<u8>> {
+    data.iter()
+        .filter_map(|(&k, v)| {
+            if let Some(v) = cast::<Vec<u8>>(&v.0) {
+                Some((k, v.to_owned()))
+            } else {
+                log::warn!("Manufacturer data had wrong type: {:?}", &v.0);
+                None
+            }
+        })
+        .collect()
+}
+
 fn get_service_data(
     device_properties: OrgBluezDevice1Properties,
 ) -> Option<HashMap<Uuid, Vec<u8>>> {
@@ -891,8 +1084,6 @@ fn get_services(device_properties: OrgBluezDevice1Properties) -> Vec<Uuid> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    use dbus::arg::{RefArg, Variant};
 
     #[test]
     fn device_adapter() {
@@ -961,6 +1152,59 @@ mod tests {
             get_service_data(OrgBluezDevice1Properties(&device_properties)),
             Some(expected_service_data)
         );
+    }
+
+    #[test]
+    fn manufacturer_data() {
+        let manufacturer_id = 0x1122;
+        let mut manufacturer_data: HashMap<u16, Variant<Box<dyn RefArg>>> = HashMap::new();
+        manufacturer_data.insert(manufacturer_id, Variant(Box::new(vec![1u8, 2, 3])));
+        let mut device_properties: HashMap<String, Variant<Box<dyn RefArg>>> = HashMap::new();
+        device_properties.insert(
+            "ManufacturerData".to_string(),
+            Variant(Box::new(manufacturer_data)),
+        );
+
+        let mut expected_manufacturer_data = HashMap::new();
+        expected_manufacturer_data.insert(manufacturer_id, vec![1u8, 2, 3]);
+
+        assert_eq!(
+            get_manufacturer_data(OrgBluezDevice1Properties(&device_properties)),
+            Some(expected_manufacturer_data)
+        );
+    }
+
+    #[test]
+    fn device_info_minimal() {
+        let id = DeviceId::new("/org/bluez/hci0/dev_11_22_33_44_55_66");
+        let mut device_properties: HashMap<String, Variant<Box<dyn RefArg>>> = HashMap::new();
+        device_properties.insert(
+            "Address".to_string(),
+            Variant(Box::new("00:11:22:33:44:55".to_string())),
+        );
+        device_properties.insert("Paired".to_string(), Variant(Box::new(false)));
+        device_properties.insert("Connected".to_string(), Variant(Box::new(false)));
+        device_properties.insert("ServicesResolved".to_string(), Variant(Box::new(false)));
+
+        let device =
+            DeviceInfo::from_properties(id.clone(), OrgBluezDevice1Properties(&device_properties))
+                .unwrap();
+        assert_eq!(
+            device,
+            DeviceInfo {
+                id,
+                mac_address: MacAddress("00:11:22:33:44:55".to_string()),
+                name: None,
+                appearance: None,
+                services: vec![],
+                paired: false,
+                connected: false,
+                rssi: None,
+                manufacturer_data: HashMap::new(),
+                service_data: HashMap::new(),
+                services_resolved: false,
+            }
+        )
     }
 
     #[test]
