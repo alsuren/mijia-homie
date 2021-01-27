@@ -1,17 +1,22 @@
 //! Example to scan for sensors, connect to each one in turn, and correct its clock if necessary.
 
+use backoff::future::retry;
+use backoff::ExponentialBackoff;
 use chrono::{DateTime, Utc};
 use eyre::Report;
 use fmt::Write;
+use futures::TryFutureExt;
 use mijia::{MijiaSession, SensorProps};
 use std::fmt::{self, Debug, Formatter};
 use std::time::{Duration, SystemTimeError};
 use std::{process::exit, time::SystemTime};
 use tokio::time;
+use tokio_compat_02::FutureExt;
 
 const SCAN_DURATION: Duration = Duration::from_secs(5);
 /// Only correct clocks which are wrong by more than this amount.
 const MINIMUM_OFFSET: Duration = Duration::from_secs(10);
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// A duration which may be negative.
 #[derive(Clone, Eq, PartialEq)]
@@ -71,7 +76,16 @@ async fn main() -> Result<(), Report> {
             continue;
         }
         println!("Connecting to {} ({})", sensor.mac_address, sensor.id);
-        if let Err(e) = session.bt_session.connect(&sensor.id).await {
+        if let Err(e) = retry(
+            ExponentialBackoff {
+                max_elapsed_time: Some(CONNECT_TIMEOUT),
+                ..Default::default()
+            },
+            || session.bt_session.connect(&sensor.id).map_err(Into::into),
+        )
+        .compat()
+        .await
+        {
             println!("Failed to connect to {}: {:?}", sensor.mac_address, e);
             continue;
         }

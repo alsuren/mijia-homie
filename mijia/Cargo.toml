@@ -19,7 +19,9 @@ tokio-stream = "0.1.1"
 uuid = "0.8.1"
 
 [dev-dependencies]
+backoff = { version = "0.2.1", features = ["tokio"] }
 chrono = "0.4.19"
 eyre = "0.6.5"
 pretty_env_logger = "0.4.0"
 tokio = { version = "1.0.1", features = ["macros", "rt", "rt-multi-thread", "time"] }
+tokio-compat-02 = "0.2.0"
