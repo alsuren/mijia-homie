@@ -568,9 +568,31 @@ impl BluetoothSession {
         )
     }
 
+    /// Wait until the services of the given device have been resolved.
+    async fn await_service_discovery(&self, device_id: &DeviceId) -> Result<(), BluetoothError> {
+        // We need to subscribe to events before checking current value to avoid a race condition.
+        let mut events = self.device_event_stream(device_id).await?;
+        if self.device(device_id).services_resolved().await? {
+            log::info!("Services already resolved.");
+            return Ok(());
+        }
+        while let Some(event) = events.next().await {
+            if matches!(event, BluetoothEvent::Device {
+                    id,
+                    event: DeviceEvent::ServicesResolved,
+                } if device_id == &id)
+            {
+                return Ok(());
+            }
+        }
+
+        panic!("Event stream ended prematurely.")
+    }
+
     /// Connect to the given Bluetooth device.
     pub async fn connect(&self, id: &DeviceId) -> Result<(), BluetoothError> {
-        Ok(self.device(id).connect().await?)
+        self.device(id).connect().await?;
+        self.await_service_discovery(id).await
     }
 
     /// Disconnect from the given Bluetooth device.

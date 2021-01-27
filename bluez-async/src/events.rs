@@ -62,6 +62,8 @@ pub enum DeviceEvent {
     ManufacturerData {
         manufacturer_data: HashMap<u16, Vec<u8>>,
     },
+    /// Service discovery has completed.
+    ServicesResolved,
 }
 
 /// Details of an event related to a GATT characteristic.
@@ -186,11 +188,17 @@ impl BluetoothEvent {
                 }
                 if let Some(manufacturer_data) = device.manufacturer_data() {
                     events.push(BluetoothEvent::Device {
-                        id,
+                        id: id.clone(),
                         event: DeviceEvent::ManufacturerData {
                             manufacturer_data: convert_manufacturer_data(manufacturer_data),
                         },
                     })
+                }
+                if device.services_resolved() == Some(true) {
+                    events.push(BluetoothEvent::Device {
+                        id,
+                        event: DeviceEvent::ServicesResolved,
+                    });
                 }
             }
             ORG_BLUEZ_GATT_CHARACTERISTIC1_NAME => {
