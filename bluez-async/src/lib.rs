@@ -46,9 +46,11 @@ use std::sync::Arc;
 use std::time::Duration;
 use thiserror::Error;
 use tokio::task::JoinError;
+use tokio::time::timeout;
 use uuid::Uuid;
 
 const DBUS_METHOD_CALL_TIMEOUT: Duration = Duration::from_secs(30);
+const SERVICE_DISCOVERY_TIMEOUT: Duration = Duration::from_secs(5);
 
 /// An error carrying out a Bluetooth operation.
 #[derive(Debug, Error)]
@@ -74,6 +76,9 @@ pub enum BluetoothError {
     /// A required property of some device or other object was not found.
     #[error("Required property {0} missing.")]
     RequiredPropertyMissing(String),
+    /// Service discovery didn't happen within the time limit.
+    #[error("Service discovery timed out")]
+    ServiceDiscoveryTimedOut,
 }
 
 /// Error type for futures representing tasks spawned by this crate.
@@ -568,9 +573,36 @@ impl BluetoothSession {
         )
     }
 
+    /// Wait until the services of the given device have been resolved.
+    async fn await_service_discovery(&self, device_id: &DeviceId) -> Result<(), BluetoothError> {
+        // We need to subscribe to events before checking current value to avoid a race condition.
+        let mut events = self.device_event_stream(device_id).await?;
+        if self.device(device_id).services_resolved().await? {
+            log::info!("Services already resolved.");
+            return Ok(());
+        }
+        timeout(SERVICE_DISCOVERY_TIMEOUT, async {
+            while let Some(event) = events.next().await {
+                if matches!(event, BluetoothEvent::Device {
+                    id,
+                    event: DeviceEvent::ServicesResolved,
+                } if device_id == &id)
+                {
+                    return Ok(());
+                }
+            }
+
+            // Stream ended prematurely. This shouldn't happen, so something has gone wrong.
+            Err(BluetoothError::ServiceDiscoveryTimedOut)
+        })
+        .await
+        .unwrap_or(Err(BluetoothError::ServiceDiscoveryTimedOut))
+    }
+
     /// Connect to the given Bluetooth device.
     pub async fn connect(&self, id: &DeviceId) -> Result<(), BluetoothError> {
-        Ok(self.device(id).connect().await?)
+        self.device(id).connect().await?;
+        self.await_service_discovery(id).await
     }
 
     /// Disconnect from the given Bluetooth device.
