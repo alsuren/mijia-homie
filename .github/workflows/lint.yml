@@ -42,3 +42,12 @@ jobs:
 
       - name: Check for differences
         run: git diff --exit-code
+  format:
+    name: Format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Format Rust code
+        run: cargo fmt
+      - name: Check for differences
+        run: git diff --exit-code
