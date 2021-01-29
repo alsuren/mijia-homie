@@ -89,16 +89,17 @@ async fn main() -> Result<(), Report> {
             println!("Failed to connect to {}: {:?}", sensor.mac_address, e);
             continue;
         }
-        let last_record = session.get_last_history_record(&sensor.id).await?;
+        let last_record_time = session.get_last_history_record(&sensor.id).await?.time;
         let sensor_time = session.get_time(&sensor.id).await?;
         let now = SystemTime::now();
-        let last_record_utc: DateTime<Utc> = last_record.time.into();
+        let last_record_utc: DateTime<Utc> = last_record_time.into();
         let sensor_time_utc: DateTime<Utc> = sensor_time.into();
         let now_utc: DateTime<Utc> = now.into();
         let offset: SignedDuration = now.duration_since(sensor_time).into();
+        let last_record_offset: SignedDuration = now.duration_since(last_record_time).into();
         println!(
-            "Time: {} (should be {}, offset {:?}), Last stored value: {}",
-            sensor_time_utc, now_utc, offset, last_record_utc
+            "Time: {} (should be {}, offset {:?}), Last stored value: {} ({:?} ago)",
+            sensor_time_utc, now_utc, offset, last_record_utc, last_record_offset
         );
         if offset.duration > MINIMUM_OFFSET {
             println!("Correcting clock.");
