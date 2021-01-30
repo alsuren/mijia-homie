@@ -1,13 +1,15 @@
 //! Example of how to subscribe to readings from one or more sensors.
 
+use bluez_async::MacAddress;
 use eyre::Report;
 use eyre::WrapErr;
 use mijia::{MijiaSession, SensorProps};
 use std::collections::HashMap;
 use std::fs::OpenOptions;
+use std::io::stdin;
 use std::io::Write;
+use std::str::FromStr;
 use std::time::Duration;
-use std::{io::stdin, process::exit};
 use tokio::time;
 
 const SCAN_DURATION: Duration = Duration::from_secs(5);
@@ -92,23 +94,15 @@ async fn main() -> Result<(), Report> {
     Ok(())
 }
 
-fn get_known_sensors(sensor_names_filename: &str) -> Result<Vec<String>, Report> {
+fn get_known_sensors(sensor_names_filename: &str) -> Result<Vec<MacAddress>, Report> {
     let sensor_names_contents = std::fs::read_to_string(sensor_names_filename)
         .wrap_err_with(|| format!("Reading {}", sensor_names_filename))?;
     let names = toml::from_str::<HashMap<String, String>>(&sensor_names_contents)?;
 
-    if names
-        .keys()
-        .any(|f| f.contains(|c: char| !(c.is_ascii_hexdigit() || c == ':')))
-    {
-        eprintln!("Invalid MAC addresses {:?}", names);
-        exit(1);
-    }
-
-    Ok(names.keys().cloned().collect())
+    let res: Result<Vec<_>, _> = names.keys().map(|s| MacAddress::from_str(s)).collect();
+    Ok(res?)
 }
 
-fn should_include_sensor(sensor: &SensorProps, excludes: &Vec<String>) -> bool {
-    let mac = sensor.mac_address.to_string();
-    !excludes.iter().any(|filter| mac.contains(filter))
+fn should_include_sensor(sensor: &SensorProps, excludes: &Vec<MacAddress>) -> bool {
+    !excludes.contains(&sensor.mac_address)
 }
