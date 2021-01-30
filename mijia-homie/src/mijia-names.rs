@@ -1,6 +1,6 @@
 //! Example of how to subscribe to readings from one or more sensors.
 
-use bluez_async::MacAddress;
+use mijia::bluetooth::MacAddress;
 use eyre::Report;
 use eyre::WrapErr;
 use mijia::{MijiaSession, SensorProps};
