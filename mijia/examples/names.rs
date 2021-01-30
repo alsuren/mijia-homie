@@ -62,7 +62,7 @@ async fn main() -> Result<(), Report> {
                 println!("What name do you want to use for {}?", sensor.mac_address);
                 let mut name = String::new();
                 stdin().read_line(&mut name)?;
-                name.truncate(name.trim_end().len());
+                let name = name.trim_end();
 
                 let mut file = OpenOptions::new()
                     .create(true)
