@@ -87,6 +87,12 @@ async fn main() -> Result<(), Report> {
         }
     }
 
+    println!(
+        "Finished inspecting all known sensors.\n\n\
+        Some sensors may have been discovered while we were trying to inspect \
+        this batch. Re-run the program to also inspect these new sensors."
+    );
+
     Ok(())
 }
 
