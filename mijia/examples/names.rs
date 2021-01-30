@@ -84,11 +84,9 @@ async fn main() -> Result<(), Report> {
             .await??;
         }
 
-        session
-            .bt_session
-            .disconnect(&sensor.id)
-            .await
-            .or_else(|_| Ok::<(), Report>(println!("disconnecting failed")))?;
+        if let Err(e) = session.bt_session.disconnect(&sensor.id).await {
+            log::error!("disconnecting failed: {:?}", e);
+        }
     }
 
     Ok(())
