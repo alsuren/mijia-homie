@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### New features
+
+- Added TX power to `DeviceInfo`.
+
 ## [0.2.0] — 2021-01-25
 
 ### Breaking changes

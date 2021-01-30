@@ -74,6 +74,8 @@ pub struct DeviceInfo {
     pub connected: bool,
     /// The Received Signal Strength Indicator of the device advertisement or inquiry.
     pub rssi: Option<i16>,
+    /// The transmission power level advertised by the device.
+    pub tx_power: Option<i16>,
     /// Manufacturer-specific advertisement data, if any. The keys are 'manufacturer IDs'.
     pub manufacturer_data: HashMap<u16, Vec<u8>>,
     /// The GATT service data from the device's advertisement, if any. This is a map from the
@@ -108,6 +110,7 @@ impl DeviceInfo {
                 .connected()
                 .ok_or_else(|| BluetoothError::RequiredPropertyMissing("Connected".to_string()))?,
             rssi: device_properties.rssi(),
+            tx_power: device_properties.tx_power(),
             manufacturer_data,
             service_data,
             services_resolved: device_properties.services_resolved().ok_or_else(|| {
@@ -264,6 +267,7 @@ mod tests {
                 paired: false,
                 connected: false,
                 rssi: None,
+                tx_power: None,
                 manufacturer_data: HashMap::new(),
                 service_data: HashMap::new(),
                 services_resolved: false,
