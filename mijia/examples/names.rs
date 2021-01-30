@@ -35,8 +35,8 @@ async fn main() -> Result<(), Report> {
     session.bt_session.start_discovery().await?;
     time::sleep(SCAN_DURATION).await;
 
-    // Get the list of sensors which are currently known, connect those which match the filter and
-    // subscribe to readings.
+    // Get the list of sensors which are currently known, connect those which
+    // are not already known about.
     let sensors = session.get_sensors().await?;
     for sensor in sensors
         .iter()
