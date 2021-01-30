@@ -1,8 +1,8 @@
 //! Example of how to subscribe to readings from one or more sensors.
 
-use mijia::bluetooth::MacAddress;
 use eyre::Report;
 use eyre::WrapErr;
+use mijia::bluetooth::MacAddress;
 use mijia::{MijiaSession, SensorProps};
 use std::collections::HashMap;
 use std::fs::OpenOptions;
@@ -13,20 +13,16 @@ use std::time::Duration;
 use tokio::time;
 
 const SCAN_DURATION: Duration = Duration::from_secs(5);
-const DEFAULT_SENSOR_NAMES_FILE: &str = "sensor-names.toml";
 
 #[tokio::main]
 async fn main() -> Result<(), Report> {
     pretty_env_logger::init();
 
     let args: Vec<String> = std::env::args().collect();
-    if args.len() > 2 {
-        eyre::bail!("USAGE: {} [/path/to/sensor-names.toml]", args[0]);
+    if args.len() != 2 {
+        eyre::bail!("USAGE: {} /path/to/sensor-names.toml", args[0]);
     }
-    let sensor_names_filename = args
-        .get(1)
-        .map(|s| s.to_owned())
-        .unwrap_or(DEFAULT_SENSOR_NAMES_FILE.to_owned());
+    let sensor_names_filename = args.get(1).map(|s| s.to_owned()).unwrap();
 
     let excludes = get_known_sensors(&sensor_names_filename)?;
     println!("ignoring sensors: {:?}", excludes);
