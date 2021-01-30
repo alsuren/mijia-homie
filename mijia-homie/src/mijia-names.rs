@@ -57,6 +57,10 @@ async fn main() -> Result<(), Report> {
             let sensor_names_filename = sensor_names_filename.clone();
 
             tokio::task::spawn_blocking(move || {
+                println!(
+                    "Successfully connected to {} (it should now have a bluetooth icon on it)",
+                    sensor.mac_address
+                );
                 println!("What name do you want to use for {}?", sensor.mac_address);
                 let mut name = String::new();
                 stdin().read_line(&mut name)?;
