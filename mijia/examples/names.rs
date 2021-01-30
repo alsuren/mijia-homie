@@ -11,13 +11,22 @@ use std::{io::stdin, process::exit};
 use tokio::time;
 
 const SCAN_DURATION: Duration = Duration::from_secs(5);
-const SENSOR_NAMES_FILE: &str = "sensor-names.toml";
+const DEFAULT_SENSOR_NAMES_FILE: &str = "sensor-names.toml";
 
 #[tokio::main]
 async fn main() -> Result<(), Report> {
     pretty_env_logger::init();
 
-    let excludes = get_known_sensors()?;
+    let args: Vec<String> = std::env::args().collect();
+    if args.len() > 2 {
+        eyre::bail!("USAGE: {} [/path/to/sensor-names.toml]", args[0]);
+    }
+    let sensor_names_filename = args
+        .get(1)
+        .map(|s| s.to_owned())
+        .unwrap_or(DEFAULT_SENSOR_NAMES_FILE.to_owned());
+
+    let excludes = get_known_sensors(&sensor_names_filename)?;
     println!("ignoring sensors: {:?}", excludes);
 
     let (_, session) = MijiaSession::new().await?;
@@ -40,13 +49,14 @@ async fn main() -> Result<(), Report> {
             let mut file = OpenOptions::new()
                 .create(true)
                 .append(true)
-                .open(SENSOR_NAMES_FILE)?;
+                .open(&sensor_names_filename)?;
             writeln!(file, r#""{mac}" = "failed""#, mac = sensor.mac_address,)?;
             continue;
         }
 
         {
             let sensor = sensor.clone();
+            let sensor_names_filename = sensor_names_filename.clone();
 
             tokio::task::spawn_blocking(move || {
                 println!("What name do you want to use for {}?", sensor.mac_address);
@@ -57,7 +67,7 @@ async fn main() -> Result<(), Report> {
                 let mut file = OpenOptions::new()
                     .create(true)
                     .append(true)
-                    .open(SENSOR_NAMES_FILE)?;
+                    .open(&sensor_names_filename)?;
                 writeln!(
                     file,
                     r#""{mac}" = "{name}""#,
@@ -84,9 +94,9 @@ async fn main() -> Result<(), Report> {
     Ok(())
 }
 
-fn get_known_sensors() -> Result<Vec<String>, Report> {
-    let sensor_names_contents = std::fs::read_to_string(SENSOR_NAMES_FILE)
-        .wrap_err_with(|| format!("Reading {}", SENSOR_NAMES_FILE))?;
+fn get_known_sensors(sensor_names_filename: &str) -> Result<Vec<String>, Report> {
+    let sensor_names_contents = std::fs::read_to_string(sensor_names_filename)
+        .wrap_err_with(|| format!("Reading {}", sensor_names_filename))?;
     let names = toml::from_str::<HashMap<String, String>>(&sensor_names_contents)?;
 
     if names
