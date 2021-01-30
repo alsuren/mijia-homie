@@ -42,7 +42,8 @@ async fn main() -> Result<(), Report> {
     {
         println!("Connecting to {}", sensor.mac_address);
         if let Err(e) = session.bt_session.connect(&sensor.id).await {
-            println!("Failed to connect to {}: {:?}", sensor.mac_address, e);
+            println!("Failed to connect to {}", sensor.mac_address);
+            log::debug!("error was: {:?}", e);
 
             let mut file = OpenOptions::new()
                 .create(true)
