@@ -1,0 +1,49 @@
+# Changelog
+
+## Unreleased
+
+### New features
+
+- Added event for new sensor being discovered.
+
+## 0.3.1
+
+### Other changes
+
+- Added more documentation.
+- Print IDs more nicely in examples.
+
+## 0.3.0
+
+### Breaking changes
+
+- Updated to Tokio 1.0, and updated some other dependencies to match.
+- Error types have changed slightly due to changes in the `dbus` crate.
+- `MijiaSession::event_stream()` no longer returns a `MsgMatch`; the match will automatically be
+  removed when you drop the stream.
+
+### Other changes
+
+- Split out BlueZ wrapper code to new crate `bluez-async`.
+- Use UUIDs to look up services and characteristics, rather than hardcoding the paths BlueZ gives them.
+- Get D-Bus to filter events when reading history records, which should make it slightly faster.
+
+## 0.2.0
+
+### Breaking changes
+
+- Switched to `thiserror` for error types.
+
+### New features
+
+- Added support for getting historical data.
+- Added support for setting comfort level, temperature unit and time.
+
+### Other changes
+
+- Added documentation.
+- Added examples.
+
+## 0.1.0
+
+Initial release.
