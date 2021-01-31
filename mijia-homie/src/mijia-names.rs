@@ -1,14 +1,15 @@
-//! Example of how to subscribe to readings from one or more sensors.
+//! Helper program for naming sensors interactively.
+#[allow(dead_code)]
+mod config;
 
+use crate::config::read_sensor_names;
 use eyre::Report;
-use eyre::WrapErr;
 use mijia::bluetooth::MacAddress;
 use mijia::{MijiaSession, SensorProps};
 use std::collections::HashMap;
 use std::fs::OpenOptions;
 use std::io::stdin;
 use std::io::Write;
-use std::str::FromStr;
 use std::time::Duration;
 use tokio::time;
 
@@ -24,8 +25,11 @@ async fn main() -> Result<(), Report> {
     }
     let sensor_names_filename = args.get(1).map(|s| s.to_owned()).unwrap();
 
-    let excludes = get_known_sensors(&sensor_names_filename)?;
-    println!("ignoring sensors: {:?}", excludes);
+    let names = read_sensor_names(&sensor_names_filename)?;
+    println!("ignoring sensors:");
+    for (mac, name) in names.iter() {
+        println!("{}: {:?}", mac, name);
+    }
 
     let (_, session) = MijiaSession::new().await?;
 
@@ -38,14 +42,14 @@ async fn main() -> Result<(), Report> {
     let sensors = session.get_sensors().await?;
     for sensor in sensors
         .iter()
-        .filter(|sensor| should_include_sensor(sensor, &excludes))
+        .filter(|sensor| should_include_sensor(sensor, &names))
     {
         println!("Connecting to {}", sensor.mac_address);
         if let Err(e) = session.bt_session.connect(&sensor.id).await {
             println!("Failed to connect to {}", sensor.mac_address);
             log::debug!("error was: {:?}", e);
 
-            write_name(sensor_names_filename, sensor.mac_address, "failed");
+            write_name(&sensor_names_filename, &sensor.mac_address, "failed")?;
             continue;
         }
 
@@ -63,7 +67,7 @@ async fn main() -> Result<(), Report> {
                 stdin().read_line(&mut name)?;
                 let name = name.trim_end();
 
-                write_name(sensor_names_filename, sensor.mac_address, name);
+                write_name(&sensor_names_filename, &sensor.mac_address, name)?;
                 Ok::<_, Report>(())
             })
             .await??;
@@ -83,23 +87,15 @@ async fn main() -> Result<(), Report> {
     Ok(())
 }
 
-fn write_name(sensor_names_filename: &str, mac: &str, name: &str) {
+fn write_name(sensor_names_filename: &str, mac: &MacAddress, name: &str) -> Result<(), Report> {
     let mut file = OpenOptions::new()
         .create(true)
         .append(true)
         .open(&sensor_names_filename)?;
     writeln!(file, r#""{mac}" = "{name}""#, mac = mac, name = name)?;
+    Ok(())
 }
 
-fn get_known_sensors(sensor_names_filename: &str) -> Result<Vec<MacAddress>, Report> {
-    let sensor_names_contents = std::fs::read_to_string(sensor_names_filename)
-        .wrap_err_with(|| format!("Reading {}", sensor_names_filename))?;
-    let names = toml::from_str::<HashMap<String, String>>(&sensor_names_contents)?;
-
-    let res: Result<Vec<_>, _> = names.keys().map(|s| MacAddress::from_str(s)).collect();
-    Ok(res?)
-}
-
-fn should_include_sensor(sensor: &SensorProps, excludes: &Vec<MacAddress>) -> bool {
-    !excludes.contains(&sensor.mac_address)
+fn should_include_sensor(sensor: &SensorProps, names: &HashMap<MacAddress, String>) -> bool {
+    !names.contains_key(&sensor.mac_address)
 }
