@@ -3,6 +3,7 @@ use dbus::arg::{cast, RefArg, Variant};
 use dbus::Path;
 use std::collections::HashMap;
 use std::fmt::{self, Display, Formatter};
+use std::str::FromStr;
 use uuid::Uuid;
 
 use crate::{AdapterId, BluetoothError, MacAddress};
@@ -59,6 +60,8 @@ pub struct DeviceInfo {
     pub id: DeviceId,
     /// The MAC address of the device.
     pub mac_address: MacAddress,
+    /// The type of MAC address the device uses.
+    pub address_type: AddressType,
     /// The human-readable name of the device, if available.
     pub name: Option<String>,
     /// The appearance of the device, as defined by GAP.
@@ -93,6 +96,10 @@ impl DeviceInfo {
         let mac_address = device_properties
             .address()
             .ok_or_else(|| BluetoothError::RequiredPropertyMissing("Address".to_string()))?;
+        let address_type = device_properties
+            .address_type()
+            .ok_or_else(|| BluetoothError::RequiredPropertyMissing("AddressType".to_string()))?
+            .parse()?;
         let services = get_services(device_properties);
         let manufacturer_data = get_manufacturer_data(device_properties).unwrap_or_default();
         let service_data = get_service_data(device_properties).unwrap_or_default();
@@ -100,6 +107,7 @@ impl DeviceInfo {
         Ok(DeviceInfo {
             id,
             mac_address: MacAddress(mac_address.to_owned()),
+            address_type,
             name: device_properties.name().cloned(),
             appearance: device_properties.appearance(),
             services,
@@ -117,6 +125,42 @@ impl DeviceInfo {
                 BluetoothError::RequiredPropertyMissing("ServicesResolved".to_string())
             })?,
         })
+    }
+}
+
+/// MAC address type of a Bluetooth device.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub enum AddressType {
+    /// Public address.
+    Public,
+    /// Random address.
+    Random,
+}
+
+impl AddressType {
+    fn as_str(&self) -> &'static str {
+        match self {
+            Self::Public => "public",
+            Self::Random => "random",
+        }
+    }
+}
+
+impl Display for AddressType {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl FromStr for AddressType {
+    type Err = BluetoothError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "public" => Ok(Self::Public),
+            "random" => Ok(Self::Random),
+            _ => Err(BluetoothError::AddressTypeParseError(s.to_owned())),
+        }
     }
 }
 
@@ -249,6 +293,10 @@ mod tests {
             "Address".to_string(),
             Variant(Box::new("00:11:22:33:44:55".to_string())),
         );
+        device_properties.insert(
+            "AddressType".to_string(),
+            Variant(Box::new("public".to_string())),
+        );
         device_properties.insert("Paired".to_string(), Variant(Box::new(false)));
         device_properties.insert("Connected".to_string(), Variant(Box::new(false)));
         device_properties.insert("ServicesResolved".to_string(), Variant(Box::new(false)));
@@ -261,6 +309,7 @@ mod tests {
             DeviceInfo {
                 id,
                 mac_address: MacAddress("00:11:22:33:44:55".to_string()),
+                address_type: AddressType::Public,
                 name: None,
                 appearance: None,
                 services: vec![],
@@ -296,5 +345,15 @@ mod tests {
             get_services(OrgBluezDevice1Properties(&device_properties)),
             vec![uuid]
         )
+    }
+
+    #[test]
+    fn address_type_parse() {
+        for &address_type in &[AddressType::Public, AddressType::Random] {
+            assert_eq!(
+                address_type.to_string().parse::<AddressType>().unwrap(),
+                address_type
+            );
+        }
     }
 }

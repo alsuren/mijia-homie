@@ -4,7 +4,7 @@
 
 ### New features
 
-- Added TX power to `DeviceInfo`.
+- Added TX power and address type to `DeviceInfo`.
 
 ## [0.2.0] — 2021-01-25
 
