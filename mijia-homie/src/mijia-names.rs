@@ -45,11 +45,7 @@ async fn main() -> Result<(), Report> {
             println!("Failed to connect to {}", sensor.mac_address);
             log::debug!("error was: {:?}", e);
 
-            let mut file = OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open(&sensor_names_filename)?;
-            writeln!(file, r#""{mac}" = "failed""#, mac = sensor.mac_address,)?;
+            write_name(sensor_names_filename, sensor.mac_address, "failed");
             continue;
         }
 
@@ -67,21 +63,7 @@ async fn main() -> Result<(), Report> {
                 stdin().read_line(&mut name)?;
                 let name = name.trim_end();
 
-                let mut file = OpenOptions::new()
-                    .create(true)
-                    .append(true)
-                    .open(&sensor_names_filename)?;
-                writeln!(
-                    file,
-                    r#""{mac}" = "{name}""#,
-                    mac = sensor.mac_address,
-                    name = name
-                )?;
-                println!(
-                    r#"written: "{mac}" = "{name}""#,
-                    mac = sensor.mac_address,
-                    name = name
-                );
+                write_name(sensor_names_filename, sensor.mac_address, name);
                 Ok::<_, Report>(())
             })
             .await??;
@@ -99,6 +81,14 @@ async fn main() -> Result<(), Report> {
     );
 
     Ok(())
+}
+
+fn write_name(sensor_names_filename: &str, mac: &str, name: &str) {
+    let mut file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&sensor_names_filename)?;
+    writeln!(file, r#""{mac}" = "{name}""#, mac = mac, name = name)?;
 }
 
 fn get_known_sensors(sensor_names_filename: &str) -> Result<Vec<MacAddress>, Report> {
