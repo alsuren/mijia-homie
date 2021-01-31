@@ -9,6 +9,14 @@ repository = "https://github.com/alsuren/mijia-homie/"
 keywords = ["ble", "bluetooth", "homie", "mqtt"]
 categories = ["network-programming"]
 
+[[bin]]
+name = "mijia-homie"
+path = "src/main.rs"
+
+[[bin]]
+name = "mijia-names"
+path = "src/mijia-names.rs"
+
 [dependencies]
 backoff = { version = "0.2.1", features = ["tokio"] }
 color-backtrace = "0.5.0"
@@ -38,6 +46,7 @@ maintainer-scripts = "debian-scripts"
 conf-files = ["/etc/mijia-homie/mijia-homie.toml"]
 assets = [
 	["target/release/mijia-homie", "usr/bin/", "755"],
+	["target/release/mijia-names", "usr/bin/", "755"],
 	["mijia-homie.example.toml", "etc/mijia-homie/mijia-homie.toml", "640"],
 	["README.md", "usr/share/doc/mijia-homie/", "644"],
 ]

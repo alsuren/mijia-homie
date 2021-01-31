@@ -1264,6 +1264,7 @@ dependencies = [
  "tokio 1.0.1",
  "tokio-compat-02 0.2.0",
  "tokio-stream",
+ "toml",
  "uuid",
 ]
 

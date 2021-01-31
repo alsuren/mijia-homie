@@ -33,9 +33,9 @@ async fn main() -> Result<(), Report> {
         println!("Connecting to {} ({})", sensor.mac_address, sensor.id);
         if let Err(e) = session.bt_session.connect(&sensor.id).await {
             println!("Failed to connect to {}: {:?}", sensor.mac_address, e);
-        } else {
-            session.start_notify_sensor(&sensor.id).await?;
+            continue;
         }
+        session.start_notify_sensor(&sensor.id).await?;
     }
 
     println!("Readings:");
