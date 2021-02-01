@@ -18,7 +18,7 @@ name = "mijia-names"
 path = "src/mijia-names.rs"
 
 [dependencies]
-backoff = { version = "0.2.1", features = ["tokio"] }
+backoff = { version = "0.3.0", features = ["tokio"] }
 color-backtrace = "0.5.0"
 eyre = "0.6.5"
 futures = "0.3.8"
@@ -35,7 +35,6 @@ serde_derive = "1.0.118"
 serde = "1.0.118"
 stable-eyre = "0.2.1"
 tokio = { version = "1.0.1", features = ["macros", "rt-multi-thread"] }
-tokio-compat-02 = "0.2.0"
 toml = "0.5.8"
 
 [package.metadata.deb]

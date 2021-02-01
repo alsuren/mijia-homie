@@ -3,7 +3,8 @@
 mod config;
 
 use crate::config::{get_mqtt_options, read_sensor_names, Config};
-use backoff::{future::FutureOperation, ExponentialBackoff};
+use backoff::future::retry;
+use backoff::ExponentialBackoff;
 use eyre::{eyre, Report};
 use futures::stream::StreamExt;
 use futures::TryFutureExt;
@@ -18,7 +19,6 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::Mutex;
 use tokio::{time, try_join};
-use tokio_compat_02::FutureExt;
 
 const SCAN_INTERVAL: Duration = Duration::from_secs(15);
 const CONNECT_INTERVAL: Duration = Duration::from_secs(1);
@@ -403,12 +403,12 @@ async fn connect_and_subscribe_sensor_or_disconnect(
         .map_err(|e| eyre!("Error connecting to {}: {:?}", name, e))?;
 
     // We managed to connect to the sensor via some id, now try to start notifications for readings.
-    FutureOperation::retry(
-        || session.start_notify_sensor(&id).map_err(Into::into),
+    retry(
         ExponentialBackoff {
             max_elapsed_time: Some(SENSOR_CONNECT_RETRY_TIMEOUT),
             ..Default::default()
         },
+        || session.start_notify_sensor(&id).map_err(Into::into),
     )
     .or_else(|e| async {
         session
@@ -418,7 +418,6 @@ async fn connect_and_subscribe_sensor_or_disconnect(
             .wrap_err_with(|| format!("Disconnecting from {} ({})", name, id))?;
         Err(Report::new(e).wrap_err(format!("Starting notifications on {} ({})", name, id)))
     })
-    .compat()
     .await?;
 
     Ok(id)

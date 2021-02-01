@@ -11,7 +11,6 @@ use std::fmt::{self, Debug, Formatter};
 use std::time::{Duration, SystemTimeError};
 use std::{process::exit, time::SystemTime};
 use tokio::time;
-use tokio_compat_02::FutureExt;
 
 const SCAN_DURATION: Duration = Duration::from_secs(5);
 /// Only correct clocks which are wrong by more than this amount.
@@ -83,7 +82,6 @@ async fn main() -> Result<(), Report> {
             },
             || session.bt_session.connect(&sensor.id).map_err(Into::into),
         )
-        .compat()
         .await
         {
             println!("Failed to connect to {}: {:?}", sensor.mac_address, e);
