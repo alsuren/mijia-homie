@@ -5,6 +5,7 @@
 ### New features
 
 - Added TX power and address type to `DeviceInfo`.
+- Added methods for using a specific adapter rather than all adapters on the system.
 
 ## [0.2.0] — 2021-01-25
 

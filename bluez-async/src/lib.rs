@@ -261,6 +261,19 @@ impl BluetoothSession {
             .await
     }
 
+    /// Power on the given Bluetooth adapter, remove any discovery filter, and then start scanning
+    /// for devices.
+    ///
+    /// This is equivalent to calling
+    /// `start_discovery_on_adapter_with_filter(adapter, &DiscoveryFilter::default())`.
+    pub async fn start_discovery_on_adapter(
+        &self,
+        adapter: &AdapterId,
+    ) -> Result<(), BluetoothError> {
+        self.start_discovery_on_adapter_with_filter(adapter, &DiscoveryFilter::default())
+            .await
+    }
+
     /// Power on all Bluetooth adapters, set the given discovery filter, and then start scanning for
     /// devices.
     ///
@@ -280,16 +293,32 @@ impl BluetoothSession {
 
         for adapter_id in adapters {
             log::trace!("Starting discovery on adapter {}", adapter_id);
-            let adapter = self.adapter(&adapter_id);
-            adapter.set_powered(true).await?;
-            adapter
-                .set_discovery_filter(discovery_filter.into())
-                .await?;
-            adapter
-                .start_discovery()
+            self.start_discovery_on_adapter_with_filter(&adapter_id, discovery_filter)
                 .await
                 .unwrap_or_else(|err| println!("starting discovery failed {:?}", err));
         }
+        Ok(())
+    }
+
+    /// Power on the given Bluetooth adapter, set the given discovery filter, and then start
+    /// scanning for devices.
+    ///
+    /// Note that BlueZ combines discovery filters from all clients and sends events matching any
+    /// filter to all clients, so you may receive unexpected discovery events if there are other
+    /// clients on the system using Bluetooth as well.
+    ///
+    /// In most common cases, `DiscoveryFilter::default()` is fine.
+    pub async fn start_discovery_on_adapter_with_filter(
+        &self,
+        adapter_id: &AdapterId,
+        discovery_filter: &DiscoveryFilter,
+    ) -> Result<(), BluetoothError> {
+        let adapter = self.adapter(&adapter_id);
+        adapter.set_powered(true).await?;
+        adapter
+            .set_discovery_filter(discovery_filter.into())
+            .await?;
+        adapter.start_discovery().await?;
         Ok(())
     }
 
@@ -301,15 +330,24 @@ impl BluetoothSession {
         }
 
         for adapter_id in adapters {
-            let adapter = self.adapter(&adapter_id);
-            adapter.stop_discovery().await?;
+            self.stop_discovery_on_adapter(&adapter_id).await?;
         }
 
         Ok(())
     }
 
+    /// Stop scanning for devices on the given Bluetooth adapters.
+    pub async fn stop_discovery_on_adapter(
+        &self,
+        adapter_id: &AdapterId,
+    ) -> Result<(), BluetoothError> {
+        let adapter = self.adapter(&adapter_id);
+        adapter.stop_discovery().await?;
+        Ok(())
+    }
+
     /// Get a list of all Bluetooth adapters on the system.
-    async fn get_adapters(&self) -> Result<Vec<AdapterId>, dbus::Error> {
+    pub async fn get_adapters(&self) -> Result<Vec<AdapterId>, BluetoothError> {
         let bluez_root = Proxy::new(
             "org.bluez",
             "/",
@@ -347,6 +385,18 @@ impl BluetoothSession {
             })
             .collect();
         Ok(devices)
+    }
+
+    /// Get a list of all Bluetooth devices which have been discovered so far on a given adapter.
+    pub async fn get_devices_on_adapter(
+        &self,
+        adapter: &AdapterId,
+    ) -> Result<Vec<DeviceInfo>, BluetoothError> {
+        let devices = self.get_devices().await?;
+        Ok(devices
+            .into_iter()
+            .filter(|device| device.id.adapter() == *adapter)
+            .collect())
     }
 
     /// Get a list of all GATT services which the given Bluetooth device offers.
