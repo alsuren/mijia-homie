@@ -21,7 +21,7 @@ pub use self::adapter::AdapterId;
 pub use self::bleuuid::{uuid_from_u16, uuid_from_u32, BleUuid};
 pub use self::characteristic::{CharacteristicFlags, CharacteristicId, CharacteristicInfo};
 pub use self::descriptor::{DescriptorId, DescriptorInfo};
-pub use self::device::{DeviceId, DeviceInfo};
+pub use self::device::{AddressType, DeviceId, DeviceInfo};
 pub use self::events::{AdapterEvent, BluetoothEvent, CharacteristicEvent, DeviceEvent};
 use self::introspect::IntrospectParse;
 use self::messagestream::MessageStream;
@@ -73,6 +73,9 @@ pub enum BluetoothError {
     /// Error parsing a characteristic flag from a string.
     #[error("Invalid characteristic flag {0:?}")]
     FlagParseError(String),
+    /// Error parsing an `AddressType` from a string.
+    #[error("Invalid address type {0}")]
+    AddressTypeParseError(String),
     /// A required property of some device or other object was not found.
     #[error("Required property {0} missing.")]
     RequiredPropertyMissing(String),
