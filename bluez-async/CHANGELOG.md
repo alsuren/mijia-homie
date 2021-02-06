@@ -9,7 +9,7 @@
 - Added support for reading and writing characteristics and descriptors from a given offset, and
   explicitly specifying what type of write operation to use.
 
-## [0.2.0] — 2021-01-25
+## 0.2.0
 
 ### Breaking changes
 
@@ -25,7 +25,7 @@
 
 - Added example to log readings from RuuviTag sensors.
 
-## [0.1.1] — 2021-01-14
+## 0.1.1
 
 ### New features
 
@@ -36,6 +36,6 @@
 - Added more documentation.
 - Added example to list all devices.
 
-## [0.1.0] — 2021-01-08
+## 0.1.0
 
 Initial release.
