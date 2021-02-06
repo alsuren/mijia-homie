@@ -169,15 +169,16 @@ checksum = "cdb031dd78e28731d87d56cc8ffef4a8f36ca26c38fe2de700543e627f8a464a"
 
 [[package]]
 name = "backoff"
-version = "0.2.1"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "721c249ab59cbc483ad4294c9ee2671835c1e43e9ffc277e6b4ecfef733cfdc5"
+checksum = "9fe17f59a06fe8b87a6fc8bf53bb70b3aba76d7685f432487a68cd5552853625"
 dependencies = [
  "futures-core",
+ "getrandom 0.2.0",
  "instant",
- "pin-project 0.4.27",
- "rand 0.7.3",
- "tokio 0.2.24",
+ "pin-project 1.0.2",
+ "rand 0.8.1",
+ "tokio 1.0.1",
 ]
 
 [[package]]
@@ -1262,7 +1263,6 @@ dependencies = [
  "pretty_env_logger",
  "thiserror",
  "tokio 1.0.1",
- "tokio-compat-02 0.2.0",
  "tokio-stream",
  "uuid",
 ]
@@ -1288,7 +1288,6 @@ dependencies = [
  "serde_derive",
  "stable-eyre",
  "tokio 1.0.1",
- "tokio-compat-02 0.2.0",
  "toml",
 ]
 
