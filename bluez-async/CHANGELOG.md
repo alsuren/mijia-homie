@@ -6,6 +6,8 @@
 
 - Added TX power and address type to `DeviceInfo`.
 - Added methods for using a specific adapter rather than all adapters on the system.
+- Added support for reading and writing characteristics and descriptors from a given offset, and
+  explicitly specifying what type of write operation to use.
 
 ## [0.2.0] — 2021-01-25
 

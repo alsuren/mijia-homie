@@ -217,6 +217,68 @@ impl Into<PropMap> for &DiscoveryFilter {
     }
 }
 
+/// The type of write operation to use.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum WriteType {
+    /// A write operation where the device is expected to respond with a confirmation or error. Also
+    /// known as a request. This corresponds to
+    /// [`CharacteristicFlags`](struct.CharacteristicFlags.html)`::WRITE`.
+    WithResponse,
+    /// A write-without-response, also known as a command. This corresponds to
+    /// [`CharacteristicFlags`](struct.CharacteristicFlags.html)`::WRITE_WITHOUT_RESPONSE`.
+    WithoutResponse,
+    /// A reliable write. This corresponds to
+    /// [`CharacteristicFlags`](struct.CharacteristicFlags.html)`::RELIABLE_WRITE`.
+    Reliable,
+}
+
+impl WriteType {
+    fn as_str(&self) -> &'static str {
+        match self {
+            Self::WithResponse => "request",
+            Self::WithoutResponse => "command",
+            Self::Reliable => "reliable",
+        }
+    }
+}
+
+impl Display for WriteType {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+/// A set of options for a characteristic write operation.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct WriteOptions {
+    /// The starting offset of the write operation.
+    pub offset: usize,
+    /// The type of write operation to use.
+    ///
+    /// Note that a given characteristic may not support all different types of write operations;
+    /// you can check with
+    /// [`CharacteristicInfo.flags`](struct.CharacteristicInfo.html#structfield.flags). The type of
+    /// write operation will also affect the maximum possible length of data which can be written in
+    /// a single operation.
+    pub write_type: Option<WriteType>,
+}
+
+impl Into<PropMap> for WriteOptions {
+    fn into(self) -> PropMap {
+        let mut map: PropMap = HashMap::new();
+        if self.offset != 0 {
+            map.insert("offset".to_string(), Variant(Box::new(self.offset as u64)));
+        }
+        if let Some(write_type) = self.write_type {
+            map.insert(
+                "type".to_string(),
+                Variant(Box::new(write_type.to_string())),
+            );
+        }
+        map
+    }
+}
+
 /// A connection to the Bluetooth daemon. This can be cheaply cloned and passed around to be used
 /// from different places. It is the main entry point to the library.
 #[derive(Clone)]
@@ -664,43 +726,92 @@ impl BluetoothSession {
     }
 
     /// Read the value of the given GATT characteristic.
+    ///
+    /// This is equivalent to calling `read_characteristic_value_with_offset(0)`.
     pub async fn read_characteristic_value(
         &self,
         id: &CharacteristicId,
     ) -> Result<Vec<u8>, BluetoothError> {
-        let characteristic = self.characteristic(id);
-        Ok(characteristic.read_value(HashMap::new()).await?)
+        self.read_characteristic_value_with_offset(id, 0).await
     }
 
-    /// Write the given value to the given GATT characteristic.
+    /// Read the value of the given GATT characteristic, starting from the given offset.
+    pub async fn read_characteristic_value_with_offset(
+        &self,
+        id: &CharacteristicId,
+        offset: usize,
+    ) -> Result<Vec<u8>, BluetoothError> {
+        let characteristic = self.characteristic(id);
+        Ok(characteristic.read_value(offset_to_propmap(offset)).await?)
+    }
+
+    /// Write the given value to the given GATT characteristic, with default options.
+    ///
+    /// This is equivalent to calling `write_characteristic_value_with_options(WriteOptions::default())`.
     pub async fn write_characteristic_value(
         &self,
         id: &CharacteristicId,
         value: impl Into<Vec<u8>>,
     ) -> Result<(), BluetoothError> {
+        self.write_characteristic_value_with_options(id, value, WriteOptions::default())
+            .await
+    }
+
+    /// Write the given value to the given GATT characteristic, with the given options.
+    pub async fn write_characteristic_value_with_options(
+        &self,
+        id: &CharacteristicId,
+        value: impl Into<Vec<u8>>,
+        options: WriteOptions,
+    ) -> Result<(), BluetoothError> {
         let characteristic = self.characteristic(id);
         Ok(characteristic
-            .write_value(value.into(), HashMap::new())
+            .write_value(value.into(), options.into())
             .await?)
     }
 
     /// Read the value of the given GATT descriptor.
+    ///
+    /// This is equivalent to calling `read_descriptor_value_with_offset(0)`.
     pub async fn read_descriptor_value(
         &self,
         id: &DescriptorId,
     ) -> Result<Vec<u8>, BluetoothError> {
+        self.read_descriptor_value_with_offset(id, 0).await
+    }
+
+    /// Read the value of the given GATT descriptor, starting from the given offset.
+    pub async fn read_descriptor_value_with_offset(
+        &self,
+        id: &DescriptorId,
+        offset: usize,
+    ) -> Result<Vec<u8>, BluetoothError> {
         let descriptor = self.descriptor(id);
-        Ok(descriptor.read_value(HashMap::new()).await?)
+        Ok(descriptor.read_value(offset_to_propmap(offset)).await?)
     }
 
     /// Write the given value to the given GATT descriptor.
+    ///
+    /// This is equivalent to calling `write_descriptor_value_with_offset(0)`.
     pub async fn write_descriptor_value(
         &self,
         id: &DescriptorId,
         value: impl Into<Vec<u8>>,
     ) -> Result<(), BluetoothError> {
+        self.write_descriptor_value_with_offset(id, value, 0).await
+    }
+
+    /// Write the given value to the given GATT descriptor, starting from the given offset.
+    pub async fn write_descriptor_value_with_offset(
+        &self,
+        id: &DescriptorId,
+        value: impl Into<Vec<u8>>,
+        offset: usize,
+    ) -> Result<(), BluetoothError> {
         let descriptor = self.descriptor(id);
-        Ok(descriptor.write_value(value.into(), HashMap::new()).await?)
+        Ok(descriptor
+            .write_value(value.into(), offset_to_propmap(offset))
+            .await?)
     }
 
     /// Start notifications on the given GATT characteristic.
@@ -751,4 +862,12 @@ impl BluetoothSession {
         Ok(select_all(message_streams)
             .flat_map(|message| stream::iter(BluetoothEvent::message_to_events(message))))
     }
+}
+
+fn offset_to_propmap(offset: usize) -> PropMap {
+    let mut map: PropMap = HashMap::new();
+    if offset != 0 {
+        map.insert("offset".to_string(), Variant(Box::new(offset as u64)));
+    }
+    map
 }
