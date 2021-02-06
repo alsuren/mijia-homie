@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.1
 
 ### New features
 
@@ -8,6 +8,11 @@
 - Added methods for using a specific adapter rather than all adapters on the system.
 - Added support for reading and writing characteristics and descriptors from a given offset, and
   explicitly specifying what type of write operation to use.
+
+### Other changes
+
+- Wait for service discovery to complete before returning from `connect`. This should avoid errors
+  when trying to look up services on a device immediately after connecting to it.
 
 ## 0.2.0
 
