@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### Breaking changes
+
+- `BluetoothSession::get_adapters()` now returns `AdapterInfo`s rather than `AdapterId`s.
+
+### New features
+
+- Added `AdapterInfo` struct with information about the status of a Bluetooth adapter, and methods
+  to get it for all adapters on the system or a specific adapter.
+
 ## 0.2.1
 
 ### New features
