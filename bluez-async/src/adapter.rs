@@ -40,6 +40,10 @@ pub struct AdapterInfo {
     pub mac_address: MacAddress,
     /// The type of MAC address the adapter uses.
     pub address_type: AddressType,
+    /// The Bluetooth system hostname.
+    pub name: String,
+    /// The Bluetooth friendly name. This defaults to the system hostname.
+    pub alias: String,
     /// Whether the adapter is currently turned on.
     pub powered: bool,
     /// Whether the adapter is currently discovering devices.
@@ -63,6 +67,14 @@ impl AdapterInfo {
             id,
             mac_address: MacAddress(mac_address.to_owned()),
             address_type,
+            name: adapter_properties
+                .name()
+                .ok_or_else(|| BluetoothError::RequiredPropertyMissing("Name".to_string()))?
+                .to_owned(),
+            alias: adapter_properties
+                .alias()
+                .ok_or_else(|| BluetoothError::RequiredPropertyMissing("Alias".to_string()))?
+                .to_owned(),
             powered: adapter_properties
                 .powered()
                 .ok_or_else(|| BluetoothError::RequiredPropertyMissing("Powered".to_string()))?,
@@ -92,6 +104,8 @@ mod tests {
             "AddressType".to_string(),
             Variant(Box::new("public".to_string())),
         );
+        adapter_properties.insert("Name".to_string(), Variant(Box::new("name".to_string())));
+        adapter_properties.insert("Alias".to_string(), Variant(Box::new("alias".to_string())));
         adapter_properties.insert("Powered".to_string(), Variant(Box::new(false)));
         adapter_properties.insert("Discovering".to_string(), Variant(Box::new(false)));
 
@@ -106,6 +120,8 @@ mod tests {
                 id,
                 mac_address: MacAddress("00:11:22:33:44:55".to_string()),
                 address_type: AddressType::Public,
+                name: "name".to_string(),
+                alias: "alias".to_string(),
                 powered: false,
                 discovering: false
             }
