@@ -1,12 +1,10 @@
 # Monitoring Temperature
 
-<pre>(with too many Bluetooth thermometers)</pre>
+(with too many Bluetooth thermometers)
 
 ![](./title.jpg)
 
-<pre>David Laban</pre>
-
-<pre>Binary Solo - 15th October 2020</pre>
+Andrew Walbran, David Laban
 
 ---
 
@@ -28,9 +26,11 @@
 
 # Backstory
 
-- Housemate has a bunch of ESP32 sensors like this one
+- We started with a few ESP32 sensors like this:
 
 ![](./inception-yun_hat_04.jpg)
+
+- These cost around US$16 each, and I couldn't get them running more than about a day on battery power.
 
 ---
 
@@ -46,7 +46,7 @@
 
 # Backstory
 
-- So we bought some of these at `$3` each.
+- So we bought some of these at $3 each.
 
 ![](./inception-order.png)
 
@@ -76,16 +76,6 @@
 
 - Orange is our code.
 
----
-
-# System Overview
-
-- This is the grand plan:
-
-  ![](./system-overview-future.svg)
-
-- Orange is our code.
-
 --
 
 - Let's dig into the different pieces.
@@ -94,15 +84,18 @@
 
 # Rust
 
-- Picked because of a [blog post](https://dev.to/lcsfelix/using-rust-blurz-to-read-from-a-ble-device-gmb) that I found.
+- Picked because of a
+  [blog post](https://dev.to/lcsfelix/using-rust-blurz-to-read-from-a-ble-device-gmb) that David
+  found.
 
 - Rust is probably not the **best** language for this.
 
-  - Bluetooth stack on linux is quite dynamic in places.
+  - Bluetooth stack on Linux is quite dynamic in places.
 
   - Cross-compiling with `cross` is okay to set up, but a bit slow.
 
-  - We found a [Python project](https://github.com/JsBergbau/MiTemperature2) halfway through, doing the same.
+  - We found a [Python project](https://github.com/JsBergbau/MiTemperature2) partway through, with
+    similar objectives.
 
 <!-- prettier-ignore-start -->
 <!--
@@ -118,9 +111,13 @@
 
     - We're both starting to use Rust for work, so good for learning.
 
-        - Andrew is working on [crosvm](https://chromium.googlesource.com/chromiumos/platform/crosvm/) at the moment.
+        - Andrew is working on
+          [crosvm](https://chromium.googlesource.com/chromiumos/platform/crosvm/) and
+          [Virt Manager](https://android.googlesource.com/platform/packages/modules/Virtualization/+/refs/heads/master/virtmanager/)
+          for Android.
 
-        - [FutureNHS](https://github.com/FutureNHS/futurenhs-platform/) is using Rust on the backend.
+        - David was using Rust for the backend of
+          [FutureNHS](https://github.com/FutureNHS/futurenhs-platform/).
 
 <!-- prettier-ignore-end -->
 
@@ -140,7 +137,7 @@
 
   - Lets the server clean up after you when you drop off the network.
 
-- Homie is an auto-discovery convention built on MQTT.
+- [Homie](https://homieiot.github.io/) is an auto-discovery convention built on MQTT.
 
 - `rumqttc` library is pretty good:
 
@@ -154,26 +151,42 @@
 
 # Bluetooth
 
-The Rust Bluetooth story is a bit sad (all wrappers around BlueZ).
+The Rust Bluetooth story is a bit sad.
 
-- `blurz` - "Bluetooth from before there was tokio"
+- `blurz` - "Bluetooth from before there was Tokio"
 
   - Started with this.
-  - Talks to BlueZ over D-Bus (single-threaded).
+  - Talks to BlueZ over D-Bus, but single-threaded and synchronous.
   - Blocking `device.connect()` calls. 😧
   - Unmaintained (for 2 years).
 
-- `btleplug` - "is that really how it's pronounced?"
+- `btleplug` - "cross-platform jumble"
 
-  - Mostly Async and threadsafe (talks over raw sockets).
-  - Theoretically cross platform.
+  - Theoretically cross platform, but many features not implemented on all platforms.
+  - Linux implementation talked to kernel directly over raw sockets, bypassing BlueZ daemon.
+    - Requires extra permissions, adds extra bugs.
+    - This has since been changed.
   - Tried switching to this (but gave up after too many panicking threads).
+  - Andrew now trying to fix it and make it async.
 
-- `dbus-rs` - "roll your own Bluetooth library"
+- `dbus-rs` - "roll your own BlueZ wrapper"
   - Generates code from D-Bus introspection.
   - Single-threaded because return types are !Send (but that's okay).
   - Async or Blocking (up to you).
   - Non-generated types are a bit **too** dynamic.
+
+---
+
+# Bluetooth
+
+We ended up building our own Bluetooth library: `bluez-async`
+
+- Linux only
+- BLE GATT Central only
+- Typesafe async wrapper around BlueZ D-Bus interface.
+- Sent patches upstream to `dbus-rs` to improve code generation and support for complex types.
+- Didn't announce it anywhere.
+- Issues filed (and a PR) by two other users so far.
 
 ---
 
@@ -222,7 +235,7 @@ The Rust Bluetooth story is a bit sad (all wrappers around BlueZ).
 
   - Just the async version of Iter, but with less syntax support.
 
-  - Not something that I use much in web-land.
+  - Not something that David uses much in web-land.
 
 - Unbounded Channels
 
@@ -234,33 +247,35 @@ The Rust Bluetooth story is a bit sad (all wrappers around BlueZ).
 
 - Andrew is good at separating things into modules (and crates):
 
-  - App -> Sensor (mijia) -> Bluetooth (bluez-generated) -> D-Bus.
+  - App (`mijia-homie`) -> Sensor (`mijia`) -> Bluetooth (`bluez-async`) -> `bluez-generated` -> D-Bus.
 
-  - App -> Homie (homie-device) -> MQTT.
+  - App (`mijia-homie`) -> Homie (`homie-device`) -> MQTT.
 
-  - [MQTT -> Homie (homie-controller) -> InfluxDB soon]
+  - MQTT -> Homie (`homie-controller`) -> `homie-influx` -> InfluxDB
 
 - Deployment
 
+  - Built with Github Actions and `cross`, packaged with `cargo-deb`, hosted on Bintray.
+
   - Everything is supervised by systemd.
 
-  - All managed by our `run.sh` script.
+  - Test coverage is a bit thin.
 
-  - Test coverage is a bit thin. Sue me. 🤠
+- Desktop Linux tech stack (D-Bus, BlueZ) is not great.
 
-- Desktop Linux tech stack (D-Bus, Bluez) is still a shitshow.
-
-- Raspberry Pi only supports 10 connected sensors (10 << 100).
+- Raspberry Pi only supports 10 connected BLE devices (10 << 100).
+  - My laptop only supports 7.
+  - We added a USB Bluetooth adapter, and got a second Raspberry Pi.
 
 ---
 
 # Links
 
-- GitHub: https://github.com/alsuren/mijia-homie/
+- GitHub: https://github.com/alsuren/mijia-homie
 
 - Homie helper library https://crates.io/crates/homie-device
 
-- Hacktoberfest https://hacktoberfest.digitalocean.com/
+- Bluetooth library https://crates.io/crates/bluez-async
 
 # Questions
 
@@ -268,6 +283,7 @@ The Rust Bluetooth story is a bit sad (all wrappers around BlueZ).
 
 --
 
-# Question from me
+# Questions from me
 
 - Does anyone have ideas about which graphs we should draw?
+- What Bluetooth devices should we play with next?
