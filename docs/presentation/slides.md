@@ -27,10 +27,9 @@ Andrew Walbran, David Laban
 # Backstory
 
 - We started with a few ESP32 sensors like this:
-
-![](./inception-yun_hat_04.jpg)
-
-- These cost around US$16 each, and I couldn't get them running more than about a day on battery power.
+  ![](./inception-yun_hat_04.jpg)
+- These cost around US$16 each, and I couldn't get them running more than about a day on battery
+  power.
 
 ---
 
@@ -71,9 +70,7 @@ Andrew Walbran, David Laban
 # System Overview
 
 - This is what it looks like:
-
   ![](./system-overview.svg)
-
 - Orange is our code.
 
 --
@@ -154,26 +151,27 @@ Andrew Walbran, David Laban
 The Rust Bluetooth story is a bit sad.
 
 - `blurz` - "Bluetooth from before there was Tokio"
-
   - Started with this.
   - Talks to BlueZ over D-Bus, but single-threaded and synchronous.
   - Blocking `device.connect()` calls. 😧
   - Unmaintained (for 2 years).
 
-- `btleplug` - "cross-platform jumble"
+<!-- prettier-ignore-start -->
 
-  - Theoretically cross platform, but many features not implemented on all platforms.
+- `btleplug` - "cross-platform jumble"
+  - Theoretically cross platform, but many features not implemented.
   - Linux implementation talked to kernel directly over raw sockets, bypassing BlueZ daemon.
-    - Requires extra permissions, adds extra bugs.
-    - This has since been changed.
+      - Requires extra permissions, adds extra bugs.
+      - This has since been changed.
   - Tried switching to this (but gave up after too many panicking threads).
   - Andrew now trying to fix it and make it async.
+
+<!-- prettier-ignore-end -->
 
 - `dbus-rs` - "roll your own BlueZ wrapper"
   - Generates code from D-Bus introspection.
   - Single-threaded because return types are !Send (but that's okay).
-  - Async or Blocking (up to you).
-  - Non-generated types are a bit **too** dynamic.
+  - Async or blocking.
 
 ---
 
@@ -182,11 +180,14 @@ The Rust Bluetooth story is a bit sad.
 We ended up building our own Bluetooth library: `bluez-async`
 
 - Linux only
+
 - BLE GATT Central only
+
 - Typesafe async wrapper around BlueZ D-Bus interface.
+
 - Sent patches upstream to `dbus-rs` to improve code generation and support for complex types.
-- Didn't announce it anywhere.
-- Issues filed (and a PR) by two other users so far.
+
+- Didn't announce it anywhere, but issues filed (and a PR) by two other users so far.
 
 ---
 
@@ -262,7 +263,6 @@ We ended up building our own Bluetooth library: `bluez-async`
   - Test coverage is a bit thin.
 
 - Desktop Linux tech stack (D-Bus, BlueZ) is not great.
-
 - Raspberry Pi only supports 10 connected BLE devices (10 << 100).
   - My laptop only supports 7.
   - We added a USB Bluetooth adapter, and got a second Raspberry Pi.
