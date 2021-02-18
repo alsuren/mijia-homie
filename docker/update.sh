@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-VERSION=0.2.1
+VERSION=0.2.1-1
 
 docker build ./docker -f docker/Dockerfile.debian-buster-aarch64 \
     -t ghcr.io/qwandor/cross-dbus-debian-buster-aarch64:$VERSION

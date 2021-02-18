@@ -18,7 +18,7 @@ RUN apt-get install --assume-yes --no-install-recommends \
 
 RUN dpkg --add-architecture arm64 && \
 	apt-get update && \
-	apt-get install -y libssl-dev:arm64 libdbus-1-dev:arm64
+	apt-get install -y libdbus-1-dev:arm64
 
 ENV CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc \
 	CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc \
