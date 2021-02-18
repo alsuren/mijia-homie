@@ -2,7 +2,6 @@ use eyre::WrapErr;
 use homie_controller::{Datatype, Device, HomieController, Node, Property};
 use influx_db_client::{Client, Point, Precision, Value};
 use std::time::SystemTime;
-use tokio_compat_02::FutureExt;
 
 const INFLUXDB_PRECISION: Option<Precision> = Some(Precision::Milliseconds);
 
@@ -22,7 +21,6 @@ pub async fn send_property_value(
                     // Passing None for rp should use the default retention policy for the database.
                     influx_db_client
                         .write_point(point, INFLUXDB_PRECISION, None)
-                        .compat()
                         .await
                         .wrap_err("Failed to send property value update to InfluxDB")?;
                 }
