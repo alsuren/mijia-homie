@@ -17,7 +17,7 @@ mod introspect;
 mod messagestream;
 mod service;
 
-pub use self::adapter::AdapterId;
+pub use self::adapter::{AdapterId, AdapterInfo};
 pub use self::bleuuid::{uuid_from_u16, uuid_from_u32, BleUuid};
 pub use self::characteristic::{CharacteristicFlags, CharacteristicId, CharacteristicInfo};
 pub use self::descriptor::{DescriptorId, DescriptorInfo};
@@ -27,8 +27,9 @@ use self::introspect::IntrospectParse;
 use self::messagestream::MessageStream;
 pub use self::service::{ServiceId, ServiceInfo};
 use bluez_generated::{
-    OrgBluezAdapter1, OrgBluezDevice1, OrgBluezDevice1Properties, OrgBluezGattCharacteristic1,
-    OrgBluezGattDescriptor1, OrgBluezGattService1, ORG_BLUEZ_ADAPTER1_NAME, ORG_BLUEZ_DEVICE1_NAME,
+    OrgBluezAdapter1, OrgBluezAdapter1Properties, OrgBluezDevice1, OrgBluezDevice1Properties,
+    OrgBluezGattCharacteristic1, OrgBluezGattDescriptor1, OrgBluezGattService1,
+    ORG_BLUEZ_ADAPTER1_NAME, ORG_BLUEZ_DEVICE1_NAME,
 };
 use dbus::arg::{PropMap, Variant};
 use dbus::nonblock::stdintf::org_freedesktop_dbus::{Introspectable, ObjectManager, Properties};
@@ -78,7 +79,7 @@ pub enum BluetoothError {
     AddressTypeParseError(String),
     /// A required property of some device or other object was not found.
     #[error("Required property {0} missing.")]
-    RequiredPropertyMissing(String),
+    RequiredPropertyMissing(&'static str),
     /// Service discovery didn't happen within the time limit.
     #[error("Service discovery timed out")]
     ServiceDiscoveryTimedOut,
@@ -353,9 +354,9 @@ impl BluetoothSession {
             return Err(BluetoothError::NoBluetoothAdapters);
         }
 
-        for adapter_id in adapters {
-            log::trace!("Starting discovery on adapter {}", adapter_id);
-            self.start_discovery_on_adapter_with_filter(&adapter_id, discovery_filter)
+        for adapter in adapters {
+            log::trace!("Starting discovery on adapter {}", adapter.id);
+            self.start_discovery_on_adapter_with_filter(&adapter.id, discovery_filter)
                 .await
                 .unwrap_or_else(|err| println!("starting discovery failed {:?}", err));
         }
@@ -391,8 +392,8 @@ impl BluetoothSession {
             return Err(BluetoothError::NoBluetoothAdapters);
         }
 
-        for adapter_id in adapters {
-            self.stop_discovery_on_adapter(&adapter_id).await?;
+        for adapter in adapters {
+            self.stop_discovery_on_adapter(&adapter.id).await?;
         }
 
         Ok(())
@@ -409,7 +410,7 @@ impl BluetoothSession {
     }
 
     /// Get a list of all Bluetooth adapters on the system.
-    pub async fn get_adapters(&self) -> Result<Vec<AdapterId>, BluetoothError> {
+    pub async fn get_adapters(&self) -> Result<Vec<AdapterInfo>, BluetoothError> {
         let bluez_root = Proxy::new(
             "org.bluez",
             "/",
@@ -422,9 +423,8 @@ impl BluetoothSession {
         Ok(tree
             .into_iter()
             .filter_map(|(object_path, interfaces)| {
-                interfaces
-                    .get(ORG_BLUEZ_ADAPTER1_NAME)
-                    .map(|_| AdapterId { object_path })
+                let adapter_properties = OrgBluezAdapter1Properties::from_interfaces(&interfaces)?;
+                AdapterInfo::from_properties(AdapterId { object_path }, adapter_properties).ok()
             })
             .collect())
     }
@@ -596,6 +596,13 @@ impl BluetoothSession {
         let device = self.device(&id);
         let properties = device.get_all(ORG_BLUEZ_DEVICE1_NAME).await?;
         DeviceInfo::from_properties(id.to_owned(), OrgBluezDevice1Properties(&properties))
+    }
+
+    /// Get information about the given Bluetooth adapter.
+    pub async fn get_adapter_info(&self, id: &AdapterId) -> Result<AdapterInfo, BluetoothError> {
+        let adapter = self.adapter(&id);
+        let properties = adapter.get_all(ORG_BLUEZ_ADAPTER1_NAME).await?;
+        AdapterInfo::from_properties(id.to_owned(), OrgBluezAdapter1Properties(&properties))
     }
 
     /// Get information about the given GATT service.
