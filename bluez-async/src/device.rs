@@ -95,10 +95,10 @@ impl DeviceInfo {
     ) -> Result<DeviceInfo, BluetoothError> {
         let mac_address = device_properties
             .address()
-            .ok_or_else(|| BluetoothError::RequiredPropertyMissing("Address".to_string()))?;
+            .ok_or_else(|| BluetoothError::RequiredPropertyMissing("Address"))?;
         let address_type = device_properties
             .address_type()
-            .ok_or_else(|| BluetoothError::RequiredPropertyMissing("AddressType".to_string()))?
+            .ok_or_else(|| BluetoothError::RequiredPropertyMissing("AddressType"))?
             .parse()?;
         let services = get_services(device_properties);
         let manufacturer_data = get_manufacturer_data(device_properties).unwrap_or_default();
@@ -113,17 +113,17 @@ impl DeviceInfo {
             services,
             paired: device_properties
                 .paired()
-                .ok_or_else(|| BluetoothError::RequiredPropertyMissing("Paired".to_string()))?,
+                .ok_or_else(|| BluetoothError::RequiredPropertyMissing("Paired"))?,
             connected: device_properties
                 .connected()
-                .ok_or_else(|| BluetoothError::RequiredPropertyMissing("Connected".to_string()))?,
+                .ok_or_else(|| BluetoothError::RequiredPropertyMissing("Connected"))?,
             rssi: device_properties.rssi(),
             tx_power: device_properties.tx_power(),
             manufacturer_data,
             service_data,
-            services_resolved: device_properties.services_resolved().ok_or_else(|| {
-                BluetoothError::RequiredPropertyMissing("ServicesResolved".to_string())
-            })?,
+            services_resolved: device_properties
+                .services_resolved()
+                .ok_or_else(|| BluetoothError::RequiredPropertyMissing("ServicesResolved"))?,
         })
     }
 }

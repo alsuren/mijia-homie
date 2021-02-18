@@ -79,7 +79,7 @@ pub enum BluetoothError {
     AddressTypeParseError(String),
     /// A required property of some device or other object was not found.
     #[error("Required property {0} missing.")]
-    RequiredPropertyMissing(String),
+    RequiredPropertyMissing(&'static str),
     /// Service discovery didn't happen within the time limit.
     #[error("Service discovery timed out")]
     ServiceDiscoveryTimedOut,
