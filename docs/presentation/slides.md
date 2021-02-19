@@ -164,7 +164,7 @@ The Rust Bluetooth story is a bit sad.
       - Requires extra permissions, adds extra bugs.
       - This has since been changed.
   - Tried switching to this (but gave up after too many panicking threads).
-  - Andrew now trying to fix it and make it async.
+  - Andrew now working to improve it and make it async.
 
 <!-- prettier-ignore-end -->
 
@@ -246,7 +246,7 @@ We ended up building our own Bluetooth library: `bluez-async`
 
 # Observations about the project
 
-- Andrew is good at separating things into modules (and crates):
+- Separating things into modules (and crates) worked well:
 
   - App (`mijia-homie`) -> Sensor (`mijia`) -> Bluetooth (`bluez-async`) -> `bluez-generated` -> D-Bus.
 
