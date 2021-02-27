@@ -69,9 +69,10 @@ async fn write_history(
     name: &str,
     history: Vec<Option<HistoryRecord>>,
 ) -> Result<(), Report> {
-    let points = history.into_iter().filter_map(|record| {
-        record.map(|record| point_for_record(measurement, mac_address, name, &record))
-    });
+    let points = history
+        .into_iter()
+        .flatten()
+        .map(|record| point_for_record(measurement, mac_address, name, &record));
     influxdb_client
         .write_points(points, INFLUXDB_PRECISION, None)
         .await?;
