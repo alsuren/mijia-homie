@@ -1,0 +1,14 @@
+# The name of the file containing sensor MAC address to name mappings.
+sensor_names_filename="sensor-names.toml"
+
+[influxdb]
+# The URL of the InfluxDB to which to connect.
+url="http://localhost:8086"
+# The username with which to authenticate to InfluxDB, if any.
+#username=""
+# The password with which to authenticate to InfluxDB, if any.
+#password=""
+# The name of the InfluxDB database to which to write data.
+database="mijia_history"
+# The name of the measurement in the database to which to write data.
+measurement="mijia_history"

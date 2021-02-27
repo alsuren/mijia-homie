@@ -1,5 +1,6 @@
 /target
 homie-influx.toml
+mijia-history-influx.toml
 mijia-homie.toml
 mappings.toml
 sensor-names.toml

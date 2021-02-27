@@ -14,6 +14,10 @@ name = "mijia-homie"
 path = "src/main.rs"
 
 [[bin]]
+name = "mijia-history-influx"
+path = "src/mijia-history-influx.rs"
+
+[[bin]]
 name = "mijia-names"
 path = "src/mijia-names.rs"
 
@@ -24,6 +28,7 @@ eyre = "0.6.5"
 futures = "0.3.8"
 futures-channel = "0.3.8"
 homie-device = { version = "0.4.0", path = "../homie-device" }
+influx_db_client = { version = "0.5.0", default-features = false, features = ["rustls-tls"] }
 itertools = "0.10.0"
 log = "0.4.11"
 mijia = { version = "0.3.1", path = "../mijia" }
@@ -36,6 +41,7 @@ serde = "1.0.118"
 stable-eyre = "0.2.1"
 tokio = { version = "1.0.1", features = ["macros", "rt-multi-thread"] }
 toml = "0.5.8"
+url = { version = "2.2.0", features = ["serde"] }
 
 [package.metadata.deb]
 # $auto doesn't work because we don't build packages in the same container as we build the binaries.
@@ -44,9 +50,11 @@ section = "net"
 maintainer-scripts = "debian-scripts"
 conf-files = ["/etc/mijia-homie/mijia-homie.toml"]
 assets = [
+	["target/release/mijia-history-influx", "usr/bin/", "755"],
 	["target/release/mijia-homie", "usr/bin/", "755"],
 	["target/release/mijia-names", "usr/bin/", "755"],
 	["mijia-homie.example.toml", "etc/mijia-homie/mijia-homie.toml", "640"],
+	["mijia-history-influx.example.toml", "etc/mijia-homie/mijia-history-influx.toml", "640"],
 	["README.md", "usr/share/doc/mijia-homie/", "644"],
 ]
 
