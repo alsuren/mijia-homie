@@ -21,6 +21,7 @@ use tokio_stream::StreamExt;
 use uuid::Uuid;
 
 mod decode;
+mod signed_duration;
 pub use decode::comfort_level::ComfortLevel;
 use decode::history::decode_range;
 pub use decode::history::HistoryRecord;
@@ -28,6 +29,7 @@ pub use decode::readings::Readings;
 pub use decode::temperature_unit::TemperatureUnit;
 use decode::time::{decode_time, encode_time};
 pub use decode::{DecodeError, EncodeError};
+pub use signed_duration::SignedDuration;
 
 const MIJIA_NAME: &str = "LYWSD03MMC";
 const SERVICE_UUID: Uuid = Uuid::from_u128(0xebe0ccb0_7a0a_4b0c_8a1a_6ff2997da3a6);

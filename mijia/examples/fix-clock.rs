@@ -4,55 +4,16 @@ use backoff::future::retry;
 use backoff::ExponentialBackoff;
 use chrono::{DateTime, Utc};
 use eyre::Report;
-use fmt::Write;
 use futures::TryFutureExt;
-use mijia::{MijiaSession, SensorProps};
-use std::fmt::{self, Debug, Formatter};
-use std::time::{Duration, SystemTimeError};
-use std::{process::exit, time::SystemTime};
+use mijia::{MijiaSession, SensorProps, SignedDuration};
+use std::process::exit;
+use std::time::{Duration, SystemTime};
 use tokio::time;
 
 const SCAN_DURATION: Duration = Duration::from_secs(5);
 /// Only correct clocks which are wrong by more than this amount.
 const MINIMUM_OFFSET: Duration = Duration::from_secs(10);
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
-
-/// A duration which may be negative.
-#[derive(Clone, Eq, PartialEq)]
-struct SignedDuration {
-    positive: bool,
-    duration: Duration,
-}
-
-impl From<Duration> for SignedDuration {
-    fn from(duration: Duration) -> Self {
-        SignedDuration {
-            positive: true,
-            duration,
-        }
-    }
-}
-
-impl From<Result<Duration, SystemTimeError>> for SignedDuration {
-    fn from(result: Result<Duration, SystemTimeError>) -> Self {
-        match result {
-            Ok(duration) => duration.into(),
-            Err(err) => SignedDuration {
-                positive: false,
-                duration: err.duration(),
-            },
-        }
-    }
-}
-
-impl Debug for SignedDuration {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        if !self.positive {
-            f.write_char('-')?;
-        }
-        self.duration.fmt(f)
-    }
-}
 
 #[tokio::main]
 async fn main() -> Result<(), Report> {
