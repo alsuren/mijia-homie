@@ -8,6 +8,7 @@ description = "Service to connect to Xiaomi Mijia 2 temperature/humidity sensors
 repository = "https://github.com/alsuren/mijia-homie/"
 keywords = ["ble", "bluetooth", "homie", "mqtt"]
 categories = ["network-programming"]
+default-run = "mijia-homie"
 
 [[bin]]
 name = "mijia-homie"
