@@ -1317,6 +1317,7 @@ dependencies = [
  "futures",
  "futures-channel",
  "homie-device",
+ "influx_db_client",
  "itertools 0.10.0",
  "log",
  "mijia",
@@ -1329,6 +1330,7 @@ dependencies = [
  "stable-eyre",
  "tokio 1.0.1",
  "toml",
+ "url",
 ]
 
 [[package]]

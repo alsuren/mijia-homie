@@ -5,6 +5,7 @@
 ### New features
 
 - Added event for new sensor being discovered.
+- Added `SignedDuration` type for conveniently comparing `SystemTime`s.
 
 ## 0.3.1
 

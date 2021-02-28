@@ -75,7 +75,7 @@ pub struct HomieConfig {
     pub min_update_period: Duration,
 }
 
-fn de_duration_seconds<'de, D: Deserializer<'de>>(d: D) -> Result<Duration, D::Error> {
+pub fn de_duration_seconds<'de, D: Deserializer<'de>>(d: D) -> Result<Duration, D::Error> {
     let seconds = u64::deserialize(d)?;
     Ok(Duration::from_secs(seconds))
 }

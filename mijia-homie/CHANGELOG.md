@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### New features
+
+- Added `mijia-names` utility to scan for sensors and create a `sensor-names.toml` config.
+- Added `mijia-history-influx` utility to dump historical data from sensors to InfluxDB.
+
 ## 0.2.2
 
 ### New features
