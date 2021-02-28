@@ -8,12 +8,13 @@ use crate::config::read_sensor_names;
 use crate::mijia_history_config::{get_influxdb_client, Config};
 use eyre::Report;
 use influx_db_client::{Client, Point, Precision};
-use mijia::{bluetooth::MacAddress, HistoryRecord, MijiaSession};
+use mijia::{bluetooth::MacAddress, HistoryRecord, MijiaSession, SignedDuration};
 use std::time::{Duration, SystemTime};
 use tokio::time;
 
 const SCAN_DURATION: Duration = Duration::from_secs(5);
 const INFLUXDB_PRECISION: Option<Precision> = Some(Precision::Milliseconds);
+const MAX_CLOCK_OFFSET: Duration = Duration::from_secs(20 * 60);
 
 #[tokio::main]
 async fn main() -> Result<(), Report> {
@@ -43,17 +44,28 @@ async fn main() -> Result<(), Report> {
                 continue;
             }
 
-            println!("Reading history...");
-            let history = session.get_all_history(&sensor.id).await?;
-            write_history(
-                &influxdb_client,
-                &config.influxdb.measurement,
-                &sensor.mac_address,
-                name,
-                history,
-            )
-            .await?;
-            println!("Written to InfluxDB.");
+            // Check that the clock isn't too badly wrong.
+            let sensor_time = session.get_time(&sensor.id).await?;
+            let now = SystemTime::now();
+            let offset: SignedDuration = now.duration_since(sensor_time).into();
+            if offset.duration > MAX_CLOCK_OFFSET {
+                println!(
+                    "Clock offset {:?} is more than {:?}, skipping.",
+                    offset, MAX_CLOCK_OFFSET
+                );
+            } else {
+                println!("Sensor time offset {:?}, reading history...", offset);
+                let history = session.get_all_history(&sensor.id).await?;
+                write_history(
+                    &influxdb_client,
+                    &config.influxdb.measurement,
+                    &sensor.mac_address,
+                    name,
+                    history,
+                )
+                .await?;
+                println!("Written to InfluxDB.");
+            }
 
             if let Err(e) = session.bt_session.disconnect(&sensor.id).await {
                 log::error!("Disconnecting failed: {:?}", e);
