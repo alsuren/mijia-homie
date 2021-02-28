@@ -1,19 +1,27 @@
+use crate::config::de_duration_seconds;
 use eyre::Report;
 use influx_db_client::{reqwest::Url, Client};
 use serde_derive::Deserialize;
 use stable_eyre::eyre::WrapErr;
 use std::fs::read_to_string;
+use std::time::Duration;
 
 const DEFAULT_DATABASE: &str = "mijia_history";
 const DEFAULT_MEASUREMENT: &str = "mijia_history";
 const DEFAULT_INFLUXDB_URL: &str = "http://localhost:8086";
 const DEFAULT_SENSOR_NAMES_FILENAME: &str = "sensor-names.toml";
+const DEFAULT_MAX_CLOCK_OFFSET: Duration = Duration::from_secs(20 * 60);
 const CONFIG_FILENAME: &str = "mijia-history-influx.toml";
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Config {
     pub sensor_names_filename: String,
+    #[serde(
+        deserialize_with = "de_duration_seconds",
+        rename = "max_clock_offset_seconds"
+    )]
+    pub max_clock_offset: Duration,
     pub influxdb: InfluxDBConfig,
 }
 
@@ -33,6 +41,7 @@ impl Default for Config {
     fn default() -> Config {
         Config {
             sensor_names_filename: DEFAULT_SENSOR_NAMES_FILENAME.to_owned(),
+            max_clock_offset: DEFAULT_MAX_CLOCK_OFFSET,
             influxdb: Default::default(),
         }
     }

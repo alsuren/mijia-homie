@@ -14,7 +14,6 @@ use tokio::time;
 
 const SCAN_DURATION: Duration = Duration::from_secs(5);
 const INFLUXDB_PRECISION: Option<Precision> = Some(Precision::Milliseconds);
-const MAX_CLOCK_OFFSET: Duration = Duration::from_secs(20 * 60);
 
 #[tokio::main]
 async fn main() -> Result<(), Report> {
@@ -48,10 +47,10 @@ async fn main() -> Result<(), Report> {
             let sensor_time = session.get_time(&sensor.id).await?;
             let now = SystemTime::now();
             let offset: SignedDuration = now.duration_since(sensor_time).into();
-            if offset.duration > MAX_CLOCK_OFFSET {
+            if offset.duration > config.max_clock_offset {
                 println!(
                     "Clock offset {:?} is more than {:?}, skipping.",
-                    offset, MAX_CLOCK_OFFSET
+                    offset, config.max_clock_offset
                 );
             } else {
                 println!("Sensor time offset {:?}, reading history...", offset);
