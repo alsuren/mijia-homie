@@ -6,6 +6,7 @@ if [ "$1" = "configure" ] ; then
   touch /etc/mijia-homie/sensor-names.toml
   adduser --system --no-create-home --home /etc/mijia-homie mijia-homie
   adduser mijia-homie bluetooth
+  chown mijia-homie /etc/mijia-homie/mijia-history-influx.toml
   chown mijia-homie /etc/mijia-homie/mijia-homie.toml
 fi
 
