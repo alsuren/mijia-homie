@@ -1,11 +1,16 @@
 # Changelog
 
-## Unreleased
+## 0.4.0
+
+### Breaking changes
+
+- Updated to `bluez-async` 0.3.0.
 
 ### New features
 
 - Added event for new sensor being discovered.
 - Added `SignedDuration` type for conveniently comparing `SystemTime`s.
+- Added example to fix clocks of sensors.
 
 ## 0.3.1
 

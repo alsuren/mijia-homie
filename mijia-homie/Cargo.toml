@@ -1,6 +1,6 @@
 [package]
 name = "mijia-homie"
-version = "0.2.2"
+version = "0.2.3"
 authors = ["David Laban <alsuren@gmail.com>", "Andrew Walbran <qwandor@google.com>"]
 edition = "2018"
 license = "MIT OR Apache-2.0"
@@ -32,7 +32,7 @@ homie-device = { version = "0.4.0", path = "../homie-device" }
 influx_db_client = { version = "0.5.0", default-features = false, features = ["rustls-tls"] }
 itertools = "0.10.0"
 log = "0.4.11"
-mijia = { version = "0.3.1", path = "../mijia" }
+mijia = { version = "0.4.0", path = "../mijia" }
 pretty_env_logger = "0.4.0"
 rumqttc = "0.4.0"
 rustls = "0.19.0"
