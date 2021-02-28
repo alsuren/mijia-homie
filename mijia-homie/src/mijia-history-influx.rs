@@ -28,6 +28,7 @@ async fn main() -> Result<(), Report> {
     let (_, session) = MijiaSession::new().await?;
 
     // Start scanning for Bluetooth devices, and wait a while for some to be discovered.
+    println!("Scanning...");
     session.bt_session.start_discovery().await?;
     time::sleep(SCAN_DURATION).await;
 
@@ -36,13 +37,13 @@ async fn main() -> Result<(), Report> {
     let sensors = session.get_sensors().await?;
     for sensor in sensors.iter() {
         if let Some(name) = names.get(&sensor.mac_address) {
-            log::info!("Connecting to {} ({})", name, sensor.mac_address);
+            println!("Connecting to {} ({})...", name, sensor.mac_address);
             if let Err(e) = session.bt_session.connect(&sensor.id).await {
                 log::error!("Failed to connect to {}: {:?}", name, e);
                 continue;
             }
 
-            log::info!("Reading history...");
+            println!("Reading history...");
             let history = session.get_all_history(&sensor.id).await?;
             write_history(
                 &influxdb_client,
@@ -52,6 +53,7 @@ async fn main() -> Result<(), Report> {
                 history,
             )
             .await?;
+            println!("Written to InfluxDB.");
 
             if let Err(e) = session.bt_session.disconnect(&sensor.id).await {
                 log::error!("Disconnecting failed: {:?}", e);
