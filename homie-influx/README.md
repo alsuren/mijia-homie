@@ -54,6 +54,17 @@ You may find it helpful to watch the logs to see whether it is managing to conne
 $ sudo journalctl -u homie-influx.service --output=cat --follow
 ```
 
+
+## Format
+
+This service publishes up to six measurements: `integer`, `float`, `boolean`, `string`, `enum`, `color`,
+corresponding to the Homie datatypes. Each message is published as an InfluxDB point with the appropriate
+name and timestamp, the value as a `value` field, and device / node / property info included as tags.
+
+In order to support Grafana clients, boolean points also have an additional `value_int` field,
+which is an integer, 1 for true or 0 for false.
+
+
 ## License
 
 Licensed under either of

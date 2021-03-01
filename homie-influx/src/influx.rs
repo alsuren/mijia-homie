@@ -79,6 +79,16 @@ fn point_for_property_value(
     if let Some(node_type) = node.node_type.to_owned() {
         point = point.add_tag("node_type", Value::String(node_type))
     }
+    if let Some(Datatype::Boolean) = property.datatype {
+        // Grafana is unable to display booleans directly,
+        // so add an integer for convenience.
+        // https://github.com/grafana/grafana/issues/8152
+        // https://github.com/grafana/grafana/issues/24929
+        point = point.add_field(
+            "value_int",
+            Value::Integer(if property.value().ok()? { 1 } else { 0 }),
+        )
+    }
 
     Some(point)
 }
@@ -320,6 +330,60 @@ mod tests {
                 .add_tag("node_name", Value::String("Node name".to_owned()))
                 .add_tag("property_name", Value::String("Property name".to_owned()))
                 .add_field("value", Value::Integer(42)),
+        );
+    }
+
+    #[test]
+    fn point_for_boolean_property() {
+        let property = Property {
+            id: "property_id".to_owned(),
+            name: None,
+            datatype: Some(Datatype::Boolean),
+            settable: false,
+            retained: true,
+            unit: None,
+            format: None,
+            value: Some("true".to_owned()),
+        };
+        let node = Node {
+            id: "node_id".to_owned(),
+            name: None,
+            node_type: None,
+            properties: property_set(vec![property.clone()]),
+        };
+        let device = Device {
+            id: "device_id".to_owned(),
+            homie_version: "4.0".to_owned(),
+            name: None,
+            state: State::Unknown,
+            implementation: None,
+            nodes: node_set(vec![node.clone()]),
+            extensions: Vec::default(),
+            local_ip: None,
+            mac: None,
+            firmware_name: None,
+            firmware_version: None,
+            stats_interval: None,
+            stats_uptime: None,
+            stats_signal: None,
+            stats_cputemp: None,
+            stats_cpuload: None,
+            stats_battery: None,
+            stats_freeheap: None,
+            stats_supply: None,
+        };
+        let timestamp_millis = 123456789;
+        let timestamp = SystemTime::UNIX_EPOCH + Duration::from_millis(timestamp_millis as u64);
+        let point = point_for_property_value(&device, &node, &property, timestamp).unwrap();
+        assert_eq!(
+            point,
+            Point::new("boolean")
+                .add_timestamp(timestamp_millis)
+                .add_tag("device_id", Value::String("device_id".to_owned()))
+                .add_tag("node_id", Value::String("node_id".to_owned()))
+                .add_tag("property_id", Value::String("property_id".to_owned()))
+                .add_field("value", Value::Boolean(true))
+                .add_field("value_int", Value::Integer(1)),
         );
     }
 }
