@@ -80,8 +80,7 @@ fn point_for_property_value(
         point = point.add_tag("node_type", Value::String(node_type))
     }
     if let Some(Datatype::Boolean) = property.datatype {
-        // Grafana is unable to display booleans directly,
-        // so add an integer for convenience.
+        // Grafana is unable to display booleans directly, so add an integer for convenience.
         // https://github.com/grafana/grafana/issues/8152
         // https://github.com/grafana/grafana/issues/24929
         point = point.add_field(
