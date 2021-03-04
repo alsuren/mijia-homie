@@ -57,10 +57,10 @@ impl AdapterInfo {
     ) -> Result<AdapterInfo, BluetoothError> {
         let mac_address = adapter_properties
             .address()
-            .ok_or_else(|| BluetoothError::RequiredPropertyMissing("Address"))?;
+            .ok_or(BluetoothError::RequiredPropertyMissing("Address"))?;
         let address_type = adapter_properties
             .address_type()
-            .ok_or_else(|| BluetoothError::RequiredPropertyMissing("AddressType"))?
+            .ok_or(BluetoothError::RequiredPropertyMissing("AddressType"))?
             .parse()?;
 
         Ok(AdapterInfo {
@@ -69,18 +69,18 @@ impl AdapterInfo {
             address_type,
             name: adapter_properties
                 .name()
-                .ok_or_else(|| BluetoothError::RequiredPropertyMissing("Name"))?
+                .ok_or(BluetoothError::RequiredPropertyMissing("Name"))?
                 .to_owned(),
             alias: adapter_properties
                 .alias()
-                .ok_or_else(|| BluetoothError::RequiredPropertyMissing("Alias"))?
+                .ok_or(BluetoothError::RequiredPropertyMissing("Alias"))?
                 .to_owned(),
             powered: adapter_properties
                 .powered()
-                .ok_or_else(|| BluetoothError::RequiredPropertyMissing("Powered"))?,
+                .ok_or(BluetoothError::RequiredPropertyMissing("Powered"))?,
             discovering: adapter_properties
                 .discovering()
-                .ok_or_else(|| BluetoothError::RequiredPropertyMissing("Discovering"))?,
+                .ok_or(BluetoothError::RequiredPropertyMissing("Discovering"))?,
         })
     }
 }
