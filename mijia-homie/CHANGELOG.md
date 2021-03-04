@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Bug fixes
+
+- Fixed owner of mijia-history-influx.toml config file.
+
 ## 0.2.3
 
 ### New features
