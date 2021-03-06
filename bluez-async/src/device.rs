@@ -1,5 +1,5 @@
 use bluez_generated::OrgBluezDevice1Properties;
-use dbus::arg::{cast, RefArg, Variant};
+use dbus::arg::{cast, PropMap, RefArg, Variant};
 use dbus::Path;
 use std::collections::HashMap;
 use std::fmt::{self, Display, Formatter};
@@ -193,14 +193,7 @@ fn get_service_data(
     Some(convert_service_data(device_properties.service_data()?))
 }
 
-pub(crate) fn convert_service_data(
-    data: &HashMap<String, Variant<Box<dyn RefArg>>>,
-) -> HashMap<Uuid, Vec<u8>> {
-    // UUIDs don't get populated until we connect. Use:
-    //     "ServiceData": Variant(InternalDict { data: [
-    //         ("0000fe95-0000-1000-8000-00805f9b34fb", Variant([48, 88, 91, 5, 1, 23, 33, 215, 56, 193, 164, 40, 1, 0])
-    //     )], outer_sig: Signature("a{sv}") })
-    // instead.
+pub(crate) fn convert_service_data(data: &PropMap) -> HashMap<Uuid, Vec<u8>> {
     data.iter()
         .filter_map(|(k, v)| match Uuid::parse_str(k) {
             Ok(uuid) => {
