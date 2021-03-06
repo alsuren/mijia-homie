@@ -1,5 +1,5 @@
 use bluez_generated::OrgBluezDevice1Properties;
-use dbus::arg::{cast, RefArg, Variant};
+use dbus::arg::{cast, PropMap, RefArg, Variant};
 use dbus::Path;
 use std::collections::HashMap;
 use std::fmt::{self, Display, Formatter};
@@ -190,49 +190,48 @@ pub(crate) fn convert_manufacturer_data(
 fn get_service_data(
     device_properties: OrgBluezDevice1Properties,
 ) -> Option<HashMap<Uuid, Vec<u8>>> {
-    // UUIDs don't get populated until we connect. Use:
-    //     "ServiceData": Variant(InternalDict { data: [
-    //         ("0000fe95-0000-1000-8000-00805f9b34fb", Variant([48, 88, 91, 5, 1, 23, 33, 215, 56, 193, 164, 40, 1, 0])
-    //     )], outer_sig: Signature("a{sv}") })
-    // instead.
-    Some(
-        device_properties
-            .service_data()?
-            .iter()
-            .filter_map(|(k, v)| match Uuid::parse_str(k) {
-                Ok(uuid) => {
-                    if let Some(v) = cast::<Vec<u8>>(&v.0) {
-                        Some((uuid, v.to_owned()))
-                    } else {
-                        log::warn!("Service data had wrong type: {:?}", &v.0);
-                        None
-                    }
-                }
-                Err(err) => {
-                    log::warn!("Error parsing service data UUID: {}", err);
+    Some(convert_service_data(device_properties.service_data()?))
+}
+
+pub(crate) fn convert_service_data(data: &PropMap) -> HashMap<Uuid, Vec<u8>> {
+    data.iter()
+        .filter_map(|(k, v)| match Uuid::parse_str(k) {
+            Ok(uuid) => {
+                if let Some(v) = cast::<Vec<u8>>(&v.0) {
+                    Some((uuid, v.to_owned()))
+                } else {
+                    log::warn!("Service data had wrong type: {:?}", &v.0);
                     None
                 }
-            })
-            .collect(),
-    )
+            }
+            Err(err) => {
+                log::warn!("Error parsing service data UUID: {}", err);
+                None
+            }
+        })
+        .collect()
 }
 
 fn get_services(device_properties: OrgBluezDevice1Properties) -> Vec<Uuid> {
     if let Some(uuids) = device_properties.uuids() {
-        uuids
-            .iter()
-            .filter_map(|uuid| {
-                Uuid::parse_str(uuid)
-                    .map_err(|err| {
-                        log::warn!("Error parsing service data UUID: {}", err);
-                        err
-                    })
-                    .ok()
-            })
-            .collect()
+        convert_services(uuids)
     } else {
         vec![]
     }
+}
+
+pub(crate) fn convert_services(uuids: &Vec<String>) -> Vec<Uuid> {
+    uuids
+        .iter()
+        .filter_map(|uuid| {
+            Uuid::parse_str(uuid)
+                .map_err(|err| {
+                    log::warn!("Error parsing service data UUID: {}", err);
+                    err
+                })
+                .ok()
+        })
+        .collect()
 }
 
 #[cfg(test)]

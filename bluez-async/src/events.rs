@@ -8,8 +8,9 @@ use dbus::nonblock::stdintf::org_freedesktop_dbus::{
 };
 use dbus::{Message, Path};
 use std::collections::HashMap;
+use uuid::Uuid;
 
-use super::device::convert_manufacturer_data;
+use super::device::{convert_manufacturer_data, convert_service_data, convert_services};
 use super::{AdapterId, CharacteristicId, DeviceId};
 
 /// An event relating to a Bluetooth device or adapter.
@@ -60,7 +61,18 @@ pub enum DeviceEvent {
     RSSI { rssi: i16 },
     /// A new value is available for the manufacturer-specific advertisement data of the device.
     ManufacturerData {
+        /// The manufacturer-specific advertisement data. The keys are 'manufacturer IDs'.
         manufacturer_data: HashMap<u16, Vec<u8>>,
+    },
+    /// New GATT service advertisement data is available for the device.
+    ServiceData {
+        /// The new GATT service data. This is a map from the service UUID to its data.
+        service_data: HashMap<Uuid, Vec<u8>>,
+    },
+    /// The set of GATT services known for the device has changed.
+    Services {
+        /// The new set of GATT service UUIDs from the device's advertisement or service discovery.
+        services: Vec<Uuid>,
     },
     /// Service discovery has completed.
     ServicesResolved,
@@ -194,6 +206,22 @@ impl BluetoothEvent {
                         },
                     })
                 }
+                if let Some(service_data) = device.service_data() {
+                    events.push(BluetoothEvent::Device {
+                        id: id.clone(),
+                        event: DeviceEvent::ServiceData {
+                            service_data: convert_service_data(service_data),
+                        },
+                    })
+                }
+                if let Some(services) = device.uuids() {
+                    events.push(BluetoothEvent::Device {
+                        id: id.clone(),
+                        event: DeviceEvent::Services {
+                            services: convert_services(services),
+                        },
+                    })
+                }
                 if device.services_resolved() == Some(true) {
                     events.push(BluetoothEvent::Device {
                         id,
@@ -222,6 +250,7 @@ impl BluetoothEvent {
 #[cfg(test)]
 mod tests {
     use super::super::ServiceId;
+    use crate::uuid_from_u32;
     use dbus::arg::{RefArg, Variant};
 
     use super::*;
@@ -267,6 +296,40 @@ mod tests {
             vec![BluetoothEvent::Device {
                 id,
                 event: DeviceEvent::ManufacturerData { manufacturer_data }
+            }]
+        )
+    }
+
+    #[test]
+    fn device_service_data() {
+        let mut service_data = HashMap::new();
+        service_data.insert(uuid_from_u32(0x11223344), vec![1u8, 2, 3]);
+        let message = device_service_data_message(
+            "/org/bluez/hci0/dev_11_22_33_44_55_66",
+            service_data.clone(),
+        );
+        let id = DeviceId::new("/org/bluez/hci0/dev_11_22_33_44_55_66");
+        assert_eq!(
+            BluetoothEvent::message_to_events(message),
+            vec![BluetoothEvent::Device {
+                id,
+                event: DeviceEvent::ServiceData { service_data }
+            }]
+        )
+    }
+
+    #[test]
+    fn device_services() {
+        let mut services = Vec::new();
+        services.push(uuid_from_u32(0x11223344));
+        let message =
+            device_services_message("/org/bluez/hci0/dev_11_22_33_44_55_66", services.clone());
+        let id = DeviceId::new("/org/bluez/hci0/dev_11_22_33_44_55_66");
+        assert_eq!(
+            BluetoothEvent::message_to_events(message),
+            vec![BluetoothEvent::Device {
+                id,
+                event: DeviceEvent::Services { services }
             }]
         )
     }
@@ -432,6 +495,41 @@ mod tests {
             "ManufacturerData".to_string(),
             Variant(Box::new(manufacturer_data)),
         );
+        let properties_changed = PropertiesPropertiesChanged {
+            interface_name: "org.bluez.Device1".to_string(),
+            changed_properties,
+            invalidated_properties: vec![],
+        };
+        properties_changed.to_emit_message(&device_path.into())
+    }
+
+    fn device_service_data_message(
+        device_path: &'static str,
+        service_data: HashMap<Uuid, Vec<u8>>,
+    ) -> Message {
+        let service_data: HashMap<_, _> = service_data
+            .into_iter()
+            .map::<(String, Variant<Box<dyn RefArg>>), _>(|(k, v)| {
+                (k.to_string(), Variant(Box::new(v)))
+            })
+            .collect();
+        let mut changed_properties: HashMap<String, Variant<Box<dyn RefArg>>> = HashMap::new();
+        changed_properties.insert("ServiceData".to_string(), Variant(Box::new(service_data)));
+        let properties_changed = PropertiesPropertiesChanged {
+            interface_name: "org.bluez.Device1".to_string(),
+            changed_properties,
+            invalidated_properties: vec![],
+        };
+        properties_changed.to_emit_message(&device_path.into())
+    }
+
+    fn device_services_message(device_path: &'static str, services: Vec<Uuid>) -> Message {
+        let services: Vec<_> = services
+            .into_iter()
+            .map::<String, _>(|k| k.to_string())
+            .collect();
+        let mut changed_properties: HashMap<String, Variant<Box<dyn RefArg>>> = HashMap::new();
+        changed_properties.insert("UUIDs".to_string(), Variant(Box::new(services)));
         let properties_changed = PropertiesPropertiesChanged {
             interface_name: "org.bluez.Device1".to_string(),
             changed_properties,
