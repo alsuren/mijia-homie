@@ -61,14 +61,19 @@ pub enum DeviceEvent {
     RSSI { rssi: i16 },
     /// A new value is available for the manufacturer-specific advertisement data of the device.
     ManufacturerData {
+        /// The manufacturer-specific advertisement data. The keys are 'manufacturer IDs'.
         manufacturer_data: HashMap<u16, Vec<u8>>,
     },
-    /// New service-specific advertisement data is available for the device.
+    /// New GATT service advertisement data is available for the device.
     ServiceData {
+        /// The new GATT service data. This is a map from the service UUID to its data.
         service_data: HashMap<Uuid, Vec<u8>>,
     },
-    /// These services have been advertised on the device.
-    Services { services: Vec<Uuid> },
+    /// The set of GATT services known for the device has changed.
+    Services {
+        /// The new set of GATT service UUIDs from the device's advertisement or service discovery.
+        services: Vec<Uuid>,
+    },
     /// Service discovery has completed.
     ServicesResolved,
 }
