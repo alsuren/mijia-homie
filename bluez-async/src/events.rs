@@ -245,6 +245,7 @@ impl BluetoothEvent {
 #[cfg(test)]
 mod tests {
     use super::super::ServiceId;
+    use crate::uuid_from_u32;
     use dbus::arg::{RefArg, Variant};
 
     use super::*;
@@ -290,6 +291,40 @@ mod tests {
             vec![BluetoothEvent::Device {
                 id,
                 event: DeviceEvent::ManufacturerData { manufacturer_data }
+            }]
+        )
+    }
+
+    #[test]
+    fn device_service_data() {
+        let mut service_data = HashMap::new();
+        service_data.insert(uuid_from_u32(0x11223344), vec![1u8, 2, 3]);
+        let message = device_service_data_message(
+            "/org/bluez/hci0/dev_11_22_33_44_55_66",
+            service_data.clone(),
+        );
+        let id = DeviceId::new("/org/bluez/hci0/dev_11_22_33_44_55_66");
+        assert_eq!(
+            BluetoothEvent::message_to_events(message),
+            vec![BluetoothEvent::Device {
+                id,
+                event: DeviceEvent::ServiceData { service_data }
+            }]
+        )
+    }
+
+    #[test]
+    fn device_services() {
+        let mut services = Vec::new();
+        services.push(uuid_from_u32(0x11223344));
+        let message =
+            device_services_message("/org/bluez/hci0/dev_11_22_33_44_55_66", services.clone());
+        let id = DeviceId::new("/org/bluez/hci0/dev_11_22_33_44_55_66");
+        assert_eq!(
+            BluetoothEvent::message_to_events(message),
+            vec![BluetoothEvent::Device {
+                id,
+                event: DeviceEvent::Services { services }
             }]
         )
     }
@@ -455,6 +490,41 @@ mod tests {
             "ManufacturerData".to_string(),
             Variant(Box::new(manufacturer_data)),
         );
+        let properties_changed = PropertiesPropertiesChanged {
+            interface_name: "org.bluez.Device1".to_string(),
+            changed_properties,
+            invalidated_properties: vec![],
+        };
+        properties_changed.to_emit_message(&device_path.into())
+    }
+
+    fn device_service_data_message(
+        device_path: &'static str,
+        service_data: HashMap<Uuid, Vec<u8>>,
+    ) -> Message {
+        let service_data: HashMap<_, _> = service_data
+            .into_iter()
+            .map::<(String, Variant<Box<dyn RefArg>>), _>(|(k, v)| {
+                (k.to_string(), Variant(Box::new(v)))
+            })
+            .collect();
+        let mut changed_properties: HashMap<String, Variant<Box<dyn RefArg>>> = HashMap::new();
+        changed_properties.insert("ServiceData".to_string(), Variant(Box::new(service_data)));
+        let properties_changed = PropertiesPropertiesChanged {
+            interface_name: "org.bluez.Device1".to_string(),
+            changed_properties,
+            invalidated_properties: vec![],
+        };
+        properties_changed.to_emit_message(&device_path.into())
+    }
+
+    fn device_services_message(device_path: &'static str, services: Vec<Uuid>) -> Message {
+        let services: Vec<_> = services
+            .into_iter()
+            .map::<String, _>(|k| k.to_string())
+            .collect();
+        let mut changed_properties: HashMap<String, Variant<Box<dyn RefArg>>> = HashMap::new();
+        changed_properties.insert("UUIDs".to_string(), Variant(Box::new(services)));
         let properties_changed = PropertiesPropertiesChanged {
             interface_name: "org.bluez.Device1".to_string(),
             changed_properties,
