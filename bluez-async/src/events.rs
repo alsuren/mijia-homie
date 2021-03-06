@@ -8,8 +8,9 @@ use dbus::nonblock::stdintf::org_freedesktop_dbus::{
 };
 use dbus::{Message, Path};
 use std::collections::HashMap;
+use uuid::Uuid;
 
-use super::device::convert_manufacturer_data;
+use super::device::{convert_manufacturer_data, convert_service_data, convert_services};
 use super::{AdapterId, CharacteristicId, DeviceId};
 
 /// An event relating to a Bluetooth device or adapter.
@@ -62,6 +63,12 @@ pub enum DeviceEvent {
     ManufacturerData {
         manufacturer_data: HashMap<u16, Vec<u8>>,
     },
+    /// New service-specific advertisement data is available for the device.
+    ServiceData {
+        service_data: HashMap<Uuid, Vec<u8>>,
+    },
+    /// These services have been advertised on the device.
+    Services { services: Vec<Uuid> },
     /// Service discovery has completed.
     ServicesResolved,
 }
@@ -191,6 +198,22 @@ impl BluetoothEvent {
                         id: id.clone(),
                         event: DeviceEvent::ManufacturerData {
                             manufacturer_data: convert_manufacturer_data(manufacturer_data),
+                        },
+                    })
+                }
+                if let Some(service_data) = device.service_data() {
+                    events.push(BluetoothEvent::Device {
+                        id: id.clone(),
+                        event: DeviceEvent::ServiceData {
+                            service_data: convert_service_data(service_data),
+                        },
+                    })
+                }
+                if let Some(services) = device.uuids() {
+                    events.push(BluetoothEvent::Device {
+                        id: id.clone(),
+                        event: DeviceEvent::Services {
+                            services: convert_services(services),
                         },
                     })
                 }
