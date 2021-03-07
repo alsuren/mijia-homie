@@ -106,8 +106,8 @@ impl Display for MacAddress {
 
 /// An error parsing a MAC address from a string.
 #[derive(Clone, Debug, Error, Eq, PartialEq)]
-#[error("Invalid MAC address")]
-pub struct ParseMacAddressError();
+#[error("Invalid MAC address '{0}'")]
+pub struct ParseMacAddressError(String);
 
 impl FromStr for MacAddress {
     type Err = ParseMacAddressError;
@@ -115,14 +115,14 @@ impl FromStr for MacAddress {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let octets: Vec<_> = s.split(':').collect();
         if octets.len() != 6 {
-            return Err(ParseMacAddressError());
+            return Err(ParseMacAddressError(s.to_owned()));
         }
         for octet in octets {
             if octet.len() != 2 {
-                return Err(ParseMacAddressError());
+                return Err(ParseMacAddressError(s.to_owned()));
             }
             if !octet.chars().all(|c| c.is_ascii_hexdigit()) {
-                return Err(ParseMacAddressError());
+                return Err(ParseMacAddressError(s.to_owned()));
             }
         }
         Ok(MacAddress(s.to_uppercase()))
