@@ -251,7 +251,7 @@ impl BluetoothEvent {
 mod tests {
     use super::super::ServiceId;
     use crate::uuid_from_u32;
-    use dbus::arg::{RefArg, Variant};
+    use dbus::arg::{PropMap, RefArg, Variant};
 
     use super::*;
 
@@ -461,7 +461,7 @@ mod tests {
     }
 
     fn adapter_powered_message(adapter_path: &'static str, powered: bool) -> Message {
-        let mut changed_properties: HashMap<String, Variant<Box<dyn RefArg>>> = HashMap::new();
+        let mut changed_properties: PropMap = HashMap::new();
         changed_properties.insert("Powered".to_string(), Variant(Box::new(powered)));
         let properties_changed = PropertiesPropertiesChanged {
             interface_name: "org.bluez.Adapter1".to_string(),
@@ -472,7 +472,7 @@ mod tests {
     }
 
     fn device_rssi_message(device_path: &'static str, rssi: i16) -> Message {
-        let mut changed_properties: HashMap<String, Variant<Box<dyn RefArg>>> = HashMap::new();
+        let mut changed_properties: PropMap = HashMap::new();
         changed_properties.insert("RSSI".to_string(), Variant(Box::new(rssi)));
         let properties_changed = PropertiesPropertiesChanged {
             interface_name: "org.bluez.Device1".to_string(),
@@ -490,7 +490,7 @@ mod tests {
             .into_iter()
             .map::<(u16, Variant<Box<dyn RefArg>>), _>(|(k, v)| (k, Variant(Box::new(v))))
             .collect();
-        let mut changed_properties: HashMap<String, Variant<Box<dyn RefArg>>> = HashMap::new();
+        let mut changed_properties: PropMap = HashMap::new();
         changed_properties.insert(
             "ManufacturerData".to_string(),
             Variant(Box::new(manufacturer_data)),
@@ -539,7 +539,7 @@ mod tests {
     }
 
     fn characteristic_value_message(characteristic_path: &'static str, value: &[u8]) -> Message {
-        let mut changed_properties: HashMap<String, Variant<Box<dyn RefArg>>> = HashMap::new();
+        let mut changed_properties: PropMap = HashMap::new();
         changed_properties.insert("Value".to_string(), Variant(Box::new(value.to_owned())));
         let properties_changed = PropertiesPropertiesChanged {
             interface_name: "org.bluez.GattCharacteristic1".to_string(),

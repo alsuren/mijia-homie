@@ -250,9 +250,9 @@ mod tests {
     #[test]
     fn service_data() {
         let uuid = uuid_from_u32(0x11223344);
-        let mut service_data: HashMap<String, Variant<Box<dyn RefArg>>> = HashMap::new();
+        let mut service_data: PropMap = HashMap::new();
         service_data.insert(uuid.to_string(), Variant(Box::new(vec![1u8, 2, 3])));
-        let mut device_properties: HashMap<String, Variant<Box<dyn RefArg>>> = HashMap::new();
+        let mut device_properties: PropMap = HashMap::new();
         device_properties.insert("ServiceData".to_string(), Variant(Box::new(service_data)));
 
         let mut expected_service_data = HashMap::new();
@@ -269,7 +269,7 @@ mod tests {
         let manufacturer_id = 0x1122;
         let mut manufacturer_data: HashMap<u16, Variant<Box<dyn RefArg>>> = HashMap::new();
         manufacturer_data.insert(manufacturer_id, Variant(Box::new(vec![1u8, 2, 3])));
-        let mut device_properties: HashMap<String, Variant<Box<dyn RefArg>>> = HashMap::new();
+        let mut device_properties: PropMap = HashMap::new();
         device_properties.insert(
             "ManufacturerData".to_string(),
             Variant(Box::new(manufacturer_data)),
@@ -287,7 +287,7 @@ mod tests {
     #[test]
     fn device_info_minimal() {
         let id = DeviceId::new("/org/bluez/hci0/dev_11_22_33_44_55_66");
-        let mut device_properties: HashMap<String, Variant<Box<dyn RefArg>>> = HashMap::new();
+        let mut device_properties: PropMap = HashMap::new();
         device_properties.insert(
             "Address".to_string(),
             Variant(Box::new("00:11:22:33:44:55".to_string())),
@@ -325,7 +325,7 @@ mod tests {
 
     #[test]
     fn get_services_none() {
-        let device_properties: HashMap<String, Variant<Box<dyn RefArg>>> = HashMap::new();
+        let device_properties: PropMap = HashMap::new();
 
         assert_eq!(
             get_services(OrgBluezDevice1Properties(&device_properties)),
@@ -337,7 +337,7 @@ mod tests {
     fn get_services_some() {
         let uuid = uuid_from_u32(0x11223344);
         let uuids = vec![uuid.to_string()];
-        let mut device_properties: HashMap<String, Variant<Box<dyn RefArg>>> = HashMap::new();
+        let mut device_properties: PropMap = HashMap::new();
         device_properties.insert("UUIDs".to_string(), Variant(Box::new(uuids)));
 
         assert_eq!(

@@ -87,7 +87,7 @@ impl AdapterInfo {
 
 #[cfg(test)]
 mod tests {
-    use dbus::arg::{RefArg, Variant};
+    use dbus::arg::{PropMap, Variant};
     use std::collections::HashMap;
 
     use super::*;
@@ -95,7 +95,7 @@ mod tests {
     #[test]
     fn adapter_info_minimal() {
         let id = AdapterId::new("/org/bluez/hci0");
-        let mut adapter_properties: HashMap<String, Variant<Box<dyn RefArg>>> = HashMap::new();
+        let mut adapter_properties: PropMap = HashMap::new();
         adapter_properties.insert(
             "Address".to_string(),
             Variant(Box::new("00:11:22:33:44:55".to_string())),
