@@ -897,7 +897,7 @@ dependencies = [
 
 [[package]]
 name = "homie-device"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "async-channel",
  "futures",

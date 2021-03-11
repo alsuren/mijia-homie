@@ -28,7 +28,7 @@ color-backtrace = "0.5.0"
 eyre = "0.6.5"
 futures = "0.3.8"
 futures-channel = "0.3.8"
-homie-device = { version = "0.4.0", path = "../homie-device" }
+homie-device = { version = "0.4.1", path = "../homie-device" }
 influx_db_client = { version = "0.5.0", default-features = false, features = ["rustls-tls"] }
 itertools = "0.10.0"
 log = "0.4.11"
