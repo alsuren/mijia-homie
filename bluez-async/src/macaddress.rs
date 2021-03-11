@@ -9,10 +9,16 @@ use thiserror::Error;
 pub struct ParseMacAddressError(String);
 
 /// MAC address of a Bluetooth device.
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct MacAddress([u8; 6]);
 
 impl Display for MacAddress {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        UpperHex::fmt(self, f)
+    }
+}
+
+impl Debug for MacAddress {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         UpperHex::fmt(self, f)
     }
