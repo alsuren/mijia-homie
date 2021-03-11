@@ -337,13 +337,18 @@ impl HomieDevice {
         try_join_unit_handles(mqtt_task, incoming_task)
     }
 
+    /// Check whether a node with the given ID currently exists on the device.
+    pub fn has_node(&self, node_id: &str) -> bool {
+        self.nodes.iter().any(|n| n.id == node_id)
+    }
+
     /// Add a node to the Homie device. It will immediately be published.
     ///
     /// This will panic if you attempt to add a node with the same ID as a node which was previously
     /// added.
     pub async fn add_node(&mut self, node: Node) -> Result<(), ClientError> {
         // First check that there isn't already a node with the same ID.
-        if self.nodes.iter().any(|n| n.id == node.id) {
+        if self.has_node(&node.id) {
             panic!("Tried to add node with duplicate ID: {:?}", node);
         }
         self.nodes.push(node);
@@ -808,6 +813,26 @@ mod tests {
         device
             .add_node(Node::new("id", "Name", "type", vec![]))
             .await?;
+
+        // Need to keep rx alive until here so that the channel isn't closed.
+        drop(rx);
+        Ok(())
+    }
+
+    /// Check that `has_node` works as expected.
+    #[tokio::test]
+    async fn has_node() -> Result<(), ClientError> {
+        let (mut device, rx) = make_test_device();
+
+        assert_eq!(device.has_node("id"), false);
+
+        device
+            .add_node(Node::new("id", "Name", "type", vec![]))
+            .await?;
+        assert_eq!(device.has_node("id"), true);
+
+        device.remove_node("id").await?;
+        assert_eq!(device.has_node("id"), false);
 
         // Need to keep rx alive until here so that the channel isn't closed.
         drop(rx);

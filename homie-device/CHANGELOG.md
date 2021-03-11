@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### New features
+
+- Added method to check whether node exists on device.
+
 ## 0.4.0
 
 ### Breaking changes
