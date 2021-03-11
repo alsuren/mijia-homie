@@ -64,3 +64,60 @@ impl FromStr for MacAddress {
         ))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn from_str() {
+        assert_eq!(
+            "11:22:33:44:55:66".parse(),
+            Ok(MacAddress([0x11, 0x22, 0x33, 0x44, 0x55, 0x66]))
+        );
+        assert_eq!(
+            "ab:cd:ef:44:55:66".parse(),
+            Ok(MacAddress([0xab, 0xcd, 0xef, 0x44, 0x55, 0x66]))
+        );
+        assert_eq!(
+            "AB:CD:EF:44:55:66".parse(),
+            Ok(MacAddress([0xab, 0xcd, 0xef, 0x44, 0x55, 0x66]))
+        );
+    }
+
+    #[test]
+    fn from_str_invalid() {
+        assert_eq!(
+            MacAddress::from_str(""),
+            Err(ParseMacAddressError("".to_string()))
+        );
+        assert_eq!(
+            MacAddress::from_str("11:22:33:44:55"),
+            Err(ParseMacAddressError("11:22:33:44:55".to_string()))
+        );
+        assert_eq!(
+            MacAddress::from_str("11:22:33:44:55:66:77"),
+            Err(ParseMacAddressError("11:22:33:44:55:66:77".to_string()))
+        );
+        assert_eq!(
+            MacAddress::from_str("11:22:33:44:555:6"),
+            Err(ParseMacAddressError("11:22:33:44:555:6".to_string()))
+        );
+        assert_eq!(
+            MacAddress::from_str("1g:22:33:44:55:66"),
+            Err(ParseMacAddressError("1g:22:33:44:55:66".to_string()))
+        );
+    }
+
+    #[test]
+    fn to_string() {
+        assert_eq!(
+            MacAddress([0x11, 0x22, 0x33, 0x44, 0x55, 0x66]).to_string(),
+            "11:22:33:44:55:66".to_string()
+        );
+        assert_eq!(
+            MacAddress([0xab, 0xcd, 0xef, 0x44, 0x55, 0x66]).to_string(),
+            "AB:CD:EF:44:55:66".to_string()
+        );
+    }
+}
