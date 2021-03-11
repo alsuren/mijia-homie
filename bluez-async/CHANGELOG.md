@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Breaking changes
+
+- More helpful errors for parsing `MacAddress`.
+
+### New features
+
+- `MacAddress` is now `Copy`, and can be formatted in upper or lower case.
+
 ## 0.3.1
 
 ### New features
