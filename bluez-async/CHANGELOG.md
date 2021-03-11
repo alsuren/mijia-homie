@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.1
+
+### New features
+
+- Added new `DeviceEvent` variants for service data and service list updates.
+
 ## 0.3.0
 
 ### Breaking changes
