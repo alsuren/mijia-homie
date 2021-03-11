@@ -57,7 +57,8 @@ impl AdapterInfo {
     ) -> Result<AdapterInfo, BluetoothError> {
         let mac_address = adapter_properties
             .address()
-            .ok_or(BluetoothError::RequiredPropertyMissing("Address"))?;
+            .ok_or(BluetoothError::RequiredPropertyMissing("Address"))?
+            .parse()?;
         let address_type = adapter_properties
             .address_type()
             .ok_or(BluetoothError::RequiredPropertyMissing("AddressType"))?
@@ -65,7 +66,7 @@ impl AdapterInfo {
 
         Ok(AdapterInfo {
             id,
-            mac_address: MacAddress(mac_address.to_owned()),
+            mac_address,
             address_type,
             name: adapter_properties
                 .name()
@@ -118,7 +119,7 @@ mod tests {
             adapter,
             AdapterInfo {
                 id,
-                mac_address: MacAddress("00:11:22:33:44:55".to_string()),
+                mac_address: "00:11:22:33:44:55".parse().unwrap(),
                 address_type: AddressType::Public,
                 name: "name".to_string(),
                 alias: "alias".to_string(),

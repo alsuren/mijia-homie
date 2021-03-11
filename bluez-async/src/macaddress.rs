@@ -1,4 +1,5 @@
-use std::fmt::{self, Debug, Display, Formatter};
+use std::convert::TryInto;
+use std::fmt::{self, Debug, Display, Formatter, LowerHex, UpperHex};
 use std::str::FromStr;
 use thiserror::Error;
 
@@ -8,12 +9,32 @@ use thiserror::Error;
 pub struct ParseMacAddressError(String);
 
 /// MAC address of a Bluetooth device.
-#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct MacAddress(pub(crate) String);
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct MacAddress([u8; 6]);
 
 impl Display for MacAddress {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        f.write_str(&self.0)
+        UpperHex::fmt(self, f)
+    }
+}
+
+impl UpperHex for MacAddress {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(
+            f,
+            "{:02X}:{:02X}:{:02X}:{:02X}:{:02X}:{:02X}",
+            self.0[0], self.0[1], self.0[2], self.0[3], self.0[4], self.0[5]
+        )
+    }
+}
+
+impl LowerHex for MacAddress {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(
+            f,
+            "{:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}",
+            self.0[0], self.0[1], self.0[2], self.0[3], self.0[4], self.0[5]
+        )
     }
 }
 
@@ -21,18 +42,19 @@ impl FromStr for MacAddress {
     type Err = ParseMacAddressError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let octets: Vec<_> = s.split(':').collect();
-        if octets.len() != 6 {
-            return Err(ParseMacAddressError(s.to_owned()));
-        }
-        for octet in octets {
-            if octet.len() != 2 {
-                return Err(ParseMacAddressError(s.to_owned()));
-            }
-            if !octet.chars().all(|c| c.is_ascii_hexdigit()) {
-                return Err(ParseMacAddressError(s.to_owned()));
-            }
-        }
-        Ok(MacAddress(s.to_uppercase()))
+        Ok(MacAddress(
+            s.split(':')
+                .map(|octet| {
+                    if octet.len() != 2 {
+                        Err(ParseMacAddressError(s.to_string()))
+                    } else {
+                        u8::from_str_radix(octet, 16)
+                            .map_err(|_| ParseMacAddressError(s.to_string()))
+                    }
+                })
+                .collect::<Result<Vec<u8>, _>>()?
+                .try_into()
+                .map_err(|_| ParseMacAddressError(s.to_string()))?,
+        ))
     }
 }

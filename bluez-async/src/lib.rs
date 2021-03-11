@@ -84,6 +84,9 @@ pub enum BluetoothError {
     /// Service discovery didn't happen within the time limit.
     #[error("Service discovery timed out")]
     ServiceDiscoveryTimedOut,
+    /// Error parsing a `MacAddress` from a string.
+    #[error(transparent)]
+    MacAddressParseError(#[from] ParseMacAddressError),
 }
 
 /// Error type for futures representing tasks spawned by this crate.

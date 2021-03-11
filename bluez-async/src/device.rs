@@ -95,7 +95,8 @@ impl DeviceInfo {
     ) -> Result<DeviceInfo, BluetoothError> {
         let mac_address = device_properties
             .address()
-            .ok_or(BluetoothError::RequiredPropertyMissing("Address"))?;
+            .ok_or(BluetoothError::RequiredPropertyMissing("Address"))?
+            .parse()?;
         let address_type = device_properties
             .address_type()
             .ok_or(BluetoothError::RequiredPropertyMissing("AddressType"))?
@@ -106,7 +107,7 @@ impl DeviceInfo {
 
         Ok(DeviceInfo {
             id,
-            mac_address: MacAddress(mac_address.to_owned()),
+            mac_address,
             address_type,
             name: device_properties.name().cloned(),
             appearance: device_properties.appearance(),
@@ -307,7 +308,7 @@ mod tests {
             device,
             DeviceInfo {
                 id,
-                mac_address: MacAddress("00:11:22:33:44:55".to_string()),
+                mac_address: "00:11:22:33:44:55".parse().unwrap(),
                 address_type: AddressType::Public,
                 name: None,
                 appearance: None,
