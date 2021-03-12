@@ -14,6 +14,7 @@ mod descriptor;
 mod device;
 mod events;
 mod introspect;
+mod macaddress;
 mod messagestream;
 mod service;
 
@@ -24,6 +25,7 @@ pub use self::descriptor::{DescriptorId, DescriptorInfo};
 pub use self::device::{AddressType, DeviceId, DeviceInfo};
 pub use self::events::{AdapterEvent, BluetoothEvent, CharacteristicEvent, DeviceEvent};
 use self::introspect::IntrospectParse;
+pub use self::macaddress::{MacAddress, ParseMacAddressError};
 use self::messagestream::MessageStream;
 pub use self::service::{ServiceId, ServiceInfo};
 use bluez_generated::{
@@ -42,7 +44,6 @@ use std::collections::HashMap;
 use std::convert::TryInto;
 use std::fmt::{self, Debug, Display, Formatter};
 use std::future::Future;
-use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 use thiserror::Error;
@@ -83,6 +84,9 @@ pub enum BluetoothError {
     /// Service discovery didn't happen within the time limit.
     #[error("Service discovery timed out")]
     ServiceDiscoveryTimedOut,
+    /// Error parsing a `MacAddress` from a string.
+    #[error(transparent)]
+    MacAddressParseError(#[from] ParseMacAddressError),
 }
 
 /// Error type for futures representing tasks spawned by this crate.
@@ -92,41 +96,6 @@ pub enum SpawnError {
     DbusConnectionLost(#[source] IOResourceError),
     #[error("Task failed: {0}")]
     Join(#[from] JoinError),
-}
-
-/// MAC address of a Bluetooth device.
-#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct MacAddress(String);
-
-impl Display for MacAddress {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        f.write_str(&self.0)
-    }
-}
-
-/// An error parsing a MAC address from a string.
-#[derive(Clone, Debug, Error, Eq, PartialEq)]
-#[error("Invalid MAC address")]
-pub struct ParseMacAddressError();
-
-impl FromStr for MacAddress {
-    type Err = ParseMacAddressError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let octets: Vec<_> = s.split(':').collect();
-        if octets.len() != 6 {
-            return Err(ParseMacAddressError());
-        }
-        for octet in octets {
-            if octet.len() != 2 {
-                return Err(ParseMacAddressError());
-            }
-            if !octet.chars().all(|c| c.is_ascii_hexdigit()) {
-                return Err(ParseMacAddressError());
-            }
-        }
-        Ok(MacAddress(s.to_uppercase()))
-    }
 }
 
 /// The type of transport to use for a scan.
