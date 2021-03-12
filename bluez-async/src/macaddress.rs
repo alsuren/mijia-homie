@@ -65,6 +65,18 @@ impl FromStr for MacAddress {
     }
 }
 
+impl From<[u8; 6]> for MacAddress {
+    fn from(octets: [u8; 6]) -> Self {
+        MacAddress(octets)
+    }
+}
+
+impl From<MacAddress> for [u8; 6] {
+    fn from(mac_address: MacAddress) -> Self {
+        mac_address.0
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
