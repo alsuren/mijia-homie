@@ -12,9 +12,6 @@ it. The repository includes a number of related crates:
 - [homie-device](./homie-device), a library for implementing Homie devices.
 - [homie-controller](./homie-controller), a library for implementing Homie controllers.
 - [mijia](./mijia), a library for reading Mijia sensors.
-- [bluez-generated](./bluez-generated), generated D-Bus bindings for talking to BlueZ on Linux.
-- [bluez-async](./bluez-async), a library built on top of `bluez-generated` providing a convenient
-  and safe interface to Bluetooth GATT client functionality.
 
 The project originated from a
 [blog post](https://dev.to/lcsfelix/using-rust-blurz-to-capture-bluetooth-messages-9f-temp-slug-3838740?preview=259783675da772c58dae7c7ec5e06fd3e9746205826a13f6c39fcdefba2e37713113f2b21f1aeade314f556d37c2bc59e2c0b128499dd616d3622327),

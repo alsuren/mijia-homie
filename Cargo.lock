@@ -257,17 +257,17 @@ dependencies = [
 [[package]]
 name = "bluez-async"
 version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "27ebad2b0d80a77a8ce06890024f6eff028f6a5ce0021564d0b71aaa13ce617a"
 dependencies = [
  "async-trait",
  "bitflags",
  "bluez-generated",
  "dbus",
  "dbus-tokio",
- "eyre",
  "futures",
  "itertools 0.10.0",
  "log",
- "pretty_env_logger",
  "serde",
  "serde-xml-rs",
  "serde_derive",
@@ -279,6 +279,8 @@ dependencies = [
 [[package]]
 name = "bluez-generated"
 version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "33ad8f302dd79411881cd0181f3bd9fc91a959b71c3a13159bd8a07d2c40dc7f"
 dependencies = [
  "dbus",
 ]
