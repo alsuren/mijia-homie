@@ -12,6 +12,12 @@ image = "ghcr.io/qwandor/cross-dbus-debian-buster-armv7:0.2.1-1"
 # context = "./docker"
 # dockerfile = "./docker/Dockerfile.debian-buster-armv7"
 
+[target.arm-unknown-linux-gnueabi]
+# image = "ghcr.io/qwandor/cross-dbus-debian-buster-armv6:TBD"
+
+# context = "./docker"
+# dockerfile = "./docker/Dockerfile.debian-buster-armv6"
+
 [target.aarch64-unknown-linux-gnu]
 image = "ghcr.io/qwandor/cross-dbus-debian-buster-aarch64:0.2.1-1"
 
