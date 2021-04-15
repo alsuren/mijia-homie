@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "mijia-homie"
+version = "0.1.0"
+description = ""
+authors = ["Anusha Ramdarshan <anusha.ramdarshan@gmail.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.9"
+ipykernel = "^5.5.3"
+pandas = "^1.2.4"
+plotly = "^4.14.3"
+
+[tool.poetry.dev-dependencies]
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
