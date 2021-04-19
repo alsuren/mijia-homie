@@ -5,3 +5,5 @@ mijia-homie.toml
 mappings.toml
 sensor-names.toml
 .DS_Store
+.vscode
+/notebooks/data
