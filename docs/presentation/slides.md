@@ -198,7 +198,7 @@ We ended up building our own Bluetooth library: `bluez-async`
 
 - Didn't announce it anywhere, but issues filed (and a PR) by two other users so far.
 
-<!-- Talk about how btleplug main branch now uses bluez-async? -->
+<!-- TODO: Talk about how there is an effort in flight to make btleplug async, using bluez-async. -- https://github.com/deviceplug/btleplug/pull/114 -->
 
 ---
 
