@@ -20,6 +20,8 @@ David Laban, Andrew Walbran, Anusha Ramdarshan
 
 - Observations about the project.
 
+- Hall of Fame
+
 - Links and Questions.
 
 ---
@@ -28,7 +30,7 @@ David Laban, Andrew Walbran, Anusha Ramdarshan
 
 - We started with a few ESP32 sensors like this:
   ![](./inception-yun_hat_04.jpg)
-- These cost around US$16 each, and I couldn't get them running more than about a day on battery
+- These cost around US$16 each, and Andrew couldn't get them running more than about a day on battery
   power.
 
 ---
@@ -45,7 +47,7 @@ David Laban, Andrew Walbran, Anusha Ramdarshan
 
 # Backstory
 
-- So we bought some of these at $3 each.
+- So we bought some of these, at $3 each.
 
 ![](./inception-order.png)
 
@@ -72,6 +74,8 @@ David Laban, Andrew Walbran, Anusha Ramdarshan
 - This is what it looks like:
   ![](./system-overview.svg)
 - Orange is our code.
+  <!-- TODO: slide at the end that describes Will's setup -->
+  <!-- TODO: slide at the end that describes cloudbbq-homie -->
 
 --
 
@@ -101,6 +105,8 @@ David Laban, Andrew Walbran, Anusha Ramdarshan
   Ideally I would set tab width to 4 everywhere in prettier, but that makes
   prettier do strange things (https://github.com/prettier/prettier/issues/5019).
 -->
+
+<!-- TODO: split this slide at this point? -->
 
 - It was fun anyway:
 
@@ -148,10 +154,12 @@ David Laban, Andrew Walbran, Anusha Ramdarshan
 
 # Bluetooth
 
+<!-- TODO: make this into a thin summary slide and move interesting content to new slides -->
+
 The Rust Bluetooth story is a bit sad.
 
 - `blurz` - "Bluetooth from before there was Tokio"
-  - Started with this.
+  - We started with this.
   - Talks to BlueZ over D-Bus, but single-threaded and synchronous.
   - Blocking `device.connect()` calls. 😧
   - Unmaintained (for 2 years).
@@ -165,6 +173,7 @@ The Rust Bluetooth story is a bit sad.
       - This has since been changed.
   - Tried switching to this (but gave up after too many panicking threads).
   - Andrew now working to improve it and make it async.
+  <!-- TODO: potentially re-write this section or split half of it out into its own slide? -->
 
 <!-- prettier-ignore-end -->
 
@@ -189,12 +198,17 @@ We ended up building our own Bluetooth library: `bluez-async`
 
 - Didn't announce it anywhere, but issues filed (and a PR) by two other users so far.
 
+<!-- Talk about how btleplug main branch now uses bluez-async? -->
+
 ---
+
+<!-- TODO: move this directly after bluetooth slide -->
 
 # Concurrency
 
 - Problem with single-threaded blocking Bluetooth library:
   ![](./single-threaded-blocking.svg)
+  <!-- TODO: add lines for publishing the readings -->
 
 ---
 
@@ -202,7 +216,9 @@ We ended up building our own Bluetooth library: `bluez-async`
 
 - Switch to async library:
   ![](./single-threaded-async.svg)
+  <!-- TODO: add lines for publishing the readings -->
 - But you all know javascript, so I don't have to tell you this.
+<!-- FIXME: maybe they don't? -->
 
 ---
 
@@ -257,6 +273,9 @@ We ended up building our own Bluetooth library: `bluez-async`
 - Deployment
 
   - Built with Github Actions and `cross`, packaged with `cargo-deb`, hosted on Bintray.
+    <!-- FIXME: except it's not, is it, because bintray is dead? -->
+    <!-- cross compiling to ARM is a pain if you need c libs, but cross makes it okay -->
+    <!-- cross compiling to ARM v6 even more of is a pain, as Will can testify, but we got there in the end -->
 
   - Everything is supervised by systemd.
 
@@ -266,6 +285,22 @@ We ended up building our own Bluetooth library: `bluez-async`
 - Raspberry Pi only supports 10 connected BLE devices (10 << 100).
   - My laptop only supports 7.
   - We added a USB Bluetooth adapter, and got a second Raspberry Pi.
+
+---
+
+<!-- TODO: related developments:
+
+* bluez-async/btleplug/etc.
+  * ???
+* cloudbbq-homie
+  * Architecture diagram
+  * Graph of some meat
+* mi plant sensor
+  * Architecture diagram
+  * ->mqtt written in python
+  * graphs
+
+ -->
 
 ---
 
