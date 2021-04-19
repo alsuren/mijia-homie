@@ -74,8 +74,6 @@ David Laban, Andrew Walbran, Anusha Ramdarshan
 - This is what it looks like:
   ![](./system-overview.svg)
 - Orange is our code.
-  <!-- TODO: slide at the end that describes Will's setup -->
-  <!-- TODO: slide at the end that describes cloudbbq-homie -->
 
 --
 
@@ -242,7 +240,7 @@ We ended up building our own Bluetooth library: `bluez-async`
 
 - `Arc<Mutex<ALL THE THINGS>`
 
-  - Fine as long as you're careful.
+  - Fine as long as you know where the lock contention is.
 
   - Only hold the mutex when you _need_ it.
 
