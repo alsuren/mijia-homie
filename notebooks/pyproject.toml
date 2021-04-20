@@ -10,6 +10,7 @@ ipykernel = "^5.5.3"
 pandas = "^1.2.4"
 plotly = "^4.14.3"
 nbstripout = "^0.3.9"
+sklearn = "^0.0"
 
 [tool.poetry.dev-dependencies]
 
