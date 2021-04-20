@@ -290,6 +290,7 @@ We ended up building our own Bluetooth library: `bluez-async`
 
 * bluez-async/btleplug/etc.
   * ???
+* jupyter notebooks for analysis
 * cloudbbq-homie
   * Architecture diagram
   * Graph of some meat
