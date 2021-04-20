@@ -22,13 +22,13 @@ In VSCode:
 
 ## Getting the data
 
-Make a data export from your influxdb, and rename the files to (notebooks/):
+Export the data from InfluxDB, e.g.:
 
-- data/homie_boolean.csv
-- data/homie_color.csv
-- data/homie_enum.csv
-- data/homie_float.csv
-- data/homie_integer.csv
+```bash
+for measurement in boolean color enum float integer; do curl "http://localhost:8086/query?db=$DATABASE&u=$USERNAME&p=$PASSWORD&chunked=true" -H "Accept: application/csv" --data-urlencode "q=SELECT * FROM $measurement" > homie_$measurement.csv; done
+```
+
+Put the files under `notebooks/data/`.
 
 ## Committing Changes
 
