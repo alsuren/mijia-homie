@@ -65,6 +65,10 @@ pub struct Property {
     /// reading of a sensor.
     pub settable: bool,
 
+    /// Whether the property value is persisted by the MQTT broker. A non-retained property can be
+    /// used for a momentary event, like a doorbell being pressed.
+    pub retained: bool,
+
     /// The unit of the property, if any. This may be one of the
     /// [recommended units](https://homieiot.github.io/specification/#property-attributes), or any
     /// other custom unit.
@@ -89,6 +93,8 @@ impl Property {
     /// * `settable`: Whether the property can be set by the Homie controller. This should be true
     ///   for properties like the brightness or power state of a light, and false for things like
     ///   the temperature reading of a sensor.
+    /// * `retained`: Whether the property value is persisted by the MQTT broker. A non-retained
+    ///   property can be used for a momentary event, like a doorbell being pressed.
     /// * `unit`: The unit for the property, if any. This may be one of the
     ///   [recommended units](https://homieiot.github.io/specification/#property-attributes), or
     ///   any other custom unit.
@@ -99,6 +105,7 @@ impl Property {
         name: &str,
         datatype: Datatype,
         settable: bool,
+        retained: bool,
         unit: Option<&str>,
         format: Option<&str>,
     ) -> Property {
@@ -107,6 +114,7 @@ impl Property {
             name,
             datatype,
             settable,
+            retained,
             unit,
             format.map(|s| s.to_owned()),
         )
@@ -121,6 +129,8 @@ impl Property {
     /// * `settable`: Whether the property can be set by the Homie controller. This should be true
     ///   for properties like the brightness or power state of a light, and false for things like
     ///   the temperature reading of a sensor.
+    /// * `retained`: Whether the property value is persisted by the MQTT broker. A non-retained
+    ///   property can be used for a momentary event, like a doorbell being pressed.
     /// * `unit`: The unit for the property, if any. This may be one of the
     ///   [recommended units](https://homieiot.github.io/specification/#property-attributes), or
     ///   any other custom unit.
@@ -129,11 +139,20 @@ impl Property {
         id: &str,
         name: &str,
         settable: bool,
+        retained: bool,
         unit: Option<&str>,
         format: Option<Range<i64>>,
     ) -> Property {
         let format = format.map(|f| format!("{}:{}", f.start, f.end));
-        Property::make(id, name, Datatype::Integer, settable, unit, format)
+        Property::make(
+            id,
+            name,
+            Datatype::Integer,
+            settable,
+            retained,
+            unit,
+            format,
+        )
     }
 
     /// Create a new floating-point property with the given attributes.
@@ -145,6 +164,8 @@ impl Property {
     /// * `settable`: Whether the property can be set by the Homie controller. This should be true
     ///   for properties like the brightness or power state of a light, and false for things like
     ///   the temperature reading of a sensor.
+    /// * `retained`: Whether the property value is persisted by the MQTT broker. A non-retained
+    ///   property can be used for a momentary event, like a doorbell being pressed.
     /// * `unit`: The unit for the property, if any. This may be one of the
     ///   [recommended units](https://homieiot.github.io/specification/#property-attributes), or
     ///   any other custom unit.
@@ -153,11 +174,12 @@ impl Property {
         id: &str,
         name: &str,
         settable: bool,
+        retained: bool,
         unit: Option<&str>,
         format: Option<Range<f64>>,
     ) -> Property {
         let format = format.map(|f| format!("{}:{}", f.start, f.end));
-        Property::make(id, name, Datatype::Float, settable, unit, format)
+        Property::make(id, name, Datatype::Float, settable, retained, unit, format)
     }
 
     /// Create a new boolean property with the given attributes.
@@ -169,11 +191,27 @@ impl Property {
     /// * `settable`: Whether the property can be set by the Homie controller. This should be true
     ///   for properties like the brightness or power state of a light, and false for things like
     ///   the temperature reading of a sensor.
+    /// * `retained`: Whether the property value is persisted by the MQTT broker. A non-retained
+    ///   property can be used for a momentary event, like a doorbell being pressed.
     /// * `unit`: The unit for the property, if any. This may be one of the
     ///   [recommended units](https://homieiot.github.io/specification/#property-attributes), or
     ///   any other custom unit.
-    pub fn boolean(id: &str, name: &str, settable: bool, unit: Option<&str>) -> Property {
-        Property::make(id, name, Datatype::Boolean, settable, unit, None::<String>)
+    pub fn boolean(
+        id: &str,
+        name: &str,
+        settable: bool,
+        retained: bool,
+        unit: Option<&str>,
+    ) -> Property {
+        Property::make(
+            id,
+            name,
+            Datatype::Boolean,
+            settable,
+            retained,
+            unit,
+            None::<String>,
+        )
     }
 
     /// Create a new string property with the given attributes.
@@ -185,11 +223,27 @@ impl Property {
     /// * `settable`: Whether the property can be set by the Homie controller. This should be true
     ///   for properties like the brightness or power state of a light, and false for things like
     ///   the temperature reading of a sensor.
+    /// * `retained`: Whether the property value is persisted by the MQTT broker. A non-retained
+    ///   property can be used for a momentary event, like a doorbell being pressed.
     /// * `unit`: The unit for the property, if any. This may be one of the
     ///   [recommended units](https://homieiot.github.io/specification/#property-attributes), or
     ///   any other custom unit.
-    pub fn string(id: &str, name: &str, settable: bool, unit: Option<&str>) -> Property {
-        Property::make(id, name, Datatype::String, settable, unit, None::<String>)
+    pub fn string(
+        id: &str,
+        name: &str,
+        settable: bool,
+        retained: bool,
+        unit: Option<&str>,
+    ) -> Property {
+        Property::make(
+            id,
+            name,
+            Datatype::String,
+            settable,
+            retained,
+            unit,
+            None::<String>,
+        )
     }
 
     /// Create a new enum property with the given attributes.
@@ -201,6 +255,8 @@ impl Property {
     /// * `settable`: Whether the property can be set by the Homie controller. This should be true
     ///   for properties like the brightness or power state of a light, and false for things like
     ///   the temperature reading of a sensor.
+    /// * `retained`: Whether the property value is persisted by the MQTT broker. A non-retained
+    ///   property can be used for a momentary event, like a doorbell being pressed.
     /// * `unit`: The unit for the property, if any. This may be one of the
     ///   [recommended units](https://homieiot.github.io/specification/#property-attributes), or
     ///   any other custom unit.
@@ -209,6 +265,7 @@ impl Property {
         id: &str,
         name: &str,
         settable: bool,
+        retained: bool,
         unit: Option<&str>,
         format: &[&str],
     ) -> Property {
@@ -217,6 +274,7 @@ impl Property {
             name,
             Datatype::Enum,
             settable,
+            retained,
             unit,
             Some(format.join(",")),
         )
@@ -231,6 +289,8 @@ impl Property {
     /// * `settable`: Whether the property can be set by the Homie controller. This should be true
     ///   for properties like the brightness or power state of a light, and false for things like
     ///   the temperature reading of a sensor.
+    /// * `retained`: Whether the property value is persisted by the MQTT broker. A non-retained
+    ///   property can be used for a momentary event, like a doorbell being pressed.
     /// * `unit`: The unit for the property, if any. This may be one of the
     ///   [recommended units](https://homieiot.github.io/specification/#property-attributes), or
     ///   any other custom unit.
@@ -239,6 +299,7 @@ impl Property {
         id: &str,
         name: &str,
         settable: bool,
+        retained: bool,
         unit: Option<&str>,
         format: ColorFormat,
     ) -> Property {
@@ -247,6 +308,7 @@ impl Property {
             name,
             Datatype::Color,
             settable,
+            retained,
             unit,
             Some(format.to_string()),
         )
@@ -257,6 +319,7 @@ impl Property {
         name: &str,
         datatype: Datatype,
         settable: bool,
+        retained: bool,
         unit: Option<&str>,
         format: Option<String>,
     ) -> Property {
@@ -265,6 +328,7 @@ impl Property {
             name: name.to_owned(),
             datatype,
             settable,
+            retained,
             unit: unit.map(|s| s.to_owned()),
             format,
         }
@@ -314,11 +378,11 @@ mod tests {
     #[test]
     fn color_property_format() {
         assert_eq!(
-            Property::color("id", "name", false, None, ColorFormat::RGB).format,
+            Property::color("id", "name", false, true, None, ColorFormat::RGB).format,
             Some("rgb".to_string())
         );
         assert_eq!(
-            Property::color("id", "name", false, None, ColorFormat::HSV).format,
+            Property::color("id", "name", false, true, None, ColorFormat::HSV).format,
             Some("hsv".to_string())
         );
     }
@@ -326,11 +390,11 @@ mod tests {
     #[test]
     fn integer_property_format() {
         assert_eq!(
-            Property::integer("id", "name", false, None, None).format,
+            Property::integer("id", "name", false, true, None, None).format,
             None
         );
         assert_eq!(
-            Property::integer("id", "name", false, None, Some(-2..5)).format,
+            Property::integer("id", "name", false, true, None, Some(-2..5)).format,
             Some("-2:5".to_string())
         );
     }
@@ -338,11 +402,11 @@ mod tests {
     #[test]
     fn float_property_format() {
         assert_eq!(
-            Property::float("id", "name", false, None, None).format,
+            Property::float("id", "name", false, true, None, None).format,
             None
         );
         assert_eq!(
-            Property::float("id", "name", false, None, Some(-2.3..5.0)).format,
+            Property::float("id", "name", false, true, None, Some(-2.3..5.0)).format,
             Some("-2.3:5".to_string())
         );
     }
@@ -350,7 +414,7 @@ mod tests {
     #[test]
     fn enum_property_format() {
         assert_eq!(
-            Property::enumeration("id", "name", false, None, &["ab", "cd"]).format,
+            Property::enumeration("id", "name", false, true, None, &["ab", "cd"]).format,
             Some("ab,cd".to_string())
         );
     }

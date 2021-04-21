@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+## Breaking changes
+
+- Added support for non-retained topics.
+
 ## 0.4.1
 
 ### New features

@@ -17,8 +17,8 @@ async fn main() -> Result<(), SpawnError> {
         "Light",
         "light",
         vec![
-            Property::boolean("power", "On", true, None),
-            Property::color("colour", "Colour", true, None, ColorFormat::RGB),
+            Property::boolean("power", "On", true, true, None),
+            Property::color("colour", "Colour", true, true, None, ColorFormat::RGB),
         ],
     );
     homie.add_node(node).await?;

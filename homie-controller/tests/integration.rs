@@ -51,6 +51,7 @@ async fn test_device() {
             "property_id",
             "Property name",
             true,
+            true,
             Some("unit"),
             None,
         )],

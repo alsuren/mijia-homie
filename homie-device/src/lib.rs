@@ -397,6 +397,12 @@ impl HomieDevice {
                     if property.settable { "true" } else { "false" },
                 )
                 .await?;
+            self.publisher
+                .publish_retained(
+                    &format!("{}/{}/$retained", node.id, property.id),
+                    if property.retained { "true" } else { "false" },
+                )
+                .await?;
             if let Some(unit) = &property.unit {
                 self.publisher
                     .publish_retained(&format!("{}/{}/$unit", node.id, property.id), unit.as_str())
@@ -478,8 +484,8 @@ impl HomieDevice {
         self.publisher.client.disconnect().await
     }
 
-    /// Publish a new value for the given property of the given node of this device. The caller is
-    /// responsible for ensuring that the value is of the correct type.
+    /// Publish a new value for the given retained property of the given node of this device. The
+    /// caller is responsible for ensuring that the value is of the correct type.
     pub async fn publish_value(
         &self,
         node_id: &str,
@@ -488,6 +494,19 @@ impl HomieDevice {
     ) -> Result<(), ClientError> {
         self.publisher
             .publish_retained(&format!("{}/{}", node_id, property_id), value.to_string())
+            .await
+    }
+
+    /// Publish a new value for the given non-retained property of the given node of this device. The
+    /// caller is responsible for ensuring that the value is of the correct type.
+    pub async fn publish_nonretained_value(
+        &self,
+        node_id: &str,
+        property_id: &str,
+        value: impl ToString,
+    ) -> Result<(), ClientError> {
+        self.publisher
+            .publish_nonretained(&format!("{}/{}", node_id, property_id), value.to_string())
             .await
     }
 }
@@ -514,6 +533,17 @@ impl DevicePublisher {
         let topic = format!("{}/{}", self.device_base, subtopic);
         self.client
             .publish(topic, QoS::AtLeastOnce, true, value)
+            .await
+    }
+
+    async fn publish_nonretained(
+        &self,
+        subtopic: &str,
+        value: impl Into<Vec<u8>>,
+    ) -> Result<(), ClientError> {
+        let topic = format!("{}/{}", self.device_base, subtopic);
+        self.client
+            .publish(topic, QoS::AtLeastOnce, false, value)
             .await
     }
 

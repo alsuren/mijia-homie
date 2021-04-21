@@ -24,8 +24,8 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
             "Sensor",
             "Environment sensor",
             vec![
-                Property::float("temperature", "Temperature", false, Some("ºC"), None),
-                Property::integer("humidity", "Humidity", false, Some("%"), None),
+                Property::float("temperature", "Temperature", false, true, Some("ºC"), None),
+                Property::integer("humidity", "Humidity", false, true, Some("%"), None),
             ],
         ))
         .await?;
