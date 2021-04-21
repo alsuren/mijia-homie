@@ -4,7 +4,9 @@
 
 ![](./title.jpg)
 
-David Laban, Andrew Walbran, Anusha Ramdarshan
+David Laban
+
+Rust London - 27 April 2021
 
 ---
 
@@ -73,7 +75,8 @@ David Laban, Andrew Walbran, Anusha Ramdarshan
 
 - This is what it looks like:
   ![](./system-overview.svg)
-- Orange is our code.
+
+<!-- TODO: add `Orange is our code.` as a legend on the diagram -->
 
 --
 
@@ -83,18 +86,18 @@ David Laban, Andrew Walbran, Anusha Ramdarshan
 
 # Rust
 
-- Picked because of a
-  [blog post](https://dev.to/lcsfelix/using-rust-blurz-to-read-from-a-ble-device-gmb) that David
-  found.
+Picked because of a
+[blog post](https://dev.to/lcsfelix/using-rust-blurz-to-read-from-a-ble-device-gmb) that I
+found.
 
-- Rust is probably not the **best** language for this.
+Rust is probably not the **best** language for this:
 
-  - Bluetooth stack on Linux is quite dynamic in places.
+- Bluetooth stack on Linux is quite dynamic in places, due to its C and D-Bus heritage.
 
-  - Cross-compiling with `cross` is okay to set up, but a bit slow.
+- Cross-compiling with `cross` is okay to set up, but iteration is slow.
 
-  - We found a [Python project](https://github.com/JsBergbau/MiTemperature2) partway through, with
-    similar objectives.
+- We found a [Python project](https://github.com/JsBergbau/MiTemperature2) partway through, with
+  similar objectives.
 
 <!-- prettier-ignore-start -->
 <!--
@@ -104,21 +107,22 @@ David Laban, Andrew Walbran, Anusha Ramdarshan
   prettier do strange things (https://github.com/prettier/prettier/issues/5019).
 -->
 
+--
 <!-- TODO: split this slide at this point? -->
 
-- It was fun anyway:
+It was fun anyway:
 
-    - Good chance to work on something together during lockdown.
+  - Good chance to work on something together during lockdown.
 
-    - We're both starting to use Rust for work, so good for learning.
+  - We're both starting to use Rust for work, so good for learning.
 
-        - Andrew is working on
-          [crosvm](https://chromium.googlesource.com/chromiumos/platform/crosvm/) and
-          [Virt Manager](https://android.googlesource.com/platform/packages/modules/Virtualization/+/refs/heads/master/virtmanager/)
-          for Android.
+      - Andrew is working on
+        [crosvm](https://chromium.googlesource.com/chromiumos/platform/crosvm/) and
+        [Virt Manager](https://android.googlesource.com/platform/packages/modules/Virtualization/+/refs/heads/master/virtmanager/)
+        for Android.
 
-        - David was using Rust for the backend of
-          [FutureNHS](https://github.com/FutureNHS/futurenhs-platform/).
+      - David was using Rust for the backend of
+        [FutureNHS](https://github.com/FutureNHS/futurenhs-platform/).
 
 <!-- prettier-ignore-end -->
 
@@ -170,7 +174,7 @@ The Rust Bluetooth story is a bit sad.
       - Requires extra permissions, adds extra bugs.
       - This has since been changed.
   - Tried switching to this (but gave up after too many panicking threads).
-  - Andrew now working to improve it and make it async.
+  - Andrew is now working to improve it and make it async.
   <!-- TODO: potentially re-write this section or split half of it out into its own slide? -->
 
 <!-- prettier-ignore-end -->
