@@ -22,7 +22,7 @@ Rust London - 27 April 2021
 
 - Observations about the project.
 
-- Hall of Fame
+<!-- - Hall of Fame -->
 
 - Links and Questions.
 
@@ -34,6 +34,10 @@ Rust London - 27 April 2021
   ![](./inception-yun_hat_04.jpg)
 - These cost around US$16 each, and Andrew couldn't get them running more than about a day on battery
   power.
+
+???
+
+ESP32 is a super-cheap system on chip with bluetooth and wifi
 
 ---
 
@@ -61,6 +65,10 @@ Rust London - 27 April 2021
 
 ![](./grafana-temperature.png)
 
+???
+
+Point at things you are mentioning, like "start of the day"
+
 ---
 
 # Backstory
@@ -86,9 +94,13 @@ Rust London - 27 April 2021
 
 # Rust
 
+<!-- FIXME: don't talk it down right at the beginning. Maybe move to observations -->
+
 Picked because of a
 [blog post](https://dev.to/lcsfelix/using-rust-blurz-to-read-from-a-ble-device-gmb) that I
 found.
+
+<!-- TODO: clickable links don't really make sense in slides -->
 
 Rust is probably not the **best** language for this:
 
@@ -154,7 +166,7 @@ It was fun anyway:
 
 ---
 
-# Bluetooth
+# Bluetooth in 2020
 
 <!-- TODO: make this into a thin summary slide and move interesting content to new slides -->
 
@@ -172,10 +184,7 @@ The Rust Bluetooth story is a bit sad.
   - Theoretically cross platform, but many features not implemented.
   - Linux implementation talked to kernel directly over raw sockets, bypassing BlueZ daemon.
       - Requires extra permissions, adds extra bugs.
-      - This has since been changed.
   - Tried switching to this (but gave up after too many panicking threads).
-  - Andrew is now working to improve it and make it async.
-  <!-- TODO: potentially re-write this section or split half of it out into its own slide? -->
 
 <!-- prettier-ignore-end -->
 
@@ -185,26 +194,6 @@ The Rust Bluetooth story is a bit sad.
   - Async or blocking.
 
 ---
-
-# Bluetooth
-
-We ended up building our own Bluetooth library: `bluez-async`
-
-- Linux only
-
-- BLE GATT Central only
-
-- Typesafe async wrapper around BlueZ D-Bus interface.
-
-- Sent patches upstream to `dbus-rs` to improve code generation and support for complex types.
-
-- Didn't announce it anywhere, but issues filed (and a PR) by two other users so far.
-
-<!-- TODO: Talk about how there is an effort in flight to make btleplug async, using bluez-async. -- https://github.com/deviceplug/btleplug/pull/114 -->
-
----
-
-<!-- TODO: move this directly after bluetooth slide -->
 
 # Concurrency
 
@@ -218,9 +207,8 @@ We ended up building our own Bluetooth library: `bluez-async`
 
 - Switch to async library:
   ![](./single-threaded-async.svg)
-  <!-- TODO: add lines for publishing the readings -->
-- But you all know javascript, so I don't have to tell you this.
-<!-- FIXME: maybe they don't? -->
+    <!-- TODO: add lines for publishing the readings -->
+  <!-- FIXME: make analogy with async -->
 
 ---
 
@@ -248,6 +236,8 @@ We ended up building our own Bluetooth library: `bluez-async`
 
   - Only hold the mutex when you _need_ it.
 
+<!-- TODO: maybe t -->
+
 - `Stream<Item = Event>`
 
   - Kinda fine.
@@ -262,6 +252,34 @@ We ended up building our own Bluetooth library: `bluez-async`
 
 ---
 
+# Bluetooth in 2021
+
+<!-- FIXME: link for bluez-async -->
+
+We ended up building our own Bluetooth library: `bluez-async`
+
+- Linux only
+- BLE GATT Central only
+- Typesafe async wrapper around BlueZ D-Bus interface.
+- Sent patches upstream to `dbus-rs` to improve code generation and support for complex types.
+- Didn't announce it anywhere, but issues filed (and a PR) by two other users so far.
+
+--
+
+<!-- FIXME: link for btleplug -->
+
+Andrew has been contributing to btleplug
+
+- Ported to use `bluez-async` on Linux.
+- Exposes an async interface everywhere.
+- There are a few bugs that need fixing before they make a release though.
+
+<!-- TODO: Talk about how there is an effort in flight to make btleplug async, using bluez-async. -- https://github.com/deviceplug/btleplug/pull/114 -->
+
+---
+
+<!-- TODO: move this directly after bluetooth slide -->
+
 # Observations about the project
 
 - Separating things into modules (and crates) worked well:
@@ -274,7 +292,8 @@ We ended up building our own Bluetooth library: `bluez-async`
 
 - Deployment
 
-  - Built with Github Actions and `cross`, packaged with `cargo-deb`, hosted on Bintray.
+  - Built with Github Actions and `cross`, packaged with `cargo-deb`.
+    <!-- , hosted on Bintray. -->
     <!-- FIXME: except it's not, is it, because bintray is dead? -->
     <!-- cross compiling to ARM is a pain if you need c libs, but cross makes it okay -->
     <!-- cross compiling to ARM v6 even more of is a pain, as Will can testify, but we got there in the end -->
