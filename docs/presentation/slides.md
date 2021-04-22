@@ -317,6 +317,7 @@ Andrew has been contributing to btleplug
 * cloudbbq-homie
   * Architecture diagram
   * Graph of some meat
+  * lamb = https://grafana.q.geek.nz/goto/xvwvw6XGk
 * mi plant sensor
   * Architecture diagram
   * ->mqtt written in python
@@ -333,6 +334,8 @@ Andrew has been contributing to btleplug
 - Homie helper library https://crates.io/crates/homie-device
 
 - Bluetooth library https://crates.io/crates/bluez-async
+
+<!-- TODO: add all other links -->
 
 # Questions
 
