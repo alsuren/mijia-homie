@@ -12,8 +12,6 @@ Rust London - 27 April 2021
 
 # Outline
 
-- TODO
-<!--
 - Backstory.
 
 - System Overview.
@@ -28,8 +26,6 @@ Rust London - 27 April 2021
 
 - Links and Questions.
 
--->
-
 ---
 
 # Backstory
@@ -41,7 +37,7 @@ Rust London - 27 April 2021
 
 ???
 
-ESP32 is a super-cheap system on chip with bluetooth and wifi
+ESP32 is a super-cheap system on chip with bluetooth and wifi, but dev-boards will always be more expensive than commercial off-the-shelf hardware.
 
 ---
 
@@ -63,64 +59,38 @@ ESP32 is a super-cheap system on chip with bluetooth and wifi
 
 <!-- TODO: receipt for the other 80 -->
 
+---
+
 # System Overview
 
-- This is what it looks like:
-  ![](./system-overview.embed.svg)
+- This is what we built:
 
-<!-- TODO: add `Orange is our code.` as a legend on the diagram -->
+![](./system-overview.embed.svg)
 
---
-
-- Let's dig into the different pieces.
+<!-- FIXME: scribbling over homie-influx -->
 
 ---
 
 # Rust
 
-<!-- FIXME: don't talk it down right at the beginning. Maybe move to observations -->
+- Good chance to work on something together during lockdown.
 
-Picked because of a
-[blog post](https://dev.to/lcsfelix/using-rust-blurz-to-read-from-a-ble-device-gmb) that I
-found.
+- We're both starting to use Rust for work, so good for learning.
 
-<!-- TODO: clickable links don't really make sense in slides -->
+  - Andrew is working on crossvm and Virt Manager for Android.
 
-Rust is probably not the **best** language for this:
+  - I was using Rust for the backend of the FutureNHS project.
 
-- Bluetooth stack on Linux is quite dynamic in places, due to its C and D-Bus heritage.
+- I also found a blog post describing how to connect to the sensors with Rust.
 
-- Cross-compiling with `cross` is okay to set up, but iteration is slow.
+???
 
-- We found a [Python project](https://github.com/JsBergbau/MiTemperature2) partway through, with
-  similar objectives.
+[crosvm](https://chromium.googlesource.com/chromiumos/platform/crosvm/)
+[Virt Manager](https://android.googlesource.com/platform/packages/modules/Virtualization/+/refs/heads/master/virtmanager/)
 
-<!-- prettier-ignore-start -->
-<!--
-  Indentation is bigger here because that's how much indentation remark needs
-  to render a third-level bullet point.
-  Ideally I would set tab width to 4 everywhere in prettier, but that makes
-  prettier do strange things (https://github.com/prettier/prettier/issues/5019).
--->
+[FutureNHS](https://github.com/FutureNHS/futurenhs-platform/).
 
---
-<!-- TODO: split this slide at this point? -->
-
-It was fun anyway:
-
-  - Good chance to work on something together during lockdown.
-
-  - We're both starting to use Rust for work, so good for learning.
-
-      - Andrew is working on
-        [crosvm](https://chromium.googlesource.com/chromiumos/platform/crosvm/) and
-        [Virt Manager](https://android.googlesource.com/platform/packages/modules/Virtualization/+/refs/heads/master/virtmanager/)
-        for Android.
-
-      - David was using Rust for the backend of
-        [FutureNHS](https://github.com/FutureNHS/futurenhs-platform/).
-
-<!-- prettier-ignore-end -->
+[blog post](https://dev.to/lcsfelix/using-rust-blurz-to-read-from-a-ble-device-gmb)
 
 ---
 
@@ -214,7 +184,7 @@ The Rust Bluetooth story is a bit sad.
 
 # Concurrency (tools that we use)
 
-<!-- TODO: maybe make a diagram for this? -->
+<!-- TODO: maybe make a diagram for this or just delete it? -->
 
 - `Arc<Mutex<ALL THE THINGS>`
 
@@ -254,13 +224,15 @@ We ended up building our own Bluetooth library: `bluez-async`
 
 <!-- FIXME: link for btleplug -->
 
-Andrew has been contributing to btleplug
+Andrew has been contributing to `btleplug`
 
 - Ported to use `bluez-async` on Linux.
 - Exposes an async interface everywhere.
 - There are a few bugs that need fixing before they make a release though.
 
-<!-- TODO: Talk about how there is an effort in flight to make btleplug async, using bluez-async. -- https://github.com/deviceplug/btleplug/pull/114 -->
+???
+
+- [btleplug async pr](https://github.com/deviceplug/btleplug/pull/114)
 
 ---
 
@@ -284,9 +256,11 @@ Point at things you are mentioning, like "start of the day"
 
 ---
 
-# Results
+# Pandas+Plotly
 
-- Data can also be exported for use with pandas/plotly
+- Data exported from influxdb.
+- Averages calculated with pandas and plotted with plotly.
+  ![](./average-temperature-by-day.png)
 
 ---
 
@@ -294,20 +268,10 @@ Point at things you are mentioning, like "start of the day"
 
 * bluez-async/btleplug/etc.
   * ???
-* jupyter notebooks for analysis
-* cloudbbq-homie
-  * Architecture diagram
-  * Graph of some meat
-  * lamb = https://grafana.q.geek.nz/goto/xvwvw6XGk
-* mi plant sensor
-  * Architecture diagram
-  * ->mqtt written in python
-  * graphs
- -->
 
 # Will's setup, with soil sensors
 
-![](will-system-overview.embed.svg)
+![](./will-system-overview.embed.svg)
 
 <!-- TODO: graphs -->
 
@@ -315,9 +279,9 @@ Point at things you are mentioning, like "start of the day"
 
 # CloudBBQ
 
-![](cloudbbq-system-overview.embed.svg)
+- We also got it working with a meat thermometer:
 
-<!-- TODO: graph -->
+![](./cloudbbq-system-overview.embed.svg)
 
 ???
 
@@ -325,7 +289,17 @@ Backstory: one of the people who sent us patches was using it with a bbq meat th
 
 ---
 
+# CloudBBQ
+
+- So now we have a graph of our roast.
+
+![](./cloudbbq-lamb.png)
+
+---
+
 # Observations about the project
+
+<!-- FIXME: diagram for this, to mirror Stu's -->
 
 - Separating things into modules (and crates) worked well:
 
@@ -339,18 +313,29 @@ Backstory: one of the people who sent us patches was using it with a bbq meat th
 
   - Built with Github Actions and `cross`, packaged with `cargo-deb`.
     <!-- , hosted on Bintray. -->
-    <!-- FIXME: except it's not, is it, because bintray is dead? -->
+    <!-- except it's not, is it, because bintray is dead? -->
     <!-- cross compiling to ARM is a pain if you need c libs, but cross makes it okay -->
     <!-- cross compiling to ARM v6 even more of is a pain, as Will can testify, but we got there in the end -->
 
   - Everything is supervised by systemd.
 
-  - Test coverage is a bit thin.
+  - Test coverage is a bit thin (blame me for this).
 
 - Desktop Linux tech stack (D-Bus, BlueZ) is not great.
 - Raspberry Pi only supports 10 connected BLE devices (10 << 100).
   - My laptop only supports 7.
   - We added a USB Bluetooth adapter, and got a second Raspberry Pi.
+
+<!-- Rust is probably not the **best** language for this:
+
+- Bluetooth stack on Linux is quite dynamic in places, due to its C and D-Bus heritage.
+
+- Cross-compiling with `cross` is okay to set up, but iteration is slow.
+
+- We found a [Python project](https://github.com/JsBergbau/MiTemperature2) partway through, with
+  similar objectives. -->
+
+---
 
 # Links
 
