@@ -61,27 +61,7 @@ ESP32 is a super-cheap system on chip with bluetooth and wifi
 
 ![](./inception-order.png)
 
----
-
-# Backstory
-
-- And now we have graphs like this:
-
-![](./grafana-temperature.png)
-
-???
-
-Point at things you are mentioning, like "start of the day"
-
----
-
-# Backstory
-
-- And this:
-
-![](./grafana-fridge.png)
-
----
+<!-- TODO: receipt for the other 80 -->
 
 # System Overview
 
@@ -234,13 +214,19 @@ The Rust Bluetooth story is a bit sad.
 
 # Concurrency (tools that we use)
 
+<!-- TODO: maybe make a diagram for this? -->
+
 - `Arc<Mutex<ALL THE THINGS>`
+
+  - Easy refactor from `&mut ALL THE THINGS`
 
   - Fine as long as you know where the lock contention is.
 
-  - Only hold the mutex when you _need_ it.
+  - Only hold the mutex when you _need_ it, and avoid holding over await points.
 
-<!-- TODO: maybe t -->
+- Unbounded Channels
+
+  - Fine if you know it's not going to back up.
 
 - `Stream<Item = Event>`
 
@@ -249,10 +235,6 @@ The Rust Bluetooth story is a bit sad.
   - Just the async version of Iter, but with less syntax support.
 
   - Not something that David uses much in web-land.
-
-- Unbounded Channels
-
-  - Fine if you know it's not going to back up.
 
 ---
 
@@ -282,7 +264,66 @@ Andrew has been contributing to btleplug
 
 ---
 
-<!-- TODO: move this directly after bluetooth slide -->
+# Results
+
+- Now we have graphs like this:
+
+![](./grafana-temperature.png)
+
+???
+
+Point at things you are mentioning, like "start of the day"
+
+---
+
+# Results
+
+- And this:
+
+![](./grafana-fridge.png)
+
+---
+
+# Results
+
+- Data can also be exported for use with pandas/plotly
+
+---
+
+<!-- TODO: related developments:
+
+* bluez-async/btleplug/etc.
+  * ???
+* jupyter notebooks for analysis
+* cloudbbq-homie
+  * Architecture diagram
+  * Graph of some meat
+  * lamb = https://grafana.q.geek.nz/goto/xvwvw6XGk
+* mi plant sensor
+  * Architecture diagram
+  * ->mqtt written in python
+  * graphs
+ -->
+
+# Will's setup, with soil sensors
+
+![](will-system-overview.embed.svg)
+
+<!-- TODO: graphs -->
+
+---
+
+# CloudBBQ
+
+![](cloudbbq-system-overview.embed.svg)
+
+<!-- TODO: graph -->
+
+???
+
+Backstory: one of the people who sent us patches was using it with a bbq meat thermometer, so I bought one for Andrew as a joke present.
+
+---
 
 # Observations about the project
 
@@ -310,29 +351,6 @@ Andrew has been contributing to btleplug
 - Raspberry Pi only supports 10 connected BLE devices (10 << 100).
   - My laptop only supports 7.
   - We added a USB Bluetooth adapter, and got a second Raspberry Pi.
-
----
-
-<!-- TODO: related developments:
-
-* bluez-async/btleplug/etc.
-  * ???
-* jupyter notebooks for analysis
-* cloudbbq-homie
-  * Architecture diagram
-  * Graph of some meat
-  * lamb = https://grafana.q.geek.nz/goto/xvwvw6XGk
-* mi plant sensor
-  * Architecture diagram
-  * ->mqtt written in python
-  * graphs
- -->
-
-# Will's setup, with soil sensors
-
-![](will-system-overview.embed.svg)
-
----
 
 # Links
 
