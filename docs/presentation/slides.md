@@ -12,6 +12,8 @@ Rust London - 27 April 2021
 
 # Outline
 
+- TODO
+<!--
 - Backstory.
 
 - System Overview.
@@ -22,9 +24,11 @@ Rust London - 27 April 2021
 
 - Observations about the project.
 
-<!-- - Hall of Fame -->
+- Hall of Fame
 
 - Links and Questions.
+
+-->
 
 ---
 
