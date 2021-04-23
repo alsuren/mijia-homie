@@ -82,7 +82,7 @@ Point at things you are mentioning, like "start of the day"
 # System Overview
 
 - This is what it looks like:
-  ![](./system-overview.svg)
+  ![](./system-overview.embed.svg)
 
 <!-- TODO: add `Orange is our code.` as a legend on the diagram -->
 
@@ -198,15 +198,14 @@ The Rust Bluetooth story is a bit sad.
 # Concurrency
 
 - Problem with single-threaded blocking Bluetooth library:
-  ![](./single-threaded-blocking.svg)
-  <!-- TODO: add lines for publishing the readings -->
+  ![](./single-threaded-blocking.embed.svg)
 
 ---
 
 # Concurrency
 
 - Switch to async library:
-  ![](./single-threaded-async.svg)
+  ![](./single-threaded-async.embed.svg)
     <!-- TODO: add lines for publishing the readings -->
   <!-- FIXME: make analogy with async -->
 
@@ -215,7 +214,7 @@ The Rust Bluetooth story is a bit sad.
 # Concurrency
 
 - NOT SO FAST!
-  ![](./single-threaded-mutex.svg)
+  ![](./single-threaded-mutex.embed.svg)
 - What if all of your sensors live in a big `Arc<Mutex<SensorState>>`?
 
 ---
@@ -223,7 +222,7 @@ The Rust Bluetooth story is a bit sad.
 # Concurrency
 
 - Hold the Mutex for as little time as possible.
-  ![](./single-threaded-mutex-final.svg)
+  ![](./single-threaded-mutex-final.embed.svg)
 - Much better.
 
 ---
