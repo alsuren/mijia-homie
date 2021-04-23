@@ -1,8 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.5.0
 
-## Breaking changes
+### Breaking changes
 
 - Added support for non-retained topics.
 
