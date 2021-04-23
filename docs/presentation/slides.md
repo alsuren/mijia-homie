@@ -204,18 +204,19 @@ The Rust Bluetooth story is a bit sad.
 
 # Concurrency
 
-- Switch to async library:
+- Switch to async library like we're used to in web-land:
   ![](./single-threaded-async.embed.svg)
-    <!-- TODO: add lines for publishing the readings -->
-  <!-- FIXME: make analogy with async -->
+
+--
+
+- NOT SO FAST!
 
 ---
 
 # Concurrency
 
-- NOT SO FAST!
+- What if all of your sensors live in a big `Arc<Mutex<GlobalState>>`?
   ![](./single-threaded-mutex.embed.svg)
-- What if all of your sensors live in a big `Arc<Mutex<SensorState>>`?
 
 ---
 
