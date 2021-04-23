@@ -322,8 +322,11 @@ Andrew has been contributing to btleplug
   * Architecture diagram
   * ->mqtt written in python
   * graphs
-
  -->
+
+# Will's setup, with soil sensors
+
+![](will-system-overview.embed.svg)
 
 ---
 
