@@ -107,21 +107,18 @@ ESP32 is a super-cheap system on chip with bluetooth and wifi, but dev-boards wi
 - Has `retain`ed messages:
 
   - Lets you get the current status from the broker.
-
   - Avoids a round-trip to a power/network-constrained device.
 
 - Has `LastWill` messages:
 
   - Lets the server clean up after you when you drop off the network.
 
-- [Homie](https://homieiot.github.io/) is an auto-discovery convention built on MQTT.
+- Homie is an auto-discovery convention built on MQTT.
 
 - `rumqttc` library is pretty good:
 
   - Works using channels, which is nice.
-
   - You are responsible for polling its event loop.
-
   - Andrew has submitted patches, and they were well received.
 
 ---
@@ -349,6 +346,8 @@ so now we have a graph of our roast:
 # Links
 
 - GitHub: https://github.com/alsuren/mijia-homie (includes this presentation)
+
+- Homie spec https://homieiot.github.io/
 
 - Homie helper library https://crates.io/crates/homie-device
 
