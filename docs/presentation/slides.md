@@ -12,19 +12,16 @@ Rust London - 27 April 2021
 
 # Outline
 
-- Backstory.
-
-- System Overview.
-
-- How it's built.
-
-- Concurrency pitfalls.
-
-- Observations about the project.
-
+- Backstory
+- System Overview
+- Rust
+- MQTT
+- Rust Bluetooth in 2020
+- Concurrency Pitfalls
+- Rust Bluetooth in 2021
 - Hall of Fame
-
-- Links and Questions.
+- Observations about the project
+- Links and Questions
 
 ---
 
@@ -120,7 +117,7 @@ ESP32 is a super-cheap system on chip with bluetooth and wifi, but dev-boards wi
 
 ---
 
-# Bluetooth in 2020
+# Rust Bluetooth in 2020
 
 <!-- TODO: make this into a thin summary slide and move interesting content to new slides -->
 
@@ -208,7 +205,7 @@ The Rust Bluetooth story is a bit sad.
 
 ---
 
-# Bluetooth in 2021
+# Rust Bluetooth in 2021
 
 <!-- FIXME: link for bluez-async -->
 
@@ -264,11 +261,6 @@ Point at things you are mentioning, like "start of the day"
 
 ---
 
-<!-- TODO: related developments:
-
-* bluez-async/btleplug/etc.
-  * ???
-
 # Will's setup, with soil sensors
 
 ![](./will-system-overview.embed.svg)
@@ -304,9 +296,7 @@ Backstory: one of the people who sent us patches was using it with a bbq meat th
 - Separating things into modules (and crates) worked well:
 
   - App (`mijia-homie`) -> Sensor (`mijia`) -> Bluetooth (`bluez-async`) -> `bluez-generated` -> D-Bus.
-
   - App (`mijia-homie`) -> Homie (`homie-device`) -> MQTT.
-
   - MQTT -> Homie (`homie-controller`) -> `homie-influx` -> InfluxDB
 
 - Deployment
@@ -316,14 +306,12 @@ Backstory: one of the people who sent us patches was using it with a bbq meat th
     <!-- except it's not, is it, because bintray is dead? -->
     <!-- cross compiling to ARM is a pain if you need c libs, but cross makes it okay -->
     <!-- cross compiling to ARM v6 even more of is a pain, as Will can testify, but we got there in the end -->
-
   - Everything is supervised by systemd.
-
   - Test coverage is a bit thin (blame me for this).
 
 - Desktop Linux tech stack (D-Bus, BlueZ) is not great.
 - Raspberry Pi only supports 10 connected BLE devices (10 << 100).
-  - My laptop only supports 7.
+  - Andrew's laptop only supports 7.
   - We added a USB Bluetooth adapter, and got a second Raspberry Pi.
 
 <!-- Rust is probably not the **best** language for this:
@@ -350,10 +338,3 @@ Backstory: one of the people who sent us patches was using it with a bbq meat th
 # Questions
 
 - ?
-
---
-
-# Questions from me
-
-- Does anyone have ideas about which graphs we should draw?
-- What Bluetooth devices should we play with next?
