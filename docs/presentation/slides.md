@@ -225,8 +225,6 @@ We ended up building our own Bluetooth library: `bluez-async`
 
 --
 
-<!-- FIXME: link for btleplug -->
-
 Andrew has been contributing to `btleplug`
 
 - Ported to use `bluez-async` on Linux.
@@ -315,9 +313,9 @@ so now we have a graph of our roast:
 
 <!-- FIXME: diagram for this, to mirror Stu's -->
 
-- Separating things into modules (and crates) worked well:
+- Separating things into layers (and crates) worked well:
 
-  - App (`mijia-homie`) -> Sensor (`mijia`) -> Bluetooth (`bluez-async`) -> `bluez-generated` -> D-Bus.
+  - App (`mijia-homie`) -> Sensor (`mijia`) -> Bluetooth (`bluez-async`) -> D-Bus.
   - App (`mijia-homie`) -> Homie (`homie-device`) -> MQTT.
   - MQTT -> Homie (`homie-controller`) -> `homie-influx` -> InfluxDB
 
@@ -332,6 +330,7 @@ so now we have a graph of our roast:
   - Test coverage is a bit thin (blame me for this).
 
 - Desktop Linux tech stack (D-Bus, BlueZ) is not great.
+
 - Raspberry Pi only supports 10 connected BLE devices (10 << 100).
   - Andrew's laptop only supports 7.
   - We added a USB Bluetooth adapter, and got a second Raspberry Pi.
