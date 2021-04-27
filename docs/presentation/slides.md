@@ -233,7 +233,7 @@ Andrew has been contributing to `btleplug`
 
 # Results
 
-- Now we have graphs like this:
+We now have graphs like this, with inside and outside readings:
 
 ![](./grafana-temperature.png)
 
@@ -245,31 +245,47 @@ Point at things you are mentioning, like "start of the day"
 
 # Results
 
-- And this:
+and readings from our fridge:
 
 ![](./grafana-fridge.png)
 
 ---
 
-# Pandas+Plotly
+# Results
 
-- Data exported from influxdb.
-- Averages calculated with pandas and plotted with plotly.
-  ![](./average-temperature-by-day.png)
+and we can plot trends using Pandas and Plotly:
+
+![](./average-temperature-by-day.png)
 
 ---
 
-# Will's setup, with soil sensors
+# Will's setup, with MiFlora sensors
+
+I gave some to my workmate:
 
 ![](./will-system-overview.embed.svg)
 
-<!-- TODO: graphs -->
+---
+
+# Will's setup, with MiFlora sensors
+
+so you can tell when Will waters his plants:
+
+![](./will_moisture.png)
+
+---
+
+# Will's setup, with MiFlora sensors
+
+and when the dehumidifier kicks in in the cellar:
+
+![](./will_dehumidifier.png)
 
 ---
 
 # CloudBBQ
 
-- We also got it working with a meat thermometer:
+We also got it working with a meat thermometer:
 
 ![](./cloudbbq-system-overview.embed.svg)
 
@@ -281,7 +297,7 @@ Backstory: one of the people who sent us patches was using it with a bbq meat th
 
 # CloudBBQ
 
-- So now we have a graph of our roast.
+so now we have a graph of our roast:
 
 ![](./cloudbbq-lamb.png)
 
