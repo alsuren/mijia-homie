@@ -183,25 +183,23 @@ The Rust Bluetooth story is a bit sad.
 
 <!-- TODO: maybe make a diagram for this or just delete it? -->
 
-- `Arc<Mutex<ALL THE THINGS>`
+- `Arc<Mutex<AllTheThings>`
 
-  - Easy refactor from `&mut ALL THE THINGS`
-
+  - Used for all of our state.
+  - Easy refactor from `&mut AllTheThings`.
   - Fine as long as you know where the lock contention is.
-
-  - Only hold the mutex when you _need_ it, and avoid holding over await points.
+  - Only hold the mutex when you _need_ it, be careful of await points.
 
 - Unbounded Channels
 
-  - Fine if you know it's not going to back up.
+  - Used for all bluetooth events, and all MQTT traffic.
+  - Fine if you know they're not going to back up.
 
 - `Stream<Item = Event>`
 
-  - Kinda fine.
-
-  - Just the async version of Iter, but with less syntax support.
-
-  - Not something that David uses much in web-land.
+  - Used as the consumption api of the Channels.
+  - Just the async version of Iter.
+  - `map()`, `filter()` and `select_all()` are easy to use.
 
 ---
 
@@ -327,14 +325,12 @@ Backstory: one of the people who sent us patches was using it with a bbq meat th
 
 # Links
 
-- GitHub: https://github.com/alsuren/mijia-homie
+- GitHub: https://github.com/alsuren/mijia-homie (includes this presentation)
 
 - Homie helper library https://crates.io/crates/homie-device
 
 - Bluetooth library https://crates.io/crates/bluez-async
 
-<!-- TODO: add all other links -->
+- `btleplug` async pr https://github.com/deviceplug/btleplug/pull/114
 
-# Questions
-
-- ?
+# Questions?
