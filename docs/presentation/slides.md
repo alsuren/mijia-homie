@@ -36,9 +36,9 @@ Rust London - 27 April 2021
 
 # Backstory
 
-- We started with a few ESP32 sensors like this:
+- We started with a few ESP32 dev-boards like this:
   ![](./inception-yun_hat_04.jpg)
-- These cost around US$16 each, and Andrew couldn't get them running more than about a day on battery
+- These cost around US$16 each, and don't last more than about a day on battery
   power.
 
 ???
@@ -49,17 +49,23 @@ ESP32 is a super-cheap system on chip with bluetooth and wifi, but dev-boards wi
 
 # Backstory
 
-- "Wouldn't it be nice to have a hundred of these?"
+<pre>
 
-- "Just imagine what you could do."
 
-- "What's the cheapest way to do this?"
+
+
+
+
+
+</pre>
+
+## "Wouldn't it be nice to have a hundred of these?"
 
 ---
 
 # Backstory
 
-- So we bought some of these, at $3 each.
+- So we bought 20 of these, at $3 each.
 
 ![](./inception-order.png)
 
@@ -79,15 +85,14 @@ ESP32 is a super-cheap system on chip with bluetooth and wifi, but dev-boards wi
 
 # Rust
 
-- Good chance to work on something together during lockdown.
-
 - We're both starting to use Rust for work, so good for learning.
 
   - Andrew is working on crossvm and Virt Manager for Android.
-
   - I was using Rust for the backend of the FutureNHS project.
 
-- I also found a blog post describing how to connect to the sensors with Rust.
+- Good chance to work on something together during lockdown.
+
+- I found a blog post describing how to connect to these sensors with Rust.
 
 ???
 
@@ -104,21 +109,11 @@ ESP32 is a super-cheap system on chip with bluetooth and wifi, but dev-boards wi
 
 - MQTT is the pubsub of choice for low-powered gadgets.
 
-- Has `retain`ed messages:
-
-  - Lets you get the current status from the broker.
-  - Avoids a round-trip to a power/network-constrained device.
-
-- Has `LastWill` messages:
-
-  - Lets the server clean up after you when you drop off the network.
-
 - Homie is an auto-discovery convention built on MQTT.
 
 - `rumqttc` library is pretty good:
 
   - Works using channels, which is nice.
-  - You are responsible for polling its event loop.
   - Andrew has submitted patches, and they were well received.
 
 ---
@@ -126,8 +121,6 @@ ESP32 is a super-cheap system on chip with bluetooth and wifi, but dev-boards wi
 # Rust Bluetooth in 2020
 
 <!-- TODO: make this into a thin summary slide and move interesting content to new slides -->
-
-The Rust Bluetooth story is a bit sad.
 
 - `blurz` - "Bluetooth from before there was Tokio"
   - We started with this.
@@ -139,16 +132,10 @@ The Rust Bluetooth story is a bit sad.
 
 - `btleplug` - "cross-platform jumble"
   - Theoretically cross platform, but many features not implemented.
-  - Linux implementation talked to kernel directly over raw sockets, bypassing BlueZ daemon.
-      - Requires extra permissions, adds extra bugs.
-  - Tried switching to this (but gave up after too many panicking threads).
+  - Linux implementation needed root access.
+  - Too many panics for us to use.
 
 <!-- prettier-ignore-end -->
-
-- `dbus-rs` - "roll your own BlueZ wrapper"
-  - Generates code from D-Bus introspection.
-  - Single-threaded because return types are !Send (but that's okay).
-  - Async or blocking.
 
 ---
 
@@ -159,9 +146,36 @@ The Rust Bluetooth story is a bit sad.
 
 ---
 
+# Rust Bluetooth in 2020
+
+<!-- TODO: make this into a thin summary slide and move interesting content to new slides -->
+
+- `blurz` - "Bluetooth from before there was Tokio"
+  - Talks to BlueZ over D-Bus, but single-threaded and synchronous.
+  - Blocking `device.connect()` calls. 😧
+  - Unmaintained (for 2 years).
+  - We started with this.
+
+<!-- prettier-ignore-start -->
+
+- `btleplug` - "cross-platform jumble"
+  - Theoretically cross platform, but many features not implemented.
+  - Linux implementation needed root access.
+  - Too many panics for us to use.
+
+<!-- prettier-ignore-end -->
+
+--
+
+- `dbus-rs` - "roll your own BlueZ wrapper"
+  - Generate code from D-Bus introspection.
+  - Async if you want.
+
+---
+
 # Concurrency
 
-- Switch to an async library, like we're used to in web-land:
+- Switch to an async library:
   ![](./single-threaded-async.embed.svg)
 
 --
@@ -215,7 +229,6 @@ The Rust Bluetooth story is a bit sad.
 We ended up building our own Bluetooth library: `bluez-async`
 
 - Linux only
-- BLE GATT Central only
 - Typesafe async wrapper around BlueZ D-Bus interface.
 - Sent patches upstream to `dbus-rs` to improve code generation and support for complex types.
 - Didn't announce it anywhere, but issues filed (and a PR) by two other users so far.
@@ -318,19 +331,15 @@ so now we have a graph of our roast:
 
 - Deployment
 
+  - Everything is supervised by systemd.
   - Built with Github Actions and `cross`, packaged with `cargo-deb`.
     <!-- , hosted on Bintray. -->
     <!-- except it's not, is it, because bintray is dead? -->
     <!-- cross compiling to ARM is a pain if you need c libs, but cross makes it okay -->
     <!-- cross compiling to ARM v6 even more of is a pain, as Will can testify, but we got there in the end -->
-  - Everything is supervised by systemd.
   - Test coverage is a bit thin (blame me for this).
 
-- Desktop Linux tech stack (D-Bus, BlueZ) is not great.
-
 - Raspberry Pi only supports 10 connected BLE devices (10 << 100).
-  - Andrew's laptop only supports 7.
-  - We added a USB Bluetooth adapter, and got a second Raspberry Pi.
 
 <!-- Rust is probably not the **best** language for this:
 
