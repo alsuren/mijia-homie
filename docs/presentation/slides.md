@@ -13,14 +13,23 @@ Rust London - 27 April 2021
 # Outline
 
 - Backstory
+
 - System Overview
-- Rust
-- MQTT
-- Rust Bluetooth in 2020
-- Concurrency Pitfalls
-- Rust Bluetooth in 2021
-- Hall of Fame
-- Observations about the project
+
+  - Rust
+
+  - MQTT
+
+  - Bluetooth in the Past
+
+  - Concurrency
+
+  - Bluetooth in the Future
+
+- Pretty Graphs
+
+- Closing Remarks
+
 - Links and Questions
 
 ---
@@ -303,7 +312,7 @@ so now we have a graph of our roast:
 
 ---
 
-# Observations about the project
+# Closing Remarks
 
 <!-- FIXME: diagram for this, to mirror Stu's -->
 
