@@ -157,45 +157,46 @@ The Rust Bluetooth story is a bit sad.
 
 # Concurrency
 
-- Problem with single-threaded blocking Bluetooth library:
+- The problem with a single-threaded blocking Bluetooth library:
   ![](./single-threaded-blocking.embed.svg)
 
 ---
 
 # Concurrency
 
-- Switch to async library like we're used to in web-land:
+- Switch to an async library, like we're used to in web-land:
   ![](./single-threaded-async.embed.svg)
 
 --
 
-- NOT SO FAST!
+- Almost.
 
 ---
 
 # Concurrency
 
-- What if all of your sensors live in a big `Arc<Mutex<GlobalState>>`?
+- In our case, everything lives in a big `Arc<Mutex<GlobalState>>`.
   ![](./single-threaded-mutex.embed.svg)
 
 ---
 
 # Concurrency
 
-- Hold the Mutex for as little time as possible.
+- So we hold the Mutex for as little time as possible.
   ![](./single-threaded-mutex-final.embed.svg)
+
+--
+
 - Much better.
 
 ---
 
 # Concurrency (tools that we use)
 
-<!-- TODO: maybe make a diagram for this or just delete it? -->
-
-- `Arc<Mutex<AllTheThings>`
+- `Arc<Mutex<GlobalState>`
 
   - Used for all of our state.
-  - Easy refactor from `&mut AllTheThings`.
+  - Easy refactor from `&mut GlobalState`.
   - Fine as long as you know where the lock contention is.
   - Only hold the mutex when you _need_ it, be careful of await points.
 
@@ -213,8 +214,6 @@ The Rust Bluetooth story is a bit sad.
 ---
 
 # Rust Bluetooth in 2021
-
-<!-- FIXME: link for bluez-async -->
 
 We ended up building our own Bluetooth library: `bluez-async`
 
