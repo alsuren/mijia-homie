@@ -207,7 +207,7 @@ The Rust Bluetooth story is a bit sad.
 
 - `Stream<Item = Event>`
 
-  - Used as the consumption api of the Channels.
+  - Used as the consumption API of the Channels.
   - Just the async version of Iter.
   - `map()`, `filter()` and `select_all()` are easy to use.
 
