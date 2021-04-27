@@ -17,14 +17,10 @@ Rust London - 27 April 2021
 - System Overview
 
   - Rust
-
   - MQTT
-
-  - Bluetooth in the Past
-
+  - Bluetooth when we started
   - Concurrency
-
-  - Bluetooth in the Future
+  - Bluetooth Developments
 
 - Pretty Graphs
 
@@ -59,7 +55,7 @@ ESP32 is a super-cheap system on chip with bluetooth and wifi, but dev-boards wi
 
 </pre>
 
-## "Wouldn't it be nice to have a hundred of these?"
+## "Wouldn't it be nice to have a hundred temperature sensors?"
 
 ---
 
@@ -78,8 +74,6 @@ ESP32 is a super-cheap system on chip with bluetooth and wifi, but dev-boards wi
 - This is what we built:
 
 ![](./system-overview.embed.svg)
-
-<!-- FIXME: scribbling over homie-influx -->
 
 ---
 
@@ -202,7 +196,7 @@ ESP32 is a super-cheap system on chip with bluetooth and wifi, but dev-boards wi
 
 ---
 
-# Concurrency (tools that we use)
+# Concurrency Summary
 
 - `Arc<Mutex<GlobalState>`
 
@@ -224,7 +218,7 @@ ESP32 is a super-cheap system on chip with bluetooth and wifi, but dev-boards wi
 
 ---
 
-# Rust Bluetooth in 2021
+# Bluetooth Developments
 
 We ended up building our own Bluetooth library: `bluez-async`
 
@@ -355,6 +349,8 @@ so now we have a graph of our roast:
 # Links
 
 - GitHub: https://github.com/alsuren/mijia-homie (includes this presentation)
+
+- Inspirational blog post https://dev.to/lcsfelix/using-rust-blurz-to-read-from-a-ble-device-gmb
 
 - Homie spec https://homieiot.github.io/
 
