@@ -305,3 +305,42 @@ impl Value for EnumValue {
         Datatype::Enum
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn color_rgb_to_from_string() {
+        let color = ColorRgb::new(111, 222, 42);
+        assert_eq!(color.to_string().parse(), Ok(color));
+    }
+
+    #[test]
+    fn color_hsv_to_from_string() {
+        let color = ColorHsv::new(231, 88, 77);
+        assert_eq!(color.to_string().parse(), Ok(color));
+    }
+
+    #[test]
+    fn color_rgb_parse_invalid() {
+        assert_eq!("".parse::<ColorRgb>(), Err(ParseColorError()));
+        assert_eq!("1,2".parse::<ColorRgb>(), Err(ParseColorError()));
+        assert_eq!("1,2,3,4".parse::<ColorRgb>(), Err(ParseColorError()));
+        assert_eq!("1,2,256".parse::<ColorRgb>(), Err(ParseColorError()));
+        assert_eq!("1,256,3".parse::<ColorRgb>(), Err(ParseColorError()));
+        assert_eq!("256,2,3".parse::<ColorRgb>(), Err(ParseColorError()));
+        assert_eq!("1,-2,3".parse::<ColorRgb>(), Err(ParseColorError()));
+    }
+
+    #[test]
+    fn color_hsv_parse_invalid() {
+        assert_eq!("".parse::<ColorHsv>(), Err(ParseColorError()));
+        assert_eq!("1,2".parse::<ColorHsv>(), Err(ParseColorError()));
+        assert_eq!("1,2,3,4".parse::<ColorHsv>(), Err(ParseColorError()));
+        assert_eq!("1,2,101".parse::<ColorHsv>(), Err(ParseColorError()));
+        assert_eq!("1,101,3".parse::<ColorHsv>(), Err(ParseColorError()));
+        assert_eq!("361,2,3".parse::<ColorHsv>(), Err(ParseColorError()));
+        assert_eq!("1,-2,3".parse::<ColorHsv>(), Err(ParseColorError()));
+    }
+}
