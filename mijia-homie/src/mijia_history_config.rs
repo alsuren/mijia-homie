@@ -22,7 +22,7 @@ pub struct Config {
         rename = "max_clock_offset_seconds"
     )]
     pub max_clock_offset: Duration,
-    pub influxdb: InfluxDBConfig,
+    pub influxdb: InfluxDbConfig,
 }
 
 impl Config {
@@ -49,7 +49,7 @@ impl Default for Config {
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(default, deny_unknown_fields)]
-pub struct InfluxDBConfig {
+pub struct InfluxDbConfig {
     pub url: Url,
     pub username: Option<String>,
     pub password: Option<String>,
@@ -57,9 +57,9 @@ pub struct InfluxDBConfig {
     pub measurement: String,
 }
 
-impl Default for InfluxDBConfig {
-    fn default() -> InfluxDBConfig {
-        InfluxDBConfig {
+impl Default for InfluxDbConfig {
+    fn default() -> InfluxDbConfig {
+        InfluxDbConfig {
             url: DEFAULT_INFLUXDB_URL.parse().unwrap(),
             username: None,
             password: None,
@@ -71,7 +71,7 @@ impl Default for InfluxDBConfig {
 
 /// Construct a new InfluxDB `Client` based on the given configuration options, for the given
 /// database.
-pub fn get_influxdb_client(config: &InfluxDBConfig) -> Result<Client, Report> {
+pub fn get_influxdb_client(config: &InfluxDbConfig) -> Result<Client, Report> {
     let mut influxdb_client = Client::new(config.url.to_owned(), &config.database);
     if let (Some(username), Some(password)) = (&config.username, &config.password) {
         influxdb_client = influxdb_client.set_authentication(username, password);

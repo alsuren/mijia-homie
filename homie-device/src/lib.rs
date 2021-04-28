@@ -23,7 +23,7 @@ use tokio::time::sleep;
 mod types;
 pub use crate::types::{Datatype, Node, Property};
 mod values;
-pub use crate::values::{Color, ColorFormat, ColorHSV, ColorRGB};
+pub use crate::values::{Color, ColorFormat, ColorHsv, ColorRgb};
 
 const HOMIE_VERSION: &str = "4.0";
 const HOMIE_IMPLEMENTATION: &str = "homie-rs";
@@ -80,9 +80,9 @@ impl Display for State {
     }
 }
 
-impl Into<Vec<u8>> for State {
-    fn into(self) -> Vec<u8> {
-        self.as_str().into()
+impl From<State> for Vec<u8> {
+    fn from(state: State) -> Self {
+        state.as_str().into()
     }
 }
 
@@ -594,7 +594,7 @@ impl HomieStats {
                 sleep(STATS_INTERVAL).await;
             }
         });
-        task.map(|res| Ok(res??))
+        task.map(|res| res?)
     }
 }
 
@@ -643,7 +643,7 @@ where
     E: From<JoinError>,
 {
     // Unwrap the JoinHandle results to get to the real results.
-    try_join(a.map(|res| Ok(res??)), b.map(|res| Ok(res??)))
+    try_join(a.map(|res| res?), b.map(|res| res?))
 }
 
 fn try_join_unit_handles<E>(

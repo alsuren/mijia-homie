@@ -24,7 +24,7 @@ const DEFAULT_MAPPINGS_FILENAME: &str = "mappings.toml";
 pub struct Config {
     pub mqtt: MqttConfig,
     pub homie: HomieConfig,
-    pub influxdb: InfluxDBConfig,
+    pub influxdb: InfluxDbConfig,
 }
 
 impl Config {
@@ -91,15 +91,15 @@ impl Default for HomieConfig {
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(default, deny_unknown_fields)]
-pub struct InfluxDBConfig {
+pub struct InfluxDbConfig {
     pub url: Url,
     pub username: Option<String>,
     pub password: Option<String>,
 }
 
-impl Default for InfluxDBConfig {
-    fn default() -> InfluxDBConfig {
-        InfluxDBConfig {
+impl Default for InfluxDbConfig {
+    fn default() -> InfluxDbConfig {
+        InfluxDbConfig {
             url: DEFAULT_INFLUXDB_URL.parse().unwrap(),
             username: None,
             password: None,
@@ -141,7 +141,7 @@ fn mappings_from_file(filename: &str) -> Result<Vec<Mapping>, Report> {
 
 /// Construct a new InfluxDB `Client` based on the given configuration options, for the given
 /// database.
-pub fn get_influxdb_client(config: &InfluxDBConfig, database: &str) -> Result<Client, Report> {
+pub fn get_influxdb_client(config: &InfluxDbConfig, database: &str) -> Result<Client, Report> {
     let mut influxdb_client = Client::new(config.url.to_owned(), database);
     if let (Some(username), Some(password)) = (&config.username, &config.password) {
         influxdb_client = influxdb_client.set_authentication(username, password);

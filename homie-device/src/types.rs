@@ -41,9 +41,9 @@ impl Display for Datatype {
     }
 }
 
-impl Into<Vec<u8>> for Datatype {
-    fn into(self) -> Vec<u8> {
-        self.as_str().into()
+impl From<Datatype> for Vec<u8> {
+    fn from(datatype: Datatype) -> Self {
+        datatype.as_str().into()
     }
 }
 
@@ -378,11 +378,11 @@ mod tests {
     #[test]
     fn color_property_format() {
         assert_eq!(
-            Property::color("id", "name", false, true, None, ColorFormat::RGB).format,
+            Property::color("id", "name", false, true, None, ColorFormat::Rgb).format,
             Some("rgb".to_string())
         );
         assert_eq!(
-            Property::color("id", "name", false, true, None, ColorFormat::HSV).format,
+            Property::color("id", "name", false, true, None, ColorFormat::Hsv).format,
             Some("hsv".to_string())
         );
     }

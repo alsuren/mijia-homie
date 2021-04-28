@@ -102,16 +102,16 @@ impl Value for String {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ColorFormat {
     /// The colour is in red-green-blue format.
-    RGB,
+    Rgb,
     /// The colour is in hue-saturation-value format.
-    HSV,
+    Hsv,
 }
 
 impl ColorFormat {
     fn as_str(&self) -> &'static str {
         match self {
-            Self::RGB => "rgb",
-            Self::HSV => "hsv",
+            Self::Rgb => "rgb",
+            Self::Hsv => "hsv",
         }
     }
 }
@@ -121,8 +121,8 @@ impl FromStr for ColorFormat {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "rgb" => Ok(Self::RGB),
-            "hsv" => Ok(Self::HSV),
+            "rgb" => Ok(Self::Rgb),
+            "hsv" => Ok(Self::Hsv),
             _ => Err(ValueError::WrongFormat {
                 format: s.to_owned(),
             }),
@@ -169,7 +169,7 @@ impl From<ParseIntError> for ParseColorError {
 
 /// A [colour](https://homieiot.github.io/specification/#color) in red-green-blue format.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ColorRGB {
+pub struct ColorRgb {
     /// The red channel of the colour, between 0 and 255.
     pub r: u8,
     /// The green channel of the colour, between 0 and 255.
@@ -178,26 +178,26 @@ pub struct ColorRGB {
     pub b: u8,
 }
 
-impl ColorRGB {
+impl ColorRgb {
     /// Construct a new RGB colour.
     pub fn new(r: u8, g: u8, b: u8) -> Self {
-        ColorRGB { r, g, b }
+        ColorRgb { r, g, b }
     }
 }
 
-impl Display for ColorRGB {
+impl Display for ColorRgb {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write!(f, "{},{},{}", self.r, self.g, self.b)
     }
 }
 
-impl FromStr for ColorRGB {
+impl FromStr for ColorRgb {
     type Err = ParseColorError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let parts: Vec<_> = s.split(',').collect();
         if let [r, g, b] = parts.as_slice() {
-            Ok(ColorRGB {
+            Ok(ColorRgb {
                 r: r.parse()?,
                 g: g.parse()?,
                 b: b.parse()?,
@@ -208,15 +208,15 @@ impl FromStr for ColorRGB {
     }
 }
 
-impl Color for ColorRGB {
+impl Color for ColorRgb {
     fn format() -> ColorFormat {
-        ColorFormat::RGB
+        ColorFormat::Rgb
     }
 }
 
 /// A [colour](https://homieiot.github.io/specification/#color) in hue-saturation-value format.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ColorHSV {
+pub struct ColorHsv {
     /// The hue of the colour, between 0 and 360.
     pub h: u16,
     /// The saturation of the colour, between 0 and 100.
@@ -225,23 +225,23 @@ pub struct ColorHSV {
     pub v: u8,
 }
 
-impl ColorHSV {
+impl ColorHsv {
     /// Construct a new HSV colour, or panic if the values given are out of range.
     pub fn new(h: u16, s: u8, v: u8) -> Self {
         assert!(h <= 360);
         assert!(s <= 100);
         assert!(v <= 100);
-        ColorHSV { h, s, v }
+        ColorHsv { h, s, v }
     }
 }
 
-impl Display for ColorHSV {
+impl Display for ColorHsv {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write!(f, "{},{},{}", self.h, self.s, self.v)
     }
 }
 
-impl FromStr for ColorHSV {
+impl FromStr for ColorHsv {
     type Err = ParseColorError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -251,16 +251,16 @@ impl FromStr for ColorHSV {
             let s = s.parse()?;
             let v = v.parse()?;
             if h <= 360 && s <= 100 && v <= 100 {
-                return Ok(ColorHSV { h, s, v });
+                return Ok(ColorHsv { h, s, v });
             }
         }
         Err(ParseColorError())
     }
 }
 
-impl Color for ColorHSV {
+impl Color for ColorHsv {
     fn format() -> ColorFormat {
-        ColorFormat::HSV
+        ColorFormat::Hsv
     }
 }
 

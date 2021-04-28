@@ -86,7 +86,7 @@ pub enum Datatype {
     /// An [enum value](https://homieiot.github.io/specification/#enum) from a set of possible
     /// values specified by the property format.
     Enum,
-    /// An [RGB](enum.ColorFormat.html#variant.RGB) or [HSV](enum.ColorFormat.html#variant.HSV)
+    /// An [RGB](enum.ColorFormat.html#variant.Rgb) or [HSV](enum.ColorFormat.html#variant.Hsv)
     /// [color](https://homieiot.github.io/specification/#color), depending on the property
     /// [format](struct.Property.html#method.color_format).
     Color,
@@ -494,7 +494,7 @@ impl Device {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::values::{ColorHSV, ColorRGB, EnumValue};
+    use crate::values::{ColorHsv, ColorRgb, EnumValue};
 
     #[test]
     fn extension_parse_succeeds() {
@@ -611,13 +611,13 @@ mod tests {
         let mut property = Property::new("property_id");
 
         // With no known value, parsing fails.
-        assert_eq!(property.value::<ColorRGB>(), Err(ValueError::Unknown));
-        assert_eq!(property.value::<ColorHSV>(), Err(ValueError::Unknown));
+        assert_eq!(property.value::<ColorRgb>(), Err(ValueError::Unknown));
+        assert_eq!(property.value::<ColorHsv>(), Err(ValueError::Unknown));
 
         // With an invalid value, parsing also fails.
         property.value = Some("".to_owned());
         assert_eq!(
-            property.value::<ColorRGB>(),
+            property.value::<ColorRgb>(),
             Err(ValueError::ParseFailed {
                 value: "".to_owned(),
                 datatype: Datatype::Color,
@@ -628,7 +628,7 @@ mod tests {
         property.value = Some("12,34,56".to_owned());
         assert_eq!(
             property.value(),
-            Ok(ColorRGB {
+            Ok(ColorRgb {
                 r: 12,
                 g: 34,
                 b: 56
@@ -636,7 +636,7 @@ mod tests {
         );
         assert_eq!(
             property.value(),
-            Ok(ColorHSV {
+            Ok(ColorHsv {
                 h: 12,
                 s: 34,
                 v: 56
@@ -647,7 +647,7 @@ mod tests {
         property.datatype = Some(Datatype::Color);
         assert_eq!(
             property.value(),
-            Ok(ColorRGB {
+            Ok(ColorRgb {
                 r: 12,
                 g: 34,
                 b: 56
@@ -655,7 +655,7 @@ mod tests {
         );
         assert_eq!(
             property.value(),
-            Ok(ColorHSV {
+            Ok(ColorHsv {
                 h: 12,
                 s: 34,
                 v: 56
@@ -666,14 +666,14 @@ mod tests {
         property.format = Some("rgb".to_owned());
         assert_eq!(
             property.value(),
-            Ok(ColorRGB {
+            Ok(ColorRgb {
                 r: 12,
                 g: 34,
                 b: 56
             })
         );
         assert_eq!(
-            property.value::<ColorHSV>(),
+            property.value::<ColorHsv>(),
             Err(ValueError::WrongFormat {
                 format: "rgb".to_owned()
             })
@@ -682,14 +682,14 @@ mod tests {
         // With the wrong datatype, parsing fails.
         property.datatype = Some(Datatype::Integer);
         assert_eq!(
-            property.value::<ColorRGB>(),
+            property.value::<ColorRgb>(),
             Err(ValueError::WrongDatatype {
                 actual: Datatype::Integer,
                 expected: Datatype::Color,
             })
         );
         assert_eq!(
-            property.value::<ColorHSV>(),
+            property.value::<ColorHsv>(),
             Err(ValueError::WrongDatatype {
                 actual: Datatype::Integer,
                 expected: Datatype::Color,
@@ -751,9 +751,9 @@ mod tests {
 
         // Parsing valid formats works even if datatype is unnkown.
         property.format = Some("rgb".to_owned());
-        assert_eq!(property.color_format(), Ok(ColorFormat::RGB));
+        assert_eq!(property.color_format(), Ok(ColorFormat::Rgb));
         property.format = Some("hsv".to_owned());
-        assert_eq!(property.color_format(), Ok(ColorFormat::HSV));
+        assert_eq!(property.color_format(), Ok(ColorFormat::Hsv));
 
         // With the wrong datatype, parsing fails.
         property.datatype = Some(Datatype::Integer);
@@ -767,7 +767,7 @@ mod tests {
 
         // With the correct datatype, parsing works.
         property.datatype = Some(Datatype::Color);
-        assert_eq!(property.color_format(), Ok(ColorFormat::HSV));
+        assert_eq!(property.color_format(), Ok(ColorFormat::Hsv));
     }
 
     #[test]

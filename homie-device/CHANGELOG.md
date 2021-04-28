@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Breaking changes
+
+- Acronyms no longer upper-case.
+
 ## 0.5.0
 
 ### Breaking changes
