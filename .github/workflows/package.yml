@@ -21,7 +21,7 @@ jobs:
           - x86_64-unknown-linux-gnu
         include:
           - target: arm-unknown-linux-gnueabi
-            binutils: binutils-arm-linux-gnueabihf
+            binutils: binutils-arm-linux-gnueabi
           - target: armv7-unknown-linux-gnueabihf
             binutils: binutils-arm-linux-gnueabihf
           - target: aarch64-unknown-linux-gnu
