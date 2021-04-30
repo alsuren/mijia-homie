@@ -28,7 +28,8 @@ jobs:
 
   coverage:
     runs-on: ubuntu-latest
-
+    env:
+      RUSTC_BOOTSTRAP: 1
     steps:
       - uses: actions/checkout@v2
       - name: Install dependencies
@@ -38,16 +39,14 @@ jobs:
       - name: Install llvm-tools
         run: rustup component add llvm-tools-preview
       - name: Build for coverage
-        run: >-
-          RUSTC_BOOTSTRAP=1
-          RUSTFLAGS="-Zinstrument-coverage"
-          cargo build --verbose
+        run: cargo build --verbose
+        env:
+          RUSTFLAGS: "-Zinstrument-coverage"
       - name: Run tests with coverage
-        run: >-
-          RUSTC_BOOTSTRAP=1
-          RUSTFLAGS="-Zinstrument-coverage"
-          LLVM_PROFILE_FILE="test-coverage-%p-%m.profraw"
-          cargo test --verbose
+        run: cargo test --verbose
+        env:
+          RUSTFLAGS: "-Zinstrument-coverage"
+          LLVM_PROFILE_FILE: "test-coverage-%p-%m.profraw"
       - name: Convert coverage
         run: ./grcov . -s . --binary-path target/debug/ -t lcov --branch --ignore-not-existing -o target/debug/lcov.info
       - name: Upload coverage to codecov.io
