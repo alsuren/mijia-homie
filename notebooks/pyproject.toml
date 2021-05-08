@@ -12,6 +12,7 @@ plotly = "^4.14.3"
 nbstripout = "^0.3.9"
 ipython-cache = "^0.2.6"
 kaleido = "0.2.1"
+nbconvert = "^6.0.7"
 
 [tool.poetry.dev-dependencies]
 
