@@ -22,6 +22,4 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Format Rust code
-        run: cargo fmt
-      - name: Check for differences
-        run: git diff --exit-code
+        run: cargo fmt --all -- --check

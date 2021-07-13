@@ -2,7 +2,7 @@ name: Rust
 
 on:
   push:
-    branches: [ master ]
+    branches: [master]
   pull_request:
 
 env:
@@ -13,22 +13,23 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v2
-    - name: Install dependencies
-      run: sudo apt-get install libdbus-1-dev
-    - name: Build
-      run: cargo build --verbose
-    - name: Run tests
-      run: cargo test --verbose
-    - name: Run clippy
-      uses: actions-rs/clippy-check@v1
-      with:
-        token: ${{ secrets.GITHUB_TOKEN }}
-        args: --all-features
+      - uses: actions/checkout@v2
+      - name: Install dependencies
+        run: sudo apt-get install libdbus-1-dev
+      - name: Build
+        run: cargo build --all-features
+      - name: Run tests
+        run: cargo test --all-features
+      - name: Run clippy
+        uses: actions-rs/clippy-check@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          args: --all-features
 
   coverage:
     runs-on: ubuntu-latest
-
+    env:
+      RUSTC_BOOTSTRAP: 1
     steps:
       - uses: actions/checkout@v2
       - name: Install dependencies
@@ -38,16 +39,14 @@ jobs:
       - name: Install llvm-tools
         run: rustup component add llvm-tools-preview
       - name: Build for coverage
-        run: >-
-          RUSTC_BOOTSTRAP=1
-          RUSTFLAGS="-Zinstrument-coverage"
-          cargo build --verbose
+        run: cargo build --all-features
+        env:
+          RUSTFLAGS: "-Zinstrument-coverage"
       - name: Run tests with coverage
-        run: >-
-          RUSTC_BOOTSTRAP=1
-          RUSTFLAGS="-Zinstrument-coverage"
-          LLVM_PROFILE_FILE="test-coverage-%p-%m.profraw"
-          cargo test --verbose
+        run: cargo test --all-features
+        env:
+          RUSTFLAGS: "-Zinstrument-coverage"
+          LLVM_PROFILE_FILE: "test-coverage-%p-%m.profraw"
       - name: Convert coverage
         run: ./grcov . -s . --binary-path target/debug/ -t lcov --branch --ignore-not-existing -o target/debug/lcov.info
       - name: Upload coverage to codecov.io
@@ -55,4 +54,3 @@ jobs:
         with:
           directory: ./target/debug
           fail_ci_if_error: true
-          verbose: true
