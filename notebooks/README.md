@@ -6,6 +6,7 @@ To get started, from this directory, run:
 
 ```bash
 poetry install
+poetry run ipython kernel install --user --name=mijia-homie
 ```
 
 and then run this command to find out where your python interpreter lives:
