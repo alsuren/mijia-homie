@@ -839,7 +839,7 @@ dependencies = [
 
 [[package]]
 name = "homie-influx"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "color-backtrace",
  "eyre",

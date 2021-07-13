@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.3
+
+### New features
+
+- Added `value_int` field to `boolean` measurements, for compatibility with Grafana.
+
+### Other changes
+
+- Use rustls rather than OpenSSL.
+
 ## 0.2.2
 
 ### Bug fixes
