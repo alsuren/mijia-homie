@@ -652,7 +652,7 @@ dependencies = [
 
 [[package]]
 name = "homie-controller"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "async-channel",
  "futures",
@@ -668,7 +668,7 @@ dependencies = [
 
 [[package]]
 name = "homie-device"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "async-channel",
  "futures",
@@ -684,7 +684,7 @@ dependencies = [
 
 [[package]]
 name = "homie-influx"
-version = "0.2.3"
+version = "0.2.4"
 dependencies = [
  "color-backtrace",
  "eyre",
@@ -994,7 +994,7 @@ dependencies = [
 
 [[package]]
 name = "mijia"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "backoff",
  "bluez-async",
@@ -1011,7 +1011,7 @@ dependencies = [
 
 [[package]]
 name = "mijia-homie"
-version = "0.2.3"
+version = "0.2.4"
 dependencies = [
  "backoff",
  "color-backtrace",

@@ -1,6 +1,6 @@
 [package]
 name = "homie-device"
-version = "0.5.0"
+version = "0.6.0"
 authors = ["Andrew Walbran <qwandor@google.com>", "David Laban <alsuren@gmail.com>"]
 edition = "2018"
 license = "MIT OR Apache-2.0"
