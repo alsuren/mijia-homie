@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Bugfixes
+
+- Updated to `rumqttc` 0.8, to fix build errors on latest rustc.
+
 ## 0.2.3
 
 ### New features

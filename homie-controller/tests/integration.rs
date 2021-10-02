@@ -5,11 +5,12 @@
 use futures::future::ready;
 use homie_controller::{Event, HomieController, State};
 use homie_device::{HomieDevice, Node, Property, SpawnError};
-use librumqttd::{Broker, Config, ConnectionSettings, ServerSettings};
+use librumqttd::{Broker, Config, ConnectionSettings, ConsoleSettings, ServerSettings};
 use rumqttc::{ConnectionError, MqttOptions, StateError};
 use std::collections::HashMap;
 use std::env;
 use std::io::ErrorKind;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::mpsc;
 use std::thread;
 
@@ -201,16 +202,14 @@ async fn test_device() {
     }
 }
 
-/// Spawn an MQTT broker listening on the given port.
+/// Spawn an MQTT broker listening on the given port on localhost.
 fn spawn_mqtt_broker(port: u16) {
     let mut servers = HashMap::new();
     servers.insert(
         "1".to_string(),
         ServerSettings {
-            port,
-            ca_path: None,
-            cert_path: None,
-            key_path: None,
+            listen: SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), port),
+            cert: None,
             next_connection_delay_ms: 1,
             connections: ConnectionSettings {
                 connection_timeout_ms: 100,
@@ -230,7 +229,9 @@ fn spawn_mqtt_broker(port: u16) {
         servers,
         cluster: None,
         replicator: None,
-        console: None,
+        console: ConsoleSettings {
+            listen: SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 0),
+        },
     };
     let mut broker = Broker::new(broker_config);
     thread::spawn(move || {

@@ -5,6 +5,7 @@
 ### Breaking changes
 
 - Acronyms no longer upper-case.
+- Updated to `rumqttc` 0.8.
 
 ## 0.5.0
 
