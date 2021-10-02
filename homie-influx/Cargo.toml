@@ -23,7 +23,9 @@ rustls-native-certs = "0.5.0"
 serde_derive = "1.0.118"
 serde = "1.0.118"
 stable-eyre = "0.2.1"
-tokio = "1.0.1"
+# TODO: Remove "io-util" once a new version of rumqttc is released which fixes
+# https://github.com/bytebeamio/rumqtt/issues/294.
+tokio = { version = "1.12.0", features = ["io-util", "macros", "rt-multi-thread"] }
 toml = "0.5.8"
 url = { version = "2.2.0", features = ["serde"] }
 
