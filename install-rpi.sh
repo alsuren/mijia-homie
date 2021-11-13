@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2002
 
 set -euxo pipefail
-shellcheck -e SC2002 "$0"
+shellcheck "$0"
 
 ## Set STATE_FILE=/path/to/some/file to change where your state file lives (in case you need to re-run the script)
 STATE_FILE="$TMPDIR/install-rpi.state"
@@ -141,4 +142,6 @@ if [[ "$STEP" == 8 ]]; then
     
     ssh "${FINAL_SSH}" curl -sSLf "https://github.com/alsuren/mijia-homie/releases/download/mijia-homie-${VERSION}/mijia-homie_${VERSION}_arm64.deb" -o "mijia-homie_${VERSION}_arm64.deb" 
     ssh "${FINAL_SSH}" sudo dpkg -i "mijia-homie_${VERSION}_arm64.deb"
+
+    inc_step
 fi
