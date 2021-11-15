@@ -251,7 +251,7 @@ async fn bluetooth_connection_loop(
         let now = Instant::now();
         if now > next_scan_due && state.lock().await.sensors.len() < sensor_names.len() {
             next_scan_due = now + SCAN_INTERVAL;
-            check_for_sensors(state.clone(), session, &sensor_names).await?;
+            check_for_sensors(state.clone(), session, sensor_names).await?;
         }
 
         // Check the state of each sensor and act on it if appropriate.
@@ -334,8 +334,8 @@ async fn check_for_sensors(
                 }
             } else {
                 // If we don't know about the sensor on any adapter, add it.
-                let sensor = Sensor::new(props, &sensor_names);
-                state.sensors.insert(sensor.mac_address.clone(), sensor);
+                let sensor = Sensor::new(props, sensor_names);
+                state.sensors.insert(sensor.mac_address, sensor);
             }
         }
     }

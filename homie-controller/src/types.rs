@@ -361,8 +361,8 @@ impl FromStr for Extension {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let parts: Vec<_> = s.split(':').collect();
         if let [id, version, homie_versions] = parts.as_slice() {
-            if let Some(homie_versions) = homie_versions.strip_prefix("[") {
-                if let Some(homie_versions) = homie_versions.strip_suffix("]") {
+            if let Some(homie_versions) = homie_versions.strip_prefix('[') {
+                if let Some(homie_versions) = homie_versions.strip_suffix(']') {
                     return Ok(Extension {
                         id: (*id).to_owned(),
                         version: (*version).to_owned(),

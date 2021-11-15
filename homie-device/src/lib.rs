@@ -356,7 +356,7 @@ impl HomieDevice {
         // nothing else can modify `nodes` in the meantime.
         let node = &self.nodes[self.nodes.len() - 1];
 
-        self.publish_node(&node).await?;
+        self.publish_node(node).await?;
         self.publish_nodes().await
     }
 

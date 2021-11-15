@@ -425,7 +425,7 @@ impl MijiaSession {
         &self,
         id: &DeviceId,
     ) -> Result<Vec<Option<HistoryRecord>>, MijiaError> {
-        let history_range = self.get_history_range(&id).await?;
+        let history_range = self.get_history_range(id).await?;
 
         let history_record_characteristic = self
             .bt_session
@@ -441,7 +441,7 @@ impl MijiaSession {
             .await?;
         let events = events.timeout(HISTORY_RECORD_TIMEOUT);
         pin!(events);
-        self.start_notify_history(&id, Some(0)).await?;
+        self.start_notify_history(id, Some(0)).await?;
 
         let mut history = vec![None; history_range.len()];
         while let Some(Ok(event)) = events.next().await {
@@ -472,7 +472,7 @@ impl MijiaSession {
             }
         }
 
-        self.stop_notify_history(&id).await?;
+        self.stop_notify_history(id).await?;
 
         Ok(history)
     }
