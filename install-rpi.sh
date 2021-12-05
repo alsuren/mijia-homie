@@ -30,13 +30,14 @@ function inc_step() {
 ## Set BACKUP_SSH=user@host.local to decide which machine to backup configs from.
 BACKUP_SSH=${BACKUP_SSH:-pi@cottagepi.local}
 ## Set BOOTSTRAP_SSH=user@host.local to specify where you expect the raspberrypi to appear on first boot
-BOOTSTRAP_SSH=${BOOTSTRAP_SSH:-pi@raspberrypi.local}
-## Set FINAL_HOSTNAME=yourfavouritepi.local to change the hostname that the raspberrypo will take
+BOOTSTRAP_HOSTNAME=${BOOTSTRAP_HOSTNAME:-raspberrypi.local}
+BOOTSTRAP_SSH=${BOOTSTRAP_SSH:-BOOTSTRAP_HOSTNAME}
+## Set FINAL_HOSTNAME=yourfavouritepi.local to change the hostname that the raspberrypi will take
 FINAL_HOSTNAME=${FINAL_HOSTNAME:-${BACKUP_SSH#*@}}
 FINAL_SSH=${FINAL_SSH:-pi@$FINAL_HOSTNAME}
 
 ## Set SSH_IMPORT_IDS='gh:alsuren gh:qwandor' to add ssh keys to your raspberry pi
-SSH_IMPORT_IDS=${SSH_IMPORT_IDS:?"Set SSH_IMPORT_IDS='gh:alsuren gh:qwandor' to add ssh keys to your raspberry pi"}
+SSH_IMPORT_IDS=${SSH_IMPORT_IDS:-'gh:alsuren gh:qwandor'}
 
 ## Set WIFI_COUNTRY="us" to specify your wifi country.
 WIFI_COUNTRY=${WIFI_COUNTRY:-"gb"}
@@ -45,7 +46,7 @@ WIFI_SSID=${WIFI_SSID:?Please set WIFI_SSID}
 ## Set WIFI_PSK="yourwifipassword" to specify your wifi password.
 WIFI_PSK=${WIFI_PSK:?Please set WIFI_PSK}
 
-## Set SDCARD=/Volumes/monutpoint/ to specify sdcard location.
+## Set SDCARD=/Volumes/mountpoint/ to specify sdcard location.
 SDCARD=${SDCARD:-/Volumes/boot/}
 
 if [ $# != 0 ]; then
@@ -110,12 +111,16 @@ if [[ "$STEP" == 4 ]]; then
 
         fi
         ssh -oStrictHostKeyChecking=no "${FINAL_SSH}" hostname
+        IP=$(ssh-copy-id -oStrictHostKeyChecking=no "${FINAL_SSH}" ip address show dev wlan0 | grep ' inet ' | sed -e 's:/.*::' -e 's/^.* //')
+        ssh-keygen -R "$IP"
+        ssh-keyscan -H "${FINAL_HOSTNAME}" >> ~/.ssh/known_hosts
+        ssh-keyscan -H "${IP}" >> ~/.ssh/known_hosts
     fi
     inc_step
 fi
 
 if [[ "$STEP" == 5 ]]; then
-    ssh -oStrictHostKeyChecking=no "${FINAL_SSH}" hostname 
+    ssh "${FINAL_SSH}" hostname 
     ssh "${FINAL_SSH}" 'curl https://sh.rustup.rs -sSf | sh -s -- -y'
     inc_step
 fi
@@ -142,6 +147,28 @@ if [[ "$STEP" == 8 ]]; then
     
     ssh "${FINAL_SSH}" curl -sSLf "https://github.com/alsuren/mijia-homie/releases/download/mijia-homie-${VERSION}/mijia-homie_${VERSION}_arm64.deb" -o "mijia-homie_${VERSION}_arm64.deb" 
     ssh "${FINAL_SSH}" sudo dpkg -i "mijia-homie_${VERSION}_arm64.deb"
+
+    inc_step
+fi
+
+if [[ "$STEP" == 9 ]]; then
+
+    echo unattended-upgrades unattended-upgrades/enable_auto_updates boolean true | ssh "${FINAL_SSH}" sudo debconf-set-selections
+    ssh "${FINAL_SSH}" sudo apt install unattended-upgrades apt-listchanges
+
+    inc_step
+fi
+
+if [[ "$STEP" == 10 ]]; then
+
+    ssh "${FINAL_SSH}" sudo passwd --delete pi
+
+    inc_step
+fi
+
+if [[ "$STEP" == 11 ]]; then
+
+    ssh "${FINAL_SSH}" sudo apt install -y vim
 
     inc_step
 fi
