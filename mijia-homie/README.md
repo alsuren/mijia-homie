@@ -1,7 +1,6 @@
 # Mijia sensor to Homie bridge
 
 [![crates.io page](https://img.shields.io/crates/v/mijia-homie.svg)](https://crates.io/crates/mijia-homie)
-[![Download](https://api.bintray.com/packages/homie-rs/homie-rs/mijia-homie/images/download.svg) ](https://bintray.com/homie-rs/homie-rs/mijia-homie/_latestVersion)
 
 `mijia-homie` is a service for connecting to Xiaomi Mijia 2 Bluetooth temperature/humidity sensors
 and publishing their readings to an MQTT broker following the
@@ -15,8 +14,8 @@ background.
 It is recommended to install the latest release from our Debian repository:
 
 ```sh
-$ curl -L https://bintray.com/user/downloadSubjectPublicKey?username=homie-rs | sudo apt-key add -
-$ echo "deb https://dl.bintray.com/homie-rs/homie-rs stable main" | sudo tee /etc/apt/sources.list.d/homie-rs.list
+$ curl -L https://homiers.jfrog.io/artifactory/api/security/keypair/public/repositories/homie-rs | sudo apt-key add -
+$ echo "deb https://homiers.jfrog.io/artifactory/homie-rs stable main" | sudo tee /etc/apt/sources.list.d/homie-rs.list
 $ sudo apt update && sudo apt install mijia-homie
 ```
 
