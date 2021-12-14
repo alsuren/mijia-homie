@@ -23,10 +23,10 @@ jobs:
         uses: actions-ecosystem/action-regex-match@v2
         with:
           text: ${{ matrix.asset.name }}
-          regex: "^([a-z0-9-]+)_([0-9.-]+)_([a-z0-9]+).deb$"
+          regex: "^[a-z0-9-]+_[0-9.-]+_([a-z0-9]+).deb$"
       - name: Upload deb package to Artifactory
         if: ${{ steps.parse_filename.outputs.match != '' }}
         run: >
           curl -H"Authorization: Bearer ${{ secrets.JFROG_TOKEN }}"
-          -XPUT "https://homiers.jfrog.io/artifactory/homie-rs/pool/${{ steps.parse_filename.outputs.group1 }};deb.distribution=stable;deb.component=main;deb.architecture=${{ steps.parse_filename.outputs.group3 }}"
+          -XPUT "https://homiers.jfrog.io/artifactory/homie-rs/pool/${{ matrix.asset.name }};deb.distribution=stable;deb.component=main;deb.architecture=${{ steps.parse_filename.outputs.group1 }}"
           -T "${{ matrix.asset.name }}"
