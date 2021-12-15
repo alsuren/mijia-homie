@@ -23,21 +23,10 @@ jobs:
         uses: actions-ecosystem/action-regex-match@v2
         with:
           text: ${{ matrix.asset.name }}
-          regex: "^([a-z0-9-]+)_([0-9.-]+)_([a-z0-9]+).deb$"
-      - name: Upload deb package to Bintray
+          regex: "^[a-z0-9-]+_[0-9.-]+_([a-z0-9]+).deb$"
+      - name: Upload deb package to Artifactory
         if: ${{ steps.parse_filename.outputs.match != '' }}
-        uses: bpicode/github-action-upload-bintray@master
-        with:
-          file: ${{ matrix.asset.name }}
-          api_user: alsuren
-          api_key: ${{ secrets.BINTRAY_API_KEY }}
-          repository_user: homie-rs
-          repository: homie-rs
-          package: ${{ steps.parse_filename.outputs.group1 }}
-          version: ${{ steps.parse_filename.outputs.group2 }}
-          upload_path: pool/stable/main
-          publish: 1
-          calculate_metadata: true # Schedule metadata calculation after upload
-          deb_distribution: stable
-          deb_component: main
-          deb_architecture: ${{ steps.parse_filename.outputs.group3 }}
+        run: >
+          curl -H"Authorization: Bearer ${{ secrets.JFROG_TOKEN }}"
+          -XPUT "https://homiers.jfrog.io/artifactory/homie-rs/pool/${{ matrix.asset.name }};deb.distribution=stable;deb.component=main;deb.architecture=${{ steps.parse_filename.outputs.group1 }}"
+          -T "${{ matrix.asset.name }}"

@@ -1,7 +1,6 @@
 # Homie device InfluxDB logger
 
 [![crates.io page](https://img.shields.io/crates/v/homie-influx.svg)](https://crates.io/crates/homie-influx)
-[![Download](https://api.bintray.com/packages/homie-rs/homie-rs/homie-influx/images/download.svg) ](https://bintray.com/homie-rs/homie-rs/homie-influx/_latestVersion)
 
 `homie-influx` is a service to connect to an MQTT broker, discover devices following the
 [Homie convention](https://homieiot.github.io/), and record their property value changes to an
@@ -15,8 +14,8 @@ background.
 It is recommended to install the latest release from our Debian repository:
 
 ```sh
-$ curl -L https://bintray.com/user/downloadSubjectPublicKey?username=homie-rs | sudo apt-key add -
-$ echo "deb https://dl.bintray.com/homie-rs/homie-rs stable main" | sudo tee /etc/apt/sources.list.d/homie-rs.list
+$ curl -L https://homiers.jfrog.io/artifactory/api/security/keypair/public/repositories/homie-rs | sudo apt-key add -
+$ echo "deb https://homiers.jfrog.io/artifactory/homie-rs stable main" | sudo tee /etc/apt/sources.list.d/homie-rs.list
 $ sudo apt update && sudo apt install homie-influx
 ```
 
