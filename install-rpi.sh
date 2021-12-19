@@ -39,7 +39,7 @@ BACKUP_SSH=${BACKUP_SSH:-pi@${BACKUP_HOSTNAME}}
 
 ## Set BOOTSTRAP_SSH=user@host.local to specify where you expect the raspberrypi to appear on first boot
 BOOTSTRAP_HOSTNAME=${BOOTSTRAP_HOSTNAME:-raspberrypi.local}
-BOOTSTRAP_SSH=${BOOTSTRAP_SSH:-BOOTSTRAP_HOSTNAME}
+BOOTSTRAP_SSH=${BOOTSTRAP_SSH:-pi@${BOOTSTRAP_HOSTNAME}}
 
 ## Set SSH_IMPORT_IDS='gh:alsuren gh:qwandor' to add ssh keys to your raspberry pi
 SSH_IMPORT_IDS=${SSH_IMPORT_IDS:-'gh:alsuren gh:qwandor'}
