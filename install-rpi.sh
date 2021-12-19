@@ -77,6 +77,19 @@ if [[ "$STEP" == 1 ]]; then
 fi
 
 if [[ "$STEP" == 2 ]]; then
+    # shellcheck disable=SC2016
+    echo '
+    NOTICE: This script does not handle flasing of SD cards.
+    You probably want to download an image from
+        https://downloads.raspberrypi.org/raspios_arm64/images/
+    and then do something like:
+        sudo dd if=~/Downloads/2021-10-30-raspios-bullseye-arm64.img of=/dev/rdisk2 bs=$((1024 * 1024 * 4))
+    '
+    until [[ -d "$SDCARD" ]]; do
+        echo "NOTICE: Waiting for $SDCARD to be mounted. Press enter to try again."
+        # automatic retry in 10 seconds if the user doesn't do anything
+        read -rt 10 || true
+    done
     echo "setting up sdcard at $SDCARD for unattended installs"
     cat > "$SDCARD/wpa_supplicant.conf" << EOF
 country=$WIFI_COUNTRY
