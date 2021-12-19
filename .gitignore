@@ -7,5 +7,5 @@ sensor-names.toml
 .DS_Store
 .vscode
 /notebooks/data
-*.mijia-homie.tar
+*.etc.tar
 install-rpi.state

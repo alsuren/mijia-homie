@@ -29,14 +29,17 @@ function inc_step() {
     set_state STEP $(("$STEP" + 1))
 }
 
+## Set FINAL_HOSTNAME=yourfavouritepi.local to change the hostname that the raspberrypi will take
+FINAL_HOSTNAME=${FINAL_HOSTNAME:-cottagepi.local}
+FINAL_SSH=${FINAL_SSH:-pi@$FINAL_HOSTNAME}
+
 ## Set BACKUP_SSH=user@host.local to decide which machine to backup configs from.
-BACKUP_SSH=${BACKUP_SSH:-pi@cottagepi.local}
+BACKUP_HOSTNAME=${BACKUP_HOSTNAME:-${FINAL_HOSTNAME}}
+BACKUP_SSH=${BACKUP_SSH:-pi@${BACKUP_HOSTNAME}}
+
 ## Set BOOTSTRAP_SSH=user@host.local to specify where you expect the raspberrypi to appear on first boot
 BOOTSTRAP_HOSTNAME=${BOOTSTRAP_HOSTNAME:-raspberrypi.local}
 BOOTSTRAP_SSH=${BOOTSTRAP_SSH:-BOOTSTRAP_HOSTNAME}
-## Set FINAL_HOSTNAME=yourfavouritepi.local to change the hostname that the raspberrypi will take
-FINAL_HOSTNAME=${FINAL_HOSTNAME:-${BACKUP_SSH#*@}}
-FINAL_SSH=${FINAL_SSH:-pi@$FINAL_HOSTNAME}
 
 ## Set SSH_IMPORT_IDS='gh:alsuren gh:qwandor' to add ssh keys to your raspberry pi
 SSH_IMPORT_IDS=${SSH_IMPORT_IDS:-'gh:alsuren gh:qwandor'}
@@ -67,8 +70,8 @@ fi
 
 if [[ "$STEP" == 1 ]]; then
     echo "backing up from ${BACKUP_SSH}"
-    ssh "${BACKUP_SSH}" sudo tar -c -f - /etc/mijia-homie > "${BACKUP_SSH}.etc.mijia-homie.tar"
-    tar -t -f "${BACKUP_SSH}.etc.mijia-homie.tar"
+    ssh "${BACKUP_SSH}" sudo tar -c -f - /etc/mijia-homie /etc/telegraf/telegraf.conf > "${BACKUP_SSH}.etc.tar"
+    tar -t -f "${BACKUP_SSH}.etc.tar"
 
     inc_step
 fi
@@ -135,7 +138,7 @@ if [[ "$STEP" == 6 ]]; then
 fi
 
 if [[ "$STEP" == 7 ]]; then
-    cat "${BACKUP_SSH}.etc.mijia-homie.tar" | \
+    cat "${BACKUP_SSH}.etc.tar" | \
         ssh "${FINAL_SSH}" sudo tar -x -v -f - -C /
     inc_step
 fi
