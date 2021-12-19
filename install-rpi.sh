@@ -182,7 +182,7 @@ fi
 
 if [[ "$STEP" == 11 ]]; then
 
-    ssh "${FINAL_SSH}" sudo apt install -y vim
+    ssh "${FINAL_SSH}" sudo apt install -y vim mc shellcheck
 
     inc_step
 fi
