@@ -157,15 +157,10 @@ if [[ "$STEP" == 7 ]]; then
 fi
 
 if [[ "$STEP" == 8 ]]; then
-    ARCH="$(ssh "${FINAL_SSH}" uname --machine)"
-    VERSION="$(git tag | sed -n s/mijia-homie-//p | tail -n1)"
-    if [[ "$ARCH" != aarch64 ]] ; then
-        echo "TODO: think about the other rpi architectures"
-        exit 1
-    fi
-    
-    ssh "${FINAL_SSH}" curl -sSLf "https://github.com/alsuren/mijia-homie/releases/download/mijia-homie-${VERSION}/mijia-homie_${VERSION}_arm64.deb" -o "mijia-homie_${VERSION}_arm64.deb" 
-    ssh "${FINAL_SSH}" sudo dpkg -i "mijia-homie_${VERSION}_arm64.deb"
+    curl -L https://homiers.jfrog.io/artifactory/api/security/keypair/public/repositories/homie-rs | ssh "${FINAL_SSH}" sudo apt-key add -
+    echo "deb https://homiers.jfrog.io/artifactory/homie-rs stable main" | ssh "${FINAL_SSH}" sudo tee /etc/apt/sources.list.d/homie-rs.list
+    ssh "${FINAL_SSH}" sudo apt update
+    ssh "${FINAL_SSH}" sudo apt install mijia-homie
 
     inc_step
 fi
