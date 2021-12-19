@@ -79,7 +79,7 @@ fi
 if [[ "$STEP" == 2 ]]; then
     # shellcheck disable=SC2016
     echo '
-    NOTICE: This script does not handle flasing of SD cards.
+    NOTICE: This script does not handle flashing of SD cards.
     You probably want to download an image from
         https://downloads.raspberrypi.org/raspios_arm64/images/
     and then do something like:
