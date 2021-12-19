@@ -186,3 +186,16 @@ if [[ "$STEP" == 11 ]]; then
 
     inc_step
 fi
+
+if [[ "$STEP" == 12 ]]; then
+    VERSION_CODENAME=$(ssh "${FINAL_SSH}" grep VERSION_CODENAME /etc/os-release | sed s/VERSION_CODENAME=//)
+
+    curl -s https://repos.influxdata.com/influxdb.key | ssh "${FINAL_SSH}" sudo apt-key add -
+    echo "deb https://repos.influxdata.com/debian ${VERSION_CODENAME} stable" | ssh "${FINAL_SSH}" sudo tee /etc/apt/sources.list.d/influxdb.list
+
+    ssh "${FINAL_SSH}" sudo apt update
+    ssh "${FINAL_SSH}" sudo apt install telegraf
+    ssh "${FINAL_SSH}" sudo systemctl start telegraf
+
+    inc_step
+fi
