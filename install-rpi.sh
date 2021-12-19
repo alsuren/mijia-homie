@@ -62,6 +62,7 @@ fi
 STEP="${STEP:-}"
 if [[ "$STEP" == "" ]]; then
     get_state STEP
+    STEP="${STEP:-1}"
 fi
 
 if [[ "$STEP" == 1 ]]; then
