@@ -4,8 +4,10 @@
 set -euxo pipefail
 shellcheck "$0"
 
+cd "$(dirname "$0")"
+
 ## Set STATE_FILE=/path/to/some/file to change where your state file lives (in case you need to re-run the script)
-STATE_FILE="$TMPDIR/install-rpi.state"
+STATE_FILE="./install-rpi.state"
 function get_state() {
     KEY="$1"
     declare -g "$KEY"

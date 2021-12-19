@@ -8,3 +8,4 @@ sensor-names.toml
 .vscode
 /notebooks/data
 *.mijia-homie.tar
+install-rpi.state
