@@ -7,3 +7,5 @@ sensor-names.toml
 .DS_Store
 .vscode
 /notebooks/data
+*.etc.tar
+install-rpi.state
