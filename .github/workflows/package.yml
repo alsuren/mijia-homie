@@ -72,7 +72,7 @@ jobs:
         working-directory: mijia-homie
         run: cargo deb --target ${{ matrix.target }} --no-build
 
-      - name: Upload package
+      - name: Upload packages
         uses: actions/upload-artifact@v2
         with:
           name: debian-packages
