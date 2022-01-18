@@ -66,11 +66,9 @@ jobs:
           command: build
           args: --release --target ${{ matrix.target }}
       - name: Package homie-influx
-        working-directory: homie-influx
-        run: cargo deb --target ${{ matrix.target }} --no-build
+        run: cargo deb --target ${{ matrix.target }} --no-build --package homie-influx
       - name: Package mijia-homie
-        working-directory: mijia-homie
-        run: cargo deb --target ${{ matrix.target }} --no-build
+        run: cargo deb --target ${{ matrix.target }} --no-build --package mijia-homie
 
       - name: Upload packages
         uses: actions/upload-artifact@v2
