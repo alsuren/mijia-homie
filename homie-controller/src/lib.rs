@@ -172,7 +172,6 @@ impl HomieController {
     }
 
     async fn handle_event(&self, incoming: Incoming) -> Result<Option<Event>, PollError> {
-        log::trace!("Incoming: {:?}", incoming);
         if let Incoming::Publish(publish) = incoming {
             match self.handle_publish(publish).await {
                 Err(HandleError::Warning(err)) => {
