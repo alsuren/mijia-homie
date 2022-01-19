@@ -171,7 +171,6 @@ pub fn get_mqtt_options(
     let client_name = format!("{}-{}", config.client_prefix, client_name_suffix);
     let mut mqtt_options = MqttOptions::new(client_name, &config.host, config.port);
     mqtt_options.set_keep_alive(5);
-    mqtt_options.set_clean_session(false);
 
     if let (Some(username), Some(password)) = (&config.username, &config.password) {
         mqtt_options.set_credentials(username, password);
