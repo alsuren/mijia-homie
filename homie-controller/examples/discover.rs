@@ -7,7 +7,8 @@ use rumqttc::MqttOptions;
 async fn main() -> Result<(), PollError> {
     pretty_env_logger::init();
 
-    let mqttoptions = MqttOptions::new("homie_controller", "test.mosquitto.org", 1883);
+    let mut mqttoptions = MqttOptions::new("homie_controller", "test.mosquitto.org", 1883);
+    mqttoptions.set_keep_alive(5);
 
     let (controller, mut event_loop) = HomieController::new(mqttoptions, "homie");
     controller.start().await?;
