@@ -172,8 +172,8 @@ impl HomieController {
     }
 
     async fn handle_event(&self, incoming: Incoming) -> Result<Option<Event>, PollError> {
-        if let Incoming::Publish(publish) = incoming {
-            match self.handle_publish(publish).await {
+        match incoming {
+            Incoming::Publish(publish) => match self.handle_publish(publish).await {
                 Err(HandleError::Warning(err)) => {
                     // These error strings indicate some issue with parsing the publish
                     // event from the network, perhaps due to a malfunctioning device,
@@ -182,7 +182,13 @@ impl HomieController {
                 }
                 Err(HandleError::Fatal(e)) => return Err(e.into()),
                 Ok(event) => return Ok(event),
+            },
+            Incoming::ConnAck(_) => {
+                // We have connected or reconnected, so make our initial subscription to start
+                // discovering Homie devices.
+                self.start().await?;
             }
+            _ => {}
         }
         Ok(None)
     }
@@ -538,7 +544,7 @@ impl HomieController {
     }
 
     /// Start discovering Homie devices.
-    pub async fn start(&self) -> Result<(), ClientError> {
+    async fn start(&self) -> Result<(), ClientError> {
         let topic = format!("{}/+/$homie", self.base_topic);
         log::trace!("Subscribe to {}", topic);
         self.mqtt_client.subscribe(topic, QoS::AtLeastOnce).await

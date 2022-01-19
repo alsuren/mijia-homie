@@ -11,7 +11,6 @@ async fn main() -> Result<(), PollError> {
     mqttoptions.set_keep_alive(5);
 
     let (controller, mut event_loop) = HomieController::new(mqttoptions, "homie");
-    controller.start().await?;
     loop {
         match controller.poll(&mut event_loop).await {
             Ok(Some(Event::PropertyValueChanged {

@@ -31,7 +31,6 @@ async fn test_device() {
     // Start controller.
     let controller_options = MqttOptions::new("homie_controller", "localhost", PORT);
     let (controller, mut event_loop) = HomieController::new(controller_options, "homie");
-    controller.start().await.unwrap();
 
     // Start device
     let (updates_tx, updates_rx) = mpsc::sync_channel(10);
