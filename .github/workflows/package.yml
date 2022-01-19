@@ -7,7 +7,7 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  cargo-deb-version: 1.28.0
+  cargo-deb-version: 1.34.2
 
 jobs:
   build:
@@ -66,13 +66,17 @@ jobs:
           command: build
           args: --release --target ${{ matrix.target }}
       - name: Package homie-influx
-        working-directory: homie-influx
-        run: cargo deb --target ${{ matrix.target }} --no-build
+        uses: actions-rs/cargo@v1
+        with:
+          command: deb
+          args: --target ${{ matrix.target }} --no-build --package homie-influx
       - name: Package mijia-homie
-        working-directory: mijia-homie
-        run: cargo deb --target ${{ matrix.target }} --no-build
+        uses: actions-rs/cargo@v1
+        with:
+          command: deb
+          args: --target ${{ matrix.target }} --no-build --package mijia-homie
 
-      - name: Upload package
+      - name: Upload packages
         uses: actions/upload-artifact@v2
         with:
           name: debian-packages
