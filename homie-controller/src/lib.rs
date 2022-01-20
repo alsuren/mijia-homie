@@ -243,12 +243,14 @@ impl HomieController {
         let parts = subtopic.split('/').collect::<Vec<&str>>();
         let event = match parts.as_slice() {
             [device_id, "$homie"] => {
+                // Subscribe to topics even if we already know about the device, because this might
+                // be a reconnection.
+                topics_to_subscribe.push(format!("{}/{}/+", self.base_topic, device_id));
+                topics_to_subscribe.push(format!("{}/{}/$fw/+", self.base_topic, device_id));
+                topics_to_subscribe.push(format!("{}/{}/$stats/+", self.base_topic, device_id));
                 if !devices.contains_key(*device_id) {
                     log::trace!("Homie device '{}' version '{}'", device_id, payload);
                     devices.insert((*device_id).to_owned(), Device::new(device_id, payload));
-                    topics_to_subscribe.push(format!("{}/{}/+", self.base_topic, device_id));
-                    topics_to_subscribe.push(format!("{}/{}/$fw/+", self.base_topic, device_id));
-                    topics_to_subscribe.push(format!("{}/{}/$stats/+", self.base_topic, device_id));
                     Some(Event::DeviceUpdated {
                         device_id: (*device_id).to_owned(),
                         has_required_attributes: false,
@@ -380,9 +382,9 @@ impl HomieController {
                 for node_id in nodes {
                     if !device.nodes.contains_key(node_id) {
                         device.add_node(Node::new(node_id));
-                        let topic = format!("{}/{}/{}/+", self.base_topic, device_id, node_id);
-                        topics_to_subscribe.push(topic);
                     }
+                    let topic = format!("{}/{}/{}/+", self.base_topic, device_id, node_id);
+                    topics_to_subscribe.push(topic);
                 }
 
                 Some(Event::device_updated(device))
@@ -419,12 +421,12 @@ impl HomieController {
                 for property_id in properties {
                     if !node.properties.contains_key(property_id) {
                         node.add_property(Property::new(property_id));
-                        let topic = format!(
-                            "{}/{}/{}/{}/+",
-                            self.base_topic, device_id, node_id, property_id
-                        );
-                        topics_to_subscribe.push(topic);
                     }
+                    let topic = format!(
+                        "{}/{}/{}/{}/+",
+                        self.base_topic, device_id, node_id, property_id
+                    );
+                    topics_to_subscribe.push(topic);
                 }
 
                 Some(Event::node_updated(device_id, node))
