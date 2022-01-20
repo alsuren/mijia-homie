@@ -16,6 +16,7 @@ const DEFAULT_HOST: &str = "test.mosquitto.org";
 const DEFAULT_PORT: u16 = 1883;
 const DEFAULT_SENSOR_NAMES_FILENAME: &str = "sensor-names.toml";
 const CONFIG_FILENAME: &str = "mijia-homie.toml";
+const KEEP_ALIVE: Duration = Duration::from_secs(5);
 
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(default, deny_unknown_fields)]
@@ -99,7 +100,7 @@ pub fn get_mqtt_options(config: MqttConfig, device_id: &str) -> MqttOptions {
 
     let mut mqtt_options = MqttOptions::new(client_name, config.host, config.port);
 
-    mqtt_options.set_keep_alive(5);
+    mqtt_options.set_keep_alive(KEEP_ALIVE);
     if let (Some(username), Some(password)) = (config.username, config.password) {
         mqtt_options.set_credentials(username, password);
     }

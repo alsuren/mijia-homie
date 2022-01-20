@@ -18,6 +18,7 @@ const DEFAULT_MQTT_RECONNECT_INTERVAL: Duration = Duration::from_secs(5);
 const DEFAULT_INFLUXDB_URL: &str = "http://localhost:8086";
 const CONFIG_FILENAME: &str = "homie-influx.toml";
 const DEFAULT_MAPPINGS_FILENAME: &str = "mappings.toml";
+const KEEP_ALIVE: Duration = Duration::from_secs(5);
 
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(default, deny_unknown_fields)]
@@ -170,7 +171,7 @@ pub fn get_mqtt_options(
 ) -> MqttOptions {
     let client_name = format!("{}-{}", config.client_prefix, client_name_suffix);
     let mut mqtt_options = MqttOptions::new(client_name, &config.host, config.port);
-    mqtt_options.set_keep_alive(5);
+    mqtt_options.set_keep_alive(KEEP_ALIVE);
 
     if let (Some(username), Some(password)) = (&config.username, &config.password) {
         mqtt_options.set_credentials(username, password);

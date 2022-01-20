@@ -217,8 +217,7 @@ fn spawn_mqtt_broker(port: u16) {
                 max_payload_size: 2048,
                 max_inflight_count: 500,
                 max_inflight_size: 1024,
-                username: None,
-                password: None,
+                login_credentials: None,
             },
         },
     );

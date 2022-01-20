@@ -2,13 +2,14 @@
 
 use homie_controller::{Event, HomieController, PollError};
 use rumqttc::MqttOptions;
+use std::time::Duration;
 
 #[tokio::main]
 async fn main() -> Result<(), PollError> {
     pretty_env_logger::init();
 
     let mut mqttoptions = MqttOptions::new("homie_controller", "test.mosquitto.org", 1883);
-    mqttoptions.set_keep_alive(5);
+    mqttoptions.set_keep_alive(Duration::from_secs(5));
 
     let (controller, mut event_loop) = HomieController::new(mqttoptions, "homie");
     loop {
