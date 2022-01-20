@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.5
+
+### Bugfixes
+
+- Handle reconnection to the MQTT broker without relying on a persistent session.
+
 ## 0.2.4
 
 ### Bugfixes
