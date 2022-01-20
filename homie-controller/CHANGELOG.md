@@ -7,6 +7,7 @@
 - It is no longer necessary to call `HomieController::start`, it has been removed from the public
   API. If the MQTT connection is dropped and reconnected the necessary subscriptions will
   automatically be set up again, without the need for a persistent session.
+- Added new `Event::Connected`.
 
 ## 0.4.0
 

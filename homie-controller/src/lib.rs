@@ -66,6 +66,9 @@ pub enum Event {
         /// being the initial value because the controller just connected to the MQTT broker.
         fresh: bool,
     },
+    /// Connected to the MQTT broker. This could be either the initial connection or a reconnection
+    /// after the connection was dropped for some reason.
+    Connected,
 }
 
 impl Event {
@@ -178,19 +181,20 @@ impl HomieController {
                     // These error strings indicate some issue with parsing the publish
                     // event from the network, perhaps due to a malfunctioning device,
                     // so should just be logged and ignored.
-                    log::warn!("{}", err)
+                    log::warn!("{}", err);
+                    Ok(None)
                 }
-                Err(HandleError::Fatal(e)) => return Err(e.into()),
-                Ok(event) => return Ok(event),
+                Err(HandleError::Fatal(e)) => Err(e.into()),
+                Ok(event) => Ok(event),
             },
             Incoming::ConnAck(_) => {
                 // We have connected or reconnected, so make our initial subscription to start
                 // discovering Homie devices.
                 self.start().await?;
+                Ok(Some(Event::Connected))
             }
-            _ => {}
+            _ => Ok(None),
         }
-        Ok(None)
     }
 
     /// Handle a publish event received from the MQTT broker, updating the devices and our
@@ -663,7 +667,7 @@ impl From<ParseFloatError> for HandleError {
 mod tests {
     use super::*;
     use async_channel::Receiver;
-    use rumqttc::{Packet, Request, Subscribe};
+    use rumqttc::{ConnAck, Packet, Request, Subscribe};
 
     fn make_test_controller() -> (HomieController, Receiver<Request>) {
         let (requests_tx, requests_rx) = async_channel::unbounded();
@@ -687,6 +691,15 @@ mod tests {
             let expected = Request::Subscribe(Subscribe::new(*topic, QoS::AtLeastOnce));
             assert!(requests.contains(&expected));
         }
+    }
+
+    async fn connect(controller: &HomieController) -> Result<Option<Event>, PollError> {
+        controller
+            .handle_event(Packet::ConnAck(ConnAck::new(
+                rumqttc::ConnectReturnCode::Success,
+                false,
+            )))
+            .await
     }
 
     async fn publish(
@@ -721,8 +734,8 @@ mod tests {
     async fn subscribes_to_things() -> Result<(), Box<dyn std::error::Error>> {
         let (controller, requests_rx) = make_test_controller();
 
-        // Start discovering.
-        controller.start().await?;
+        // Connecting should start discovering.
+        connect(&controller).await?;
         expect_subscriptions(&requests_rx, &["base_topic/+/$homie"]);
 
         // Discover a new device.
@@ -763,7 +776,7 @@ mod tests {
         let (controller, _requests_rx) = make_test_controller();
 
         // Start discovering.
-        controller.start().await?;
+        assert_eq!(connect(&controller).await?, Some(Event::Connected));
 
         // Discover a new device.
         assert_eq!(
@@ -882,7 +895,7 @@ mod tests {
 
         // Discover a new device with a node with a property.
 
-        controller.start().await?;
+        connect(&controller).await?;
         publish(&controller, "base_topic/device_id/$homie", "4.0").await?;
         publish(&controller, "base_topic/device_id/$name", "Device name").await?;
         publish(&controller, "base_topic/device_id/$state", "ready").await?;
