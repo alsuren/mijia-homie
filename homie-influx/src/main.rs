@@ -46,7 +46,6 @@ async fn main() -> Result<(), eyre::Report> {
             influxdb_client,
             config.mqtt.reconnect_interval,
         );
-        controller.start().await?;
         join_handles.push(handle);
     }
 

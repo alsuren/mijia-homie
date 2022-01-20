@@ -66,6 +66,9 @@ pub enum Event {
         /// being the initial value because the controller just connected to the MQTT broker.
         fresh: bool,
     },
+    /// Connected to the MQTT broker. This could be either the initial connection or a reconnection
+    /// after the connection was dropped for some reason.
+    Connected,
 }
 
 impl Event {
@@ -172,20 +175,26 @@ impl HomieController {
     }
 
     async fn handle_event(&self, incoming: Incoming) -> Result<Option<Event>, PollError> {
-        log::trace!("Incoming: {:?}", incoming);
-        if let Incoming::Publish(publish) = incoming {
-            match self.handle_publish(publish).await {
+        match incoming {
+            Incoming::Publish(publish) => match self.handle_publish(publish).await {
                 Err(HandleError::Warning(err)) => {
                     // These error strings indicate some issue with parsing the publish
                     // event from the network, perhaps due to a malfunctioning device,
                     // so should just be logged and ignored.
-                    log::warn!("{}", err)
+                    log::warn!("{}", err);
+                    Ok(None)
                 }
-                Err(HandleError::Fatal(e)) => return Err(e.into()),
-                Ok(event) => return Ok(event),
+                Err(HandleError::Fatal(e)) => Err(e.into()),
+                Ok(event) => Ok(event),
+            },
+            Incoming::ConnAck(_) => {
+                // We have connected or reconnected, so make our initial subscription to start
+                // discovering Homie devices.
+                self.start().await?;
+                Ok(Some(Event::Connected))
             }
+            _ => Ok(None),
         }
-        Ok(None)
     }
 
     /// Handle a publish event received from the MQTT broker, updating the devices and our
@@ -238,12 +247,14 @@ impl HomieController {
         let parts = subtopic.split('/').collect::<Vec<&str>>();
         let event = match parts.as_slice() {
             [device_id, "$homie"] => {
+                // Subscribe to topics even if we already know about the device, because this might
+                // be a reconnection.
+                topics_to_subscribe.push(format!("{}/{}/+", self.base_topic, device_id));
+                topics_to_subscribe.push(format!("{}/{}/$fw/+", self.base_topic, device_id));
+                topics_to_subscribe.push(format!("{}/{}/$stats/+", self.base_topic, device_id));
                 if !devices.contains_key(*device_id) {
                     log::trace!("Homie device '{}' version '{}'", device_id, payload);
                     devices.insert((*device_id).to_owned(), Device::new(device_id, payload));
-                    topics_to_subscribe.push(format!("{}/{}/+", self.base_topic, device_id));
-                    topics_to_subscribe.push(format!("{}/{}/$fw/+", self.base_topic, device_id));
-                    topics_to_subscribe.push(format!("{}/{}/$stats/+", self.base_topic, device_id));
                     Some(Event::DeviceUpdated {
                         device_id: (*device_id).to_owned(),
                         has_required_attributes: false,
@@ -375,9 +386,9 @@ impl HomieController {
                 for node_id in nodes {
                     if !device.nodes.contains_key(node_id) {
                         device.add_node(Node::new(node_id));
-                        let topic = format!("{}/{}/{}/+", self.base_topic, device_id, node_id);
-                        topics_to_subscribe.push(topic);
                     }
+                    let topic = format!("{}/{}/{}/+", self.base_topic, device_id, node_id);
+                    topics_to_subscribe.push(topic);
                 }
 
                 Some(Event::device_updated(device))
@@ -414,12 +425,12 @@ impl HomieController {
                 for property_id in properties {
                     if !node.properties.contains_key(property_id) {
                         node.add_property(Property::new(property_id));
-                        let topic = format!(
-                            "{}/{}/{}/{}/+",
-                            self.base_topic, device_id, node_id, property_id
-                        );
-                        topics_to_subscribe.push(topic);
                     }
+                    let topic = format!(
+                        "{}/{}/{}/{}/+",
+                        self.base_topic, device_id, node_id, property_id
+                    );
+                    topics_to_subscribe.push(topic);
                 }
 
                 Some(Event::node_updated(device_id, node))
@@ -539,7 +550,7 @@ impl HomieController {
     }
 
     /// Start discovering Homie devices.
-    pub async fn start(&self) -> Result<(), ClientError> {
+    async fn start(&self) -> Result<(), ClientError> {
         let topic = format!("{}/+/$homie", self.base_topic);
         log::trace!("Subscribe to {}", topic);
         self.mqtt_client.subscribe(topic, QoS::AtLeastOnce).await
@@ -656,7 +667,7 @@ impl From<ParseFloatError> for HandleError {
 mod tests {
     use super::*;
     use async_channel::Receiver;
-    use rumqttc::{Packet, Request, Subscribe};
+    use rumqttc::{ConnAck, Packet, Request, Subscribe};
 
     fn make_test_controller() -> (HomieController, Receiver<Request>) {
         let (requests_tx, requests_rx) = async_channel::unbounded();
@@ -680,6 +691,15 @@ mod tests {
             let expected = Request::Subscribe(Subscribe::new(*topic, QoS::AtLeastOnce));
             assert!(requests.contains(&expected));
         }
+    }
+
+    async fn connect(controller: &HomieController) -> Result<Option<Event>, PollError> {
+        controller
+            .handle_event(Packet::ConnAck(ConnAck::new(
+                rumqttc::ConnectReturnCode::Success,
+                false,
+            )))
+            .await
     }
 
     async fn publish(
@@ -714,8 +734,8 @@ mod tests {
     async fn subscribes_to_things() -> Result<(), Box<dyn std::error::Error>> {
         let (controller, requests_rx) = make_test_controller();
 
-        // Start discovering.
-        controller.start().await?;
+        // Connecting should start discovering.
+        connect(&controller).await?;
         expect_subscriptions(&requests_rx, &["base_topic/+/$homie"]);
 
         // Discover a new device.
@@ -756,7 +776,7 @@ mod tests {
         let (controller, _requests_rx) = make_test_controller();
 
         // Start discovering.
-        controller.start().await?;
+        assert_eq!(connect(&controller).await?, Some(Event::Connected));
 
         // Discover a new device.
         assert_eq!(
@@ -875,7 +895,7 @@ mod tests {
 
         // Discover a new device with a node with a property.
 
-        controller.start().await?;
+        connect(&controller).await?;
         publish(&controller, "base_topic/device_id/$homie", "4.0").await?;
         publish(&controller, "base_topic/device_id/$name", "Device name").await?;
         publish(&controller, "base_topic/device_id/$state", "ready").await?;

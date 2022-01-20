@@ -47,7 +47,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let (controller, event_loop) = HomieController::new(mqttoptions, "homie");
     let controller = Arc::new(controller);
     let handle = spawn_poll_loop(event_loop, controller.clone());
-    controller.start().await?;
 
     for _ in 0..3 {
         for &value in [true, false].iter() {
