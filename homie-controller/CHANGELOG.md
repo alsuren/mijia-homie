@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Bugfixes
+
+- Fixed bug introducted in 0.5.0 which could result in an infinite loop of subscribing and receiving
+  messages.
+
 ## 0.5.0
 
 ### Breaking changes
