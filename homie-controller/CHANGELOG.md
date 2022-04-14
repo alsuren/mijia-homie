@@ -4,7 +4,7 @@
 
 ### Bugfixes
 
-- Fixed bug introducted in 0.5.0 which could result in an infinite loop of subscribing and receiving
+- Fixed bug introduced in 0.5.0 which could result in an infinite loop of subscribing and receiving
   messages.
 
 ## 0.5.0
