@@ -11,22 +11,21 @@ categories = ["network-programming"]
 
 [dependencies]
 color-backtrace = "0.5.1"
-eyre = "0.6.5"
-futures = "0.3.17"
+eyre = "0.6.8"
+futures = "0.3.21"
 homie-controller = { version = "0.5.1", path = "../homie-controller" }
-influx_db_client = { version = "0.5.0", default-features = false, features = ["rustls-tls"] }
-log = "0.4.14"
+# Pinned due to https://github.com/driftluo/InfluxDBClient-rs/issues/65.
+influx_db_client = { version = "=0.5.1", default-features = false, features = ["rustls-tls"] }
+log = "0.4.17"
 pretty_env_logger = "0.4.0"
-rumqttc = "0.10.0"
-rustls = "0.19.1"
-rustls-native-certs = "0.5.0"
-serde_derive = "1.0.130"
-serde = "1.0.130"
+rumqttc = "0.12.0"
+rustls = "0.20.6"
+rustls-native-certs = "0.6.2"
+serde_derive = "1.0.137"
+serde = "1.0.137"
 stable-eyre = "0.2.2"
-# TODO: Remove "io-util" once a new version of rumqttc is released which fixes
-# https://github.com/bytebeamio/rumqtt/issues/294.
-tokio = { version = "1.12.0", features = ["io-util", "macros", "rt-multi-thread"] }
-toml = "0.5.8"
+tokio = { version = "1.19.2", features = ["macros", "rt-multi-thread"] }
+toml = "0.5.9"
 url = { version = "2.2.2", features = ["serde"] }
 
 [package.metadata.deb]

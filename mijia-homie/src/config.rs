@@ -1,7 +1,7 @@
 use eyre::Report;
 use mijia::bluetooth::{MacAddress, ParseMacAddressError};
 use rumqttc::{MqttOptions, Transport};
-use rustls::ClientConfig;
+use rustls::{ClientConfig, RootCertStore};
 use serde::{Deserialize as _, Deserializer};
 use serde_derive::Deserialize;
 use stable_eyre::eyre::WrapErr;
@@ -106,9 +106,16 @@ pub fn get_mqtt_options(config: MqttConfig, device_id: &str) -> MqttOptions {
     }
 
     if config.use_tls {
-        let mut client_config = ClientConfig::new();
-        client_config.root_store =
-            rustls_native_certs::load_native_certs().expect("could not load platform certs");
+        let mut root_store = RootCertStore::empty();
+        for cert in
+            rustls_native_certs::load_native_certs().expect("Failed to load platform certificates.")
+        {
+            root_store.add(&rustls::Certificate(cert.0)).unwrap();
+        }
+        let client_config = ClientConfig::builder()
+            .with_safe_defaults()
+            .with_root_certificates(root_store)
+            .with_no_client_auth();
         mqtt_options.set_transport(Transport::tls_with_config(client_config.into()));
     }
     mqtt_options

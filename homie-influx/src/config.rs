@@ -2,7 +2,7 @@ use eyre::Report;
 use influx_db_client::reqwest::Url;
 use influx_db_client::Client;
 use rumqttc::{MqttOptions, TlsConfiguration, Transport};
-use rustls::ClientConfig;
+use rustls::{ClientConfig, RootCertStore};
 use serde::{Deserialize as _, Deserializer};
 use serde_derive::Deserialize;
 use stable_eyre::eyre;
@@ -153,9 +153,16 @@ pub fn get_influxdb_client(config: &InfluxDbConfig, database: &str) -> Result<Cl
 /// Construct a `ClientConfig` for TLS connections to the MQTT broker, if TLS is enabled.
 pub fn get_tls_client_config(config: &MqttConfig) -> Option<Arc<ClientConfig>> {
     if config.use_tls {
-        let mut client_config = ClientConfig::new();
-        client_config.root_store = rustls_native_certs::load_native_certs()
-            .expect("Failed to load platform certificates.");
+        let mut root_store = RootCertStore::empty();
+        for cert in
+            rustls_native_certs::load_native_certs().expect("Failed to load platform certificates.")
+        {
+            root_store.add(&rustls::Certificate(cert.0)).unwrap();
+        }
+        let client_config = ClientConfig::builder()
+            .with_safe_defaults()
+            .with_root_certificates(root_store)
+            .with_no_client_auth();
         Some(Arc::new(client_config))
     } else {
         None
