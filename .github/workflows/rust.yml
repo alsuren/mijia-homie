@@ -28,8 +28,6 @@ jobs:
 
   coverage:
     runs-on: ubuntu-latest
-    env:
-      RUSTC_BOOTSTRAP: 1
     steps:
       - uses: actions/checkout@v2
       - name: Install dependencies
@@ -41,11 +39,11 @@ jobs:
       - name: Build for coverage
         run: cargo build --all-features
         env:
-          RUSTFLAGS: "-Zinstrument-coverage"
+          RUSTFLAGS: "-Cinstrument-coverage"
       - name: Run tests with coverage
         run: cargo test --all-features
         env:
-          RUSTFLAGS: "-Zinstrument-coverage"
+          RUSTFLAGS: "-Cinstrument-coverage"
           LLVM_PROFILE_FILE: "test-coverage-%p-%m.profraw"
       - name: Convert coverage
         run: ./grcov . -s . --binary-path target/debug/ -t lcov --branch --ignore-not-existing -o target/debug/lcov.info
