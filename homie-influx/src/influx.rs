@@ -39,7 +39,7 @@ fn influx_value_for_homie_property(property: &Property) -> Option<Value> {
         Datatype::Integer => Value::Integer(property.value().ok()?),
         Datatype::Float => Value::Float(property.value().ok()?),
         Datatype::Boolean => Value::Boolean(property.value().ok()?),
-        _ => Value::String(property.value.to_owned()?),
+        _ => property.value.to_owned()?.into(),
     })
 }
 
@@ -61,23 +61,23 @@ fn point_for_property_value(
                 .as_millis() as i64,
         )
         .add_field("value", value)
-        .add_tag("device_id", Value::String(device.id.to_owned()))
-        .add_tag("node_id", Value::String(node.id.to_owned()))
-        .add_tag("property_id", Value::String(property.id.to_owned()));
+        .add_tag("device_id", device.id.to_owned())
+        .add_tag("node_id", node.id.to_owned())
+        .add_tag("property_id", property.id.to_owned());
     if let Some(device_name) = device.name.to_owned() {
-        point = point.add_tag("device_name", Value::String(device_name));
+        point = point.add_tag("device_name", device_name);
     }
     if let Some(node_name) = node.name.to_owned() {
-        point = point.add_tag("node_name", Value::String(node_name));
+        point = point.add_tag("node_name", node_name);
     }
     if let Some(property_name) = property.name.to_owned() {
-        point = point.add_tag("property_name", Value::String(property_name));
+        point = point.add_tag("property_name", property_name);
     }
     if let Some(unit) = property.unit.to_owned() {
-        point = point.add_tag("unit", Value::String(unit));
+        point = point.add_tag("unit", unit);
     }
     if let Some(node_type) = node.node_type.to_owned() {
-        point = point.add_tag("node_type", Value::String(node_type))
+        point = point.add_tag("node_type", node_type)
     }
     if let Some(Datatype::Boolean) = property.datatype {
         // Grafana is unable to display booleans directly, so add an integer for convenience.
@@ -167,7 +167,7 @@ mod tests {
         };
         assert_eq!(
             influx_value_for_homie_property(&property).unwrap(),
-            Value::String("abc".to_owned()),
+            Value::from("abc".to_owned()),
         );
     }
 
@@ -185,7 +185,7 @@ mod tests {
         };
         assert_eq!(
             influx_value_for_homie_property(&property).unwrap(),
-            Value::String("abc".to_owned()),
+            Value::from("abc".to_owned()),
         );
     }
 
@@ -203,7 +203,7 @@ mod tests {
         };
         assert_eq!(
             influx_value_for_homie_property(&property).unwrap(),
-            Value::String("12,34,56".to_owned()),
+            Value::from("12,34,56".to_owned()),
         );
     }
 
@@ -267,10 +267,10 @@ mod tests {
             point,
             Point::new("integer")
                 .add_timestamp(timestamp_millis)
-                .add_tag("device_id", Value::String("device_id".to_owned()))
-                .add_tag("node_id", Value::String("node_id".to_owned()))
-                .add_tag("property_id", Value::String("property_id".to_owned()))
-                .add_field("value", Value::Integer(42)),
+                .add_tag("device_id", "device_id".to_owned())
+                .add_tag("node_id", "node_id".to_owned())
+                .add_tag("property_id", "property_id".to_owned())
+                .add_field("value", 42),
         );
     }
 
@@ -321,13 +321,13 @@ mod tests {
             point,
             Point::new("integer")
                 .add_timestamp(timestamp_millis)
-                .add_tag("device_id", Value::String("device_id".to_owned()))
-                .add_tag("node_id", Value::String("node_id".to_owned()))
-                .add_tag("property_id", Value::String("property_id".to_owned()))
-                .add_tag("node_type", Value::String("node type".to_owned()))
-                .add_tag("device_name", Value::String("Device name".to_owned()))
-                .add_tag("node_name", Value::String("Node name".to_owned()))
-                .add_tag("property_name", Value::String("Property name".to_owned()))
+                .add_tag("device_id", "device_id".to_owned())
+                .add_tag("node_id", "node_id".to_owned())
+                .add_tag("property_id", "property_id".to_owned())
+                .add_tag("node_type", "node type".to_owned())
+                .add_tag("device_name", "Device name".to_owned())
+                .add_tag("node_name", "Node name".to_owned())
+                .add_tag("property_name", "Property name".to_owned())
                 .add_field("value", Value::Integer(42)),
         );
     }
@@ -378,11 +378,11 @@ mod tests {
             point,
             Point::new("boolean")
                 .add_timestamp(timestamp_millis)
-                .add_tag("device_id", Value::String("device_id".to_owned()))
-                .add_tag("node_id", Value::String("node_id".to_owned()))
-                .add_tag("property_id", Value::String("property_id".to_owned()))
-                .add_field("value", Value::Boolean(true))
-                .add_field("value_int", Value::Integer(1)),
+                .add_tag("device_id", "device_id".to_owned())
+                .add_tag("node_id", "node_id".to_owned())
+                .add_tag("property_id", "property_id".to_owned())
+                .add_field("value", true)
+                .add_field("value_int", 1),
         );
     }
 }
