@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.0
+
+### Breaking changes
+
+- Updated to `rumqttc` 0.12.
+
 ## 0.5.1
 
 ### Bugfixes
@@ -15,6 +21,7 @@
   API. If the MQTT connection is dropped and reconnected the necessary subscriptions will
   automatically be set up again, without the need for a persistent session.
 - Added new `Event::Connected`.
+- Updated to `rumqttc` 0.10.
 
 ## 0.4.0
 
