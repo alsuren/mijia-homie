@@ -80,9 +80,9 @@ dependencies = [
 
 [[package]]
 name = "async-trait"
-version = "0.1.49"
+version = "0.1.56"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "589652ce7ccb335d1e7ecb3be145425702b290dbcb7029bbeaae263fc1d87b48"
+checksum = "96cf8829f67d2eab0b2dfa42c5d0ef737e0724e4a82b01b3e292456202b19716"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -168,9 +168,9 @@ dependencies = [
 
 [[package]]
 name = "bluez-async"
-version = "0.5.5"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "49a8c776528da76d05d5d7b4f6566aa8a03390ec731c7022463dcad2068aafcc"
+checksum = "e81db626818b179ab5fc3393b7ac77462335f716b302ef1ff1866473ab6ddb25"
 dependencies = [
  "async-trait",
  "bitflags",
@@ -184,7 +184,7 @@ dependencies = [
  "serde-xml-rs",
  "thiserror",
  "tokio",
- "uuid",
+ "uuid 1.1.2",
 ]
 
 [[package]]
@@ -1002,7 +1002,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-stream",
- "uuid",
+ "uuid 0.8.2",
 ]
 
 [[package]]
@@ -2101,6 +2101,12 @@ name = "uuid"
 version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bc5cf98d8186244414c848017f0e2676b3fcb46807f6668a97dfe67359a3c4b7"
+
+[[package]]
+name = "uuid"
+version = "1.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dd6469f4314d5f1ffec476e05f17cc9a78bc7a27a6a857842170bdf8d6f98d2f"
 
 [[package]]
 name = "version_check"
