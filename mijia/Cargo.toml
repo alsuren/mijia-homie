@@ -10,13 +10,13 @@ keywords = ["ble", "bluetooth", "humidity", "temperature"]
 categories = ["hardware-support"]
 
 [dependencies]
-bluez-async = "0.5.5"
+bluez-async = "0.6.0"
 futures = "0.3.21"
 log = "0.4.17"
 thiserror = "1.0.31"
 tokio = "1.19.2"
 tokio-stream = "0.1.9"
-uuid = "0.8.2"
+uuid = "1.1.2"
 
 [dev-dependencies]
 backoff = { version = "0.4.0", features = ["tokio"] }
