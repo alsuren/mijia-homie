@@ -29,7 +29,6 @@ eyre = "0.6.8"
 futures = "0.3.21"
 futures-channel = "0.3.21"
 homie-device = { version = "0.6.0", path = "../homie-device" }
-# Pinned due to https://github.com/driftluo/InfluxDBClient-rs/issues/65.
 influx_db_client = { version = "0.5.1", default-features = false, features = ["rustls-tls"] }
 itertools = "0.10.3"
 log = "0.4.17"
