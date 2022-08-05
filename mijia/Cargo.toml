@@ -20,7 +20,7 @@ uuid = "1.1.2"
 
 [dev-dependencies]
 backoff = { version = "0.4.0", features = ["tokio"] }
-chrono = "0.4.19"
+chrono = "0.4.20"
 eyre = "0.6.8"
 pretty_env_logger = "0.4.0"
 tokio = { version = "1.20.1", features = ["macros", "rt", "rt-multi-thread", "time"] }
