@@ -16,7 +16,7 @@ thiserror = "1.0.32"
 
 [dev-dependencies]
 async-channel = "1.7.1"
-futures = "0.3.21"
+futures = "0.3.23"
 homie-device = { version = "0.7.0", path = "../homie-device" }
 pretty_env_logger = "0.4.0"
 rumqttd = "0.11.0"
