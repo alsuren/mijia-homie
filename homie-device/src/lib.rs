@@ -278,7 +278,7 @@ impl HomieDevice {
         mut update_callback: Option<UpdateCallback>,
     ) -> impl Future<Output = Result<(), SpawnError>> {
         let device_base = format!("{}/", self.publisher.device_base);
-        let (incoming_tx, incoming_rx) = async_channel::unbounded();
+        let (incoming_tx, incoming_rx) = flume::unbounded();
 
         let mqtt_task = task::spawn(async move {
             loop {
@@ -286,7 +286,7 @@ impl HomieDevice {
                 log::trace!("Notification = {:?}", notification);
 
                 if let Event::Incoming(incoming) = notification {
-                    incoming_tx.send(incoming).await.map_err(|_| {
+                    incoming_tx.send_async(incoming).await.map_err(|_| {
                         SpawnError::Internal("Incoming event channel receiver closed.")
                     })?;
                 }
@@ -294,46 +294,47 @@ impl HomieDevice {
         });
 
         let publisher = self.publisher.clone();
-        let incoming_task: JoinHandle<Result<(), SpawnError>> =
-            task::spawn(async move {
-                loop {
-                    if let Incoming::Publish(publish) = incoming_rx.recv().await.map_err(|_| {
-                        SpawnError::Internal("Incoming event channel sender closed.")
-                    })? {
-                        if let Some(rest) = publish.topic.strip_prefix(&device_base) {
-                            if let ([node_id, property_id, "set"], Ok(payload)) = (
-                                rest.split('/').collect::<Vec<&str>>().as_slice(),
-                                str::from_utf8(&publish.payload),
-                            ) {
-                                log::trace!(
-                                    "set node {:?} property {:?} to {:?}",
-                                    node_id,
-                                    property_id,
-                                    payload
-                                );
-                                if let Some(callback) = update_callback.as_mut() {
-                                    if let Some(value) = callback(
-                                        node_id.to_string(),
-                                        property_id.to_string(),
-                                        payload.to_string(),
-                                    )
-                                    .await
-                                    {
-                                        publisher
-                                            .publish_retained(
-                                                &format!("{}/{}", node_id, property_id),
-                                                value,
-                                            )
-                                            .await?;
-                                    }
+        let incoming_task: JoinHandle<Result<(), SpawnError>> = task::spawn(async move {
+            loop {
+                if let Incoming::Publish(publish) = incoming_rx
+                    .recv_async()
+                    .await
+                    .map_err(|_| SpawnError::Internal("Incoming event channel sender closed."))?
+                {
+                    if let Some(rest) = publish.topic.strip_prefix(&device_base) {
+                        if let ([node_id, property_id, "set"], Ok(payload)) = (
+                            rest.split('/').collect::<Vec<&str>>().as_slice(),
+                            str::from_utf8(&publish.payload),
+                        ) {
+                            log::trace!(
+                                "set node {:?} property {:?} to {:?}",
+                                node_id,
+                                property_id,
+                                payload
+                            );
+                            if let Some(callback) = update_callback.as_mut() {
+                                if let Some(value) = callback(
+                                    node_id.to_string(),
+                                    property_id.to_string(),
+                                    payload.to_string(),
+                                )
+                                .await
+                                {
+                                    publisher
+                                        .publish_retained(
+                                            &format!("{}/{}", node_id, property_id),
+                                            value,
+                                        )
+                                        .await?;
                                 }
                             }
-                        } else {
-                            log::warn!("Unexpected publish: {:?}", publish);
                         }
+                    } else {
+                        log::warn!("Unexpected publish: {:?}", publish);
                     }
                 }
-            });
+            }
+        });
         try_join_unit_handles(mqtt_task, incoming_task)
     }
 
@@ -663,13 +664,12 @@ fn simplify_unit_pair<E>(m: Result<((), ()), E>) -> Result<(), E> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use async_channel::Receiver;
+    use flume::Receiver;
     use rumqttc::Request;
 
     fn make_test_device() -> (HomieDevice, Receiver<Request>) {
-        let (requests_tx, requests_rx) = async_channel::unbounded();
-        let (cancel_tx, _cancel_rx) = async_channel::unbounded();
-        let client = AsyncClient::from_senders(requests_tx, cancel_tx);
+        let (requests_tx, requests_rx) = flume::unbounded();
+        let client = AsyncClient::from_senders(requests_tx);
         let publisher = DevicePublisher::new(client, "homie/test-device".to_string());
         let device = HomieDevice::new(publisher, "Test device".to_string(), &[]);
         (device, requests_rx)

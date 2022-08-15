@@ -667,13 +667,12 @@ impl From<ParseFloatError> for HandleError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use async_channel::Receiver;
+    use flume::Receiver;
     use rumqttc::{ConnAck, Packet, Request, Subscribe};
 
     fn make_test_controller() -> (HomieController, Receiver<Request>) {
-        let (requests_tx, requests_rx) = async_channel::unbounded();
-        let (cancel_tx, _cancel_rx) = async_channel::unbounded();
-        let mqtt_client = AsyncClient::from_senders(requests_tx, cancel_tx);
+        let (requests_tx, requests_rx) = flume::unbounded();
+        let mqtt_client = AsyncClient::from_senders(requests_tx);
         let controller = HomieController {
             base_topic: "base_topic".to_owned(),
             mqtt_client,

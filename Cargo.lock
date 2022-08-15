@@ -65,17 +65,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e6f8c380fa28aa1b36107cd97f0196474bb7241bb95a453c5c01a15ac74b2eac"
 
 [[package]]
-name = "async-channel"
-version = "1.7.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e14485364214912d3b19cc3435dde4df66065127f05fa0d75c712f36f12c2f28"
-dependencies = [
- "concurrent-queue",
- "event-listener",
- "futures-core",
-]
-
-[[package]]
 name = "async-trait"
 version = "0.1.56"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -667,7 +656,7 @@ dependencies = [
 name = "homie-controller"
 version = "0.6.0"
 dependencies = [
- "async-channel",
+ "flume",
  "futures",
  "homie-device",
  "log",
@@ -683,7 +672,7 @@ dependencies = [
 name = "homie-device"
 version = "0.7.0"
 dependencies = [
- "async-channel",
+ "flume",
  "futures",
  "local_ipaddress",
  "log",
