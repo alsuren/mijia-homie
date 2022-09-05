@@ -17,7 +17,7 @@ log = "0.4.17"
 mac_address = "1.1.3"
 rumqttc = "0.15.0"
 tokio = "1.21.0"
-thiserror = "1.0.33"
+thiserror = "1.0.34"
 
 [dev-dependencies]
 pretty_env_logger = "0.4.0"
