@@ -794,7 +794,14 @@ mod tests {
 
         // Discover a node on the device.
         publish(&controller, "base_topic/device_id/$nodes", "node_id").await?;
-        expect_subscriptions(&requests_rx, &["base_topic/device_id/node_id/+"]);
+        expect_subscriptions(
+            &requests_rx,
+            &[
+                "base_topic/device_id/node_id/$name",
+                "base_topic/device_id/node_id/$type",
+                "base_topic/device_id/node_id/$properties",
+            ],
+        );
 
         // Discover a property on the node.
         publish(
@@ -805,7 +812,16 @@ mod tests {
         .await?;
         expect_subscriptions(
             &requests_rx,
-            &["base_topic/device_id/node_id/property_id/+"],
+            &[
+                "base_topic/device_id/node_id/property_id",
+                "base_topic/device_id/node_id/property_id/set",
+                "base_topic/device_id/node_id/property_id/$retained",
+                "base_topic/device_id/node_id/property_id/$settable",
+                "base_topic/device_id/node_id/property_id/$format",
+                "base_topic/device_id/node_id/property_id/$unit",
+                "base_topic/device_id/node_id/property_id/$datatype",
+                "base_topic/device_id/node_id/property_id/$name",
+            ],
         );
 
         // No more subscriptions.
