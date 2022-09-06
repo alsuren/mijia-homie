@@ -134,6 +134,35 @@ struct PublishResponse {
     topics_to_unsubscribe: Vec<String>,
 }
 
+fn build_node_topics(topics: &mut Vec<String>, base_topic: &str, device_id: &str, node_id: &str) {
+    let node_topic = format!("{}/{}/{}", base_topic, device_id, node_id);
+    for sub in ["$name", "$type", "$properties"] {
+        topics.push(format!("{}/{}", node_topic, sub));
+    }
+}
+
+fn build_property_topics(
+    topics: &mut Vec<String>,
+    base_topic: &str,
+    device_id: &str,
+    node_id: &str,
+    property_id: &str,
+) {
+    let prop_topic = format!("{}/{}/{}/{}", base_topic, device_id, node_id, property_id);
+    for sub in [
+        "set",
+        "$retained",
+        "$settable",
+        "$format",
+        "$unit",
+        "$datatype",
+        "$name",
+    ] {
+        topics.push(format!("{}/{}", prop_topic, sub));
+    }
+    topics.push(prop_topic);
+}
+
 impl HomieController {
     /// Create a new `HomieController` connected to an MQTT broker.
     ///
@@ -367,14 +396,20 @@ impl HomieController {
                     let kept = nodes.contains(&node_id.as_ref());
                     if !kept {
                         // The node has been removed, so unsubscribe from its topics and those of its properties
-                        let node_topic = format!("{}/{}/{}/+", self.base_topic, device_id, node_id);
-                        topics_to_unsubscribe.push(node_topic);
+                        build_node_topics(
+                            &mut topics_to_unsubscribe,
+                            &self.base_topic,
+                            device_id,
+                            node_id,
+                        );
                         for property_id in node.properties.keys() {
-                            let topic = format!(
-                                "{}/{}/{}/{}/+",
-                                self.base_topic, device_id, node_id, property_id
+                            build_property_topics(
+                                &mut topics_to_unsubscribe,
+                                &self.base_topic,
+                                device_id,
+                                node_id,
+                                property_id,
                             );
-                            topics_to_unsubscribe.push(topic);
                         }
                     }
                     kept
@@ -384,8 +419,12 @@ impl HomieController {
                 for node_id in nodes {
                     if !device.nodes.contains_key(node_id) {
                         device.add_node(Node::new(node_id));
-                        let topic = format!("{}/{}/{}/+", self.base_topic, device_id, node_id);
-                        topics_to_subscribe.push(topic);
+                        build_node_topics(
+                            &mut topics_to_subscribe,
+                            &self.base_topic,
+                            device_id,
+                            node_id,
+                        );
                     }
                 }
 
@@ -410,11 +449,13 @@ impl HomieController {
                     let kept = properties.contains(&property_id.as_ref());
                     if !kept {
                         // The property has been removed, so unsubscribe from its topics.
-                        let topic = format!(
-                            "{}/{}/{}/{}/+",
-                            self.base_topic, device_id, node_id, property_id
+                        build_property_topics(
+                            &mut topics_to_unsubscribe,
+                            &self.base_topic,
+                            device_id,
+                            node_id,
+                            property_id,
                         );
-                        topics_to_unsubscribe.push(topic);
                     }
                     kept
                 });
@@ -423,11 +464,13 @@ impl HomieController {
                 for property_id in properties {
                     if !node.properties.contains_key(property_id) {
                         node.add_property(Property::new(property_id));
-                        let topic = format!(
-                            "{}/{}/{}/{}/+",
-                            self.base_topic, device_id, node_id, property_id
+                        build_property_topics(
+                            &mut topics_to_subscribe,
+                            &self.base_topic,
+                            device_id,
+                            node_id,
+                            property_id,
                         );
-                        topics_to_subscribe.push(topic);
                     }
                 }
 
