@@ -115,6 +115,7 @@ pub struct HomieController {
     /// The set of Homie devices which have been discovered so far, keyed by their IDs.
     // TODO: Consider using Mutex<im::HashMap<...>> instead.
     devices: Mutex<Arc<HashMap<String, Device>>>,
+    early_property_values: Mutex<Arc<HashMap<String, String>>>,
 }
 
 pub struct HomieEventLoop {
@@ -147,6 +148,7 @@ impl HomieController {
             mqtt_client,
             base_topic: base_topic.to_string(),
             devices: Mutex::new(Arc::new(HashMap::new())),
+            early_property_values: Mutex::new(Arc::new(HashMap::new())),
         };
         (controller, HomieEventLoop::new(event_loop))
     }
@@ -238,6 +240,8 @@ impl HomieController {
         // our Arc to point to that, so that it is now a unique reference.
         let devices = &mut *self.devices.lock().unwrap();
         let devices = Arc::make_mut(devices);
+        let early_property_values = &mut *self.early_property_values.lock().unwrap();
+        let early_property_values = Arc::make_mut(early_property_values);
 
         // Collect MQTT topics to which we need to subscribe or unsubscribe here, so that the
         // subscription can happen after the devices lock has been released.
@@ -422,7 +426,10 @@ impl HomieController {
                 // Add new properties.
                 for property_id in properties {
                     if !node.properties.contains_key(property_id) {
-                        node.add_property(Property::new(property_id));
+                        let mut new_prop = Property::new(property_id);
+                        let key = format!("{}/{}/{}", device_id, node_id, property_id);
+                        new_prop.value = early_property_values.get(&key).cloned();
+                        node.add_property(new_prop);
                         let topic = format!(
                             "{}/{}/{}/{}/+",
                             self.base_topic, device_id, node_id, property_id
@@ -511,23 +518,43 @@ impl HomieController {
                     && !node_id.starts_with('$')
                     && !property_id.starts_with('$') =>
             {
-                // TODO: What about values of properties we don't yet know about? They may arrive
-                // before the $properties of the node, because the "homie/node_id/+" subscription
-                // matches both.
-                let property = get_mut_property_for(
+                match get_mut_property_for(
                     devices,
                     "Got property value for",
                     device_id,
                     node_id,
                     property_id,
-                )?;
-                property.value = Some(payload.to_owned());
-                Some(Event::property_value(
-                    device_id,
-                    node_id,
-                    property,
-                    !publish.retain,
-                ))
+                ) {
+                    Ok(mut property) => {
+                        property.value = Some(payload.to_owned());
+                        Some(Event::property_value(
+                            device_id,
+                            node_id,
+                            property,
+                            !publish.retain,
+                        ))
+                    }
+
+                    Err(_) if publish.retain => {
+                        // temporarily store payloads for unknown properties to prevent
+                        // a race condition when the broker sends out the property
+                        // payloads before $properties
+
+                        early_property_values.insert(subtopic.to_owned(), payload.to_owned());
+
+                        // XXX is this return value correct? should we wait for $properties?
+                        // if so, how to return many PropertyValueChanged from there?
+                        Some(Event::PropertyValueChanged {
+                            device_id: device_id.to_string(),
+                            node_id: node_id.to_string(),
+                            property_id: property_id.to_string(),
+                            value: payload.to_string(),
+                            fresh: false,
+                        })
+                    }
+
+                    Err(e) => return Err(e.into()),
+                }
             }
             [_device_id, _node_id, _property_id, "set"] => {
                 // Value set message may have been sent by us or another controller. Either way,
@@ -677,6 +704,7 @@ mod tests {
             base_topic: "base_topic".to_owned(),
             mqtt_client,
             devices: Mutex::new(Arc::new(HashMap::new())),
+            early_property_values: Mutex::new(Arc::new(HashMap::new())),
         };
         (controller, requests_rx)
     }
@@ -714,6 +742,18 @@ mod tests {
                 payload,
             )))
             .await
+    }
+
+    async fn publish_retained(
+        controller: &HomieController,
+        topic: &str,
+        payload: &str,
+    ) -> Result<Option<Event>, PollError> {
+        let mut publish = Publish::new(topic, QoS::AtLeastOnce, payload);
+
+        publish.retain = true;
+
+        controller.handle_event(Packet::Publish(publish)).await
     }
 
     fn property_set(properties: Vec<Property>) -> HashMap<String, Property> {
@@ -767,6 +807,54 @@ mod tests {
 
         // No more subscriptions.
         assert!(requests_rx.is_empty());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn retained_payloads_before_properties() -> Result<(), Box<dyn std::error::Error>> {
+        let (controller, _requests_rx) = make_test_controller();
+
+        // Connecting should start discovering.
+        connect(&controller).await?;
+
+        // Discover a new device.
+        publish_retained(&controller, "base_topic/device_id/$homie", "4.0").await?;
+
+        // Discover a node on the device.
+        publish_retained(&controller, "base_topic/device_id/$nodes", "node_id").await?;
+
+        // Get the property payload before $properties
+        publish_retained(
+            &controller,
+            "base_topic/device_id/node_id/property_id",
+            "HELLO WORLD",
+        )
+        .await?;
+
+        // discover the property after its payload
+        publish_retained(
+            &controller,
+            "base_topic/device_id/node_id/$properties",
+            "property_id",
+        )
+        .await?;
+
+        assert_eq!(
+            controller
+                .devices()
+                .get("device_id")
+                .unwrap()
+                .nodes
+                .get("node_id")
+                .unwrap()
+                .properties
+                .get("property_id")
+                .unwrap()
+                .value
+                .as_deref(),
+            Some("HELLO WORLD")
+        );
 
         Ok(())
     }
