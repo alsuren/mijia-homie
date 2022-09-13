@@ -134,14 +134,14 @@ struct PublishResponse {
     topics_to_unsubscribe: Vec<String>,
 }
 
-fn build_node_topics(topics: &mut Vec<String>, base_topic: &str, device_id: &str, node_id: &str) {
+fn add_node_topics(topics: &mut Vec<String>, base_topic: &str, device_id: &str, node_id: &str) {
     let node_topic = format!("{}/{}/{}", base_topic, device_id, node_id);
     for sub in ["$name", "$type", "$properties"] {
         topics.push(format!("{}/{}", node_topic, sub));
     }
 }
 
-fn build_property_topics(
+fn add_property_topics(
     topics: &mut Vec<String>,
     base_topic: &str,
     device_id: &str,
@@ -396,14 +396,14 @@ impl HomieController {
                     let kept = nodes.contains(&node_id.as_ref());
                     if !kept {
                         // The node has been removed, so unsubscribe from its topics and those of its properties
-                        build_node_topics(
+                        add_node_topics(
                             &mut topics_to_unsubscribe,
                             &self.base_topic,
                             device_id,
                             node_id,
                         );
                         for property_id in node.properties.keys() {
-                            build_property_topics(
+                            add_property_topics(
                                 &mut topics_to_unsubscribe,
                                 &self.base_topic,
                                 device_id,
@@ -419,7 +419,7 @@ impl HomieController {
                 for node_id in nodes {
                     if !device.nodes.contains_key(node_id) {
                         device.add_node(Node::new(node_id));
-                        build_node_topics(
+                        add_node_topics(
                             &mut topics_to_subscribe,
                             &self.base_topic,
                             device_id,
@@ -449,7 +449,7 @@ impl HomieController {
                     let kept = properties.contains(&property_id.as_ref());
                     if !kept {
                         // The property has been removed, so unsubscribe from its topics.
-                        build_property_topics(
+                        add_property_topics(
                             &mut topics_to_unsubscribe,
                             &self.base_topic,
                             device_id,
@@ -464,7 +464,7 @@ impl HomieController {
                 for property_id in properties {
                     if !node.properties.contains_key(property_id) {
                         node.add_property(Property::new(property_id));
-                        build_property_topics(
+                        add_property_topics(
                             &mut topics_to_subscribe,
                             &self.base_topic,
                             device_id,
