@@ -115,7 +115,7 @@ pub struct HomieController {
     /// The set of Homie devices which have been discovered so far, keyed by their IDs.
     // TODO: Consider using Mutex<im::HashMap<...>> instead.
     devices: Mutex<Arc<HashMap<String, Device>>>,
-    early_property_values: Mutex<Arc<HashMap<String, String>>>,
+    early_property_values: Mutex<HashMap<String, String>>,
 }
 
 pub struct HomieEventLoop {
@@ -148,7 +148,7 @@ impl HomieController {
             mqtt_client,
             base_topic: base_topic.to_string(),
             devices: Mutex::new(Arc::new(HashMap::new())),
-            early_property_values: Mutex::new(Arc::new(HashMap::new())),
+            early_property_values: Mutex::new(HashMap::new()),
         };
         (controller, HomieEventLoop::new(event_loop))
     }
@@ -241,7 +241,6 @@ impl HomieController {
         let devices = &mut *self.devices.lock().unwrap();
         let devices = Arc::make_mut(devices);
         let early_property_values = &mut *self.early_property_values.lock().unwrap();
-        let early_property_values = Arc::make_mut(early_property_values);
 
         // Collect MQTT topics to which we need to subscribe or unsubscribe here, so that the
         // subscription can happen after the devices lock has been released.
@@ -704,7 +703,7 @@ mod tests {
             base_topic: "base_topic".to_owned(),
             mqtt_client,
             devices: Mutex::new(Arc::new(HashMap::new())),
-            early_property_values: Mutex::new(Arc::new(HashMap::new())),
+            early_property_values: Mutex::new(HashMap::new()),
         };
         (controller, requests_rx)
     }
