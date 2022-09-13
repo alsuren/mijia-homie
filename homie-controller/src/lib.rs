@@ -554,9 +554,6 @@ impl HomieController {
                     && !node_id.starts_with('$')
                     && !property_id.starts_with('$') =>
             {
-                // TODO: What about values of properties we don't yet know about? They may arrive
-                // before the $properties of the node, because the "homie/node_id/+" subscription
-                // matches both.
                 let property = get_mut_property_for(
                     devices,
                     "Got property value for",
