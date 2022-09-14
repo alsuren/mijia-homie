@@ -30,7 +30,7 @@ futures = "0.3.24"
 futures-channel = "0.3.24"
 homie-device = { version = "0.7.0", path = "../homie-device" }
 influx_db_client = { version = "0.5.1", default-features = false, features = ["rustls-tls"] }
-itertools = "0.10.3"
+itertools = "0.10.4"
 log = "0.4.17"
 mijia = { version = "0.6.0", path = "../mijia" }
 pretty_env_logger = "0.4.0"
