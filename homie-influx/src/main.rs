@@ -62,10 +62,11 @@ fn spawn_homie_poll_loop(
     task::spawn(async move {
         loop {
             match controller.poll(&mut event_loop).await {
-                Ok(Some(event)) => {
-                    handle_event(controller.as_ref(), &influx_db_client, event).await;
+                Ok(events) => {
+                    for event in events {
+                        handle_event(controller.as_ref(), &influx_db_client, event).await;
+                    }
                 }
-                Ok(None) => {}
                 Err(e) => {
                     log::error!(
                         "Failed to poll HomieController for base topic '{}': {}",
