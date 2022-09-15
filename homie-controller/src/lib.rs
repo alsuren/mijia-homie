@@ -115,6 +115,8 @@ pub struct HomieController {
     /// The set of Homie devices which have been discovered so far, keyed by their IDs.
     // TODO: Consider using Mutex<im::HashMap<...>> instead.
     devices: Mutex<Arc<HashMap<String, Device>>>,
+    /// temporarily holds retained property payloads that were received before their nodes'
+    /// $properties. The stored payloads are consumed when $properties is received.
     early_property_values: Mutex<HashMap<String, String>>,
 }
 
@@ -240,6 +242,7 @@ impl HomieController {
         // our Arc to point to that, so that it is now a unique reference.
         let devices = &mut *self.devices.lock().unwrap();
         let devices = Arc::make_mut(devices);
+
         let early_property_values = &mut *self.early_property_values.lock().unwrap();
 
         // Collect MQTT topics to which we need to subscribe or unsubscribe here, so that the
