@@ -115,7 +115,7 @@ pub struct HomieController {
     /// The set of Homie devices which have been discovered so far, keyed by their IDs.
     // TODO: Consider using Mutex<im::HashMap<...>> instead.
     devices: Mutex<Arc<HashMap<String, Device>>>,
-    early_property_values: Mutex<Option<HashMap<String, String>>>,
+    early_property_values: Mutex<HashMap<String, String>>,
 }
 
 pub struct HomieEventLoop {
@@ -148,7 +148,7 @@ impl HomieController {
             mqtt_client,
             base_topic: base_topic.to_string(),
             devices: Mutex::new(Arc::new(HashMap::new())),
-            early_property_values: Mutex::new(Some(HashMap::new())),
+            early_property_values: Mutex::new(HashMap::new()),
         };
         (controller, HomieEventLoop::new(event_loop))
     }
@@ -427,10 +427,8 @@ impl HomieController {
                     if !node.properties.contains_key(property_id) {
                         let mut new_prop = Property::new(property_id);
 
-                        new_prop.value = early_property_values.as_mut().and_then(|map| {
-                            let key = format!("{}/{}/{}", device_id, node_id, property_id);
-                            map.remove(&key)
-                        });
+                        let key = format!("{}/{}/{}", device_id, node_id, property_id);
+                        new_prop.value = early_property_values.remove(&key);
 
                         node.add_property(new_prop);
                         let topic = format!(
@@ -440,9 +438,6 @@ impl HomieController {
                         topics_to_subscribe.push(topic);
                     }
                 }
-
-                // drop temporary payload storage as soon as $properties was received
-                early_property_values.take();
 
                 Some(Event::node_updated(device_id, node))
             }
@@ -524,17 +519,14 @@ impl HomieController {
                     && !node_id.starts_with('$')
                     && !property_id.starts_with('$') =>
             {
-                match (
-                    get_mut_property_for(
-                        devices,
-                        "Got property value for",
-                        device_id,
-                        node_id,
-                        property_id,
-                    ),
-                    early_property_values,
+                match get_mut_property_for(
+                    devices,
+                    "Got property value for",
+                    device_id,
+                    node_id,
+                    property_id,
                 ) {
-                    (Ok(mut property), _) => {
+                    Ok(mut property) => {
                         property.value = Some(payload.to_owned());
                         Some(Event::property_value(
                             device_id,
@@ -544,7 +536,7 @@ impl HomieController {
                         ))
                     }
 
-                    (Err(_), Some(early_property_values)) if publish.retain => {
+                    Err(_) if publish.retain => {
                         // temporarily store payloads for unknown properties to prevent
                         // a race condition when the broker sends out the property
                         // payloads before $properties
@@ -562,7 +554,7 @@ impl HomieController {
                         })
                     }
 
-                    (Err(e), _) => return Err(e.into()),
+                    Err(e) => return Err(e.into()),
                 }
             }
             [_device_id, _node_id, _property_id, "set"] => {
@@ -713,7 +705,7 @@ mod tests {
             base_topic: "base_topic".to_owned(),
             mqtt_client,
             devices: Mutex::new(Arc::new(HashMap::new())),
-            early_property_values: Mutex::new(Some(HashMap::new())),
+            early_property_values: Mutex::new(HashMap::new()),
         };
         (controller, requests_rx)
     }
