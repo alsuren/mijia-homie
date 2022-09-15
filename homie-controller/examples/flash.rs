@@ -15,23 +15,21 @@ fn spawn_poll_loop(
 ) -> JoinHandle<Result<(), PollError>> {
     task::spawn(async move {
         loop {
-            if let Some(event) = controller.poll(&mut event_loop).await? {
-                match event {
-                    Event::PropertyValueChanged {
-                        device_id,
-                        node_id,
-                        property_id,
-                        value,
-                        fresh,
-                    } => {
-                        println!(
-                            "{}/{}/{} = {} ({})",
-                            device_id, node_id, property_id, value, fresh
-                        );
-                    }
-                    _ => {
-                        log::info!("Event: {:?}", event);
-                    }
+            for event in controller.poll(&mut event_loop).await? {
+                if let Event::PropertyValueChanged {
+                    device_id,
+                    node_id,
+                    property_id,
+                    value,
+                    fresh,
+                } = event
+                {
+                    println!(
+                        "{}/{}/{} = {} ({})",
+                        device_id, node_id, property_id, value, fresh
+                    );
+                } else {
+                    log::info!("Event: {:?}", event);
                 }
             }
         }

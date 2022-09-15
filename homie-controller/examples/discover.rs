@@ -14,30 +14,33 @@ async fn main() -> Result<(), PollError> {
     let (controller, mut event_loop) = HomieController::new(mqttoptions, "homie");
     loop {
         match controller.poll(&mut event_loop).await {
-            Ok(Some(Event::PropertyValueChanged {
-                device_id,
-                node_id,
-                property_id,
-                value,
-                fresh,
-            })) => {
-                println!(
-                    "{}/{}/{} = {} ({})",
-                    device_id, node_id, property_id, value, fresh
-                );
-            }
-            Ok(Some(event)) => {
-                println!("Event: {:?}", event);
-                println!("Devices:");
-                for device in controller.devices().values() {
-                    if device.has_required_attributes() {
-                        println!(" * {:?}", device);
+            Ok(events) => {
+                for event in events {
+                    if let Event::PropertyValueChanged {
+                        device_id,
+                        node_id,
+                        property_id,
+                        value,
+                        fresh,
+                    } = event
+                    {
+                        println!(
+                            "{}/{}/{} = {} ({})",
+                            device_id, node_id, property_id, value, fresh
+                        );
                     } else {
-                        println!(" * {} not ready.", device.id);
+                        println!("Event: {:?}", event);
+                        println!("Devices:");
+                        for device in controller.devices().values() {
+                            if device.has_required_attributes() {
+                                println!(" * {:?}", device);
+                            } else {
+                                println!(" * {} not ready.", device.id);
+                            }
+                        }
                     }
                 }
             }
-            Ok(None) => {}
             Err(e) => log::error!("Error: {:?}", e),
         }
     }

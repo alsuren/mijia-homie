@@ -60,8 +60,8 @@ async fn test_device() {
     homie.ready().await.unwrap();
 
     // Wait until the controller knows about all required attributes of the device.
-    loop {
-        if let Some(event) = controller.poll(&mut event_loop).await.unwrap() {
+    'outer0: loop {
+        for event in controller.poll(&mut event_loop).await.unwrap() {
             log::trace!("Event: {:?}", event);
             let devices = controller.devices();
             if let Some(device) = devices.get("device_id") {
@@ -80,7 +80,7 @@ async fn test_device() {
                         .unit
                         .is_some()
                 {
-                    break;
+                    break 'outer0;
                 }
             }
         }
@@ -113,8 +113,8 @@ async fn test_device() {
         .unwrap();
 
     // Wait until the controller receives the value.
-    loop {
-        if let Some(event) = controller.poll(&mut event_loop).await.unwrap() {
+    'outer1: loop {
+        for event in controller.poll(&mut event_loop).await.unwrap() {
             log::trace!("Event: {:?}", event);
             if let Event::PropertyValueChanged {
                 device_id,
@@ -129,7 +129,7 @@ async fn test_device() {
                 assert_eq!(property_id, "property_id");
                 assert_eq!(value, "42");
                 assert_eq!(fresh, true);
-                break;
+                break 'outer1;
             }
         }
     }
@@ -151,8 +151,8 @@ async fn test_device() {
         .unwrap();
 
     // Wait for the device to receive the value and send it back to the controller.
-    loop {
-        if let Some(event) = controller.poll(&mut event_loop).await.unwrap() {
+    'outer2: loop {
+        for event in controller.poll(&mut event_loop).await.unwrap() {
             log::trace!("Event: {:?}", event);
             if let Event::PropertyValueChanged {
                 device_id,
@@ -167,7 +167,7 @@ async fn test_device() {
                 assert_eq!(property_id, "property_id");
                 assert_eq!(value, "13");
                 assert_eq!(fresh, true);
-                break;
+                break 'outer2;
             }
         }
     }
@@ -196,8 +196,10 @@ async fn test_device() {
 
     // Disconnect the controller.
     controller.disconnect().await.unwrap();
-    while let Ok(event) = controller.poll(&mut event_loop).await {
-        log::trace!("Event: {:?}", event);
+    while let Ok(events) = controller.poll(&mut event_loop).await {
+        for event in events {
+            log::trace!("Event: {:?}", event);
+        }
     }
 }
 

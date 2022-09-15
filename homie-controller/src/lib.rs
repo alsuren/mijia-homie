@@ -132,7 +132,7 @@ impl HomieEventLoop {
 
 /// Internal struct for the return value of HomieController::handle_publish_sync()
 struct PublishResponse {
-    event: Option<Event>,
+    events: Vec<Event>,
     topics_to_subscribe: Vec<String>,
     topics_to_unsubscribe: Vec<String>,
 }
@@ -167,18 +167,18 @@ impl HomieController {
     }
 
     /// Poll the `EventLoop`, and maybe return a Homie event.
-    pub async fn poll(&self, event_loop: &mut HomieEventLoop) -> Result<Option<Event>, PollError> {
+    pub async fn poll(&self, event_loop: &mut HomieEventLoop) -> Result<Vec<Event>, PollError> {
         let notification = event_loop.event_loop.poll().await?;
         log::trace!("Notification = {:?}", notification);
 
         if let rumqttc::Event::Incoming(incoming) = notification {
             self.handle_event(incoming).await
         } else {
-            Ok(None)
+            Ok(vec![])
         }
     }
 
-    async fn handle_event(&self, incoming: Incoming) -> Result<Option<Event>, PollError> {
+    async fn handle_event(&self, incoming: Incoming) -> Result<Vec<Event>, PollError> {
         match incoming {
             Incoming::Publish(publish) => match self.handle_publish(publish).await {
                 Err(HandleError::Warning(err)) => {
@@ -186,27 +186,27 @@ impl HomieController {
                     // event from the network, perhaps due to a malfunctioning device,
                     // so should just be logged and ignored.
                     log::warn!("{}", err);
-                    Ok(None)
+                    Ok(vec![])
                 }
                 Err(HandleError::Fatal(e)) => Err(e.into()),
-                Ok(event) => Ok(event),
+                Ok(events) => Ok(events),
             },
             Incoming::ConnAck(_) => {
                 // We have connected or reconnected, so make our initial subscription to start
                 // discovering Homie devices.
                 self.start().await?;
-                Ok(Some(Event::Connected))
+                Ok(vec![Event::Connected])
             }
-            _ => Ok(None),
+            _ => Ok(vec![]),
         }
     }
 
     /// Handle a publish event received from the MQTT broker, updating the devices and our
     /// subscriptions as appropriate and possibly returning an event to send back to the controller
     /// application.
-    async fn handle_publish(&self, publish: Publish) -> Result<Option<Event>, HandleError> {
+    async fn handle_publish(&self, publish: Publish) -> Result<Vec<Event>, HandleError> {
         let PublishResponse {
-            event,
+            events,
             topics_to_subscribe,
             topics_to_unsubscribe,
         } = self.handle_publish_sync(publish)?;
@@ -220,7 +220,7 @@ impl HomieController {
             self.mqtt_client.unsubscribe(topic).await?;
         }
 
-        Ok(event)
+        Ok(events)
     }
 
     /// Handle a publish event, update the devices, and return any event and any new topics which
@@ -251,7 +251,7 @@ impl HomieController {
         let mut topics_to_unsubscribe: Vec<String> = vec![];
 
         let parts = subtopic.split('/').collect::<Vec<&str>>();
-        let event = match parts.as_slice() {
+        let events = match parts.as_slice() {
             [device_id, "$homie"] => {
                 if !devices.contains_key(*device_id) {
                     log::trace!("Homie device '{}' version '{}'", device_id, payload);
@@ -259,29 +259,29 @@ impl HomieController {
                     topics_to_subscribe.push(format!("{}/{}/+", self.base_topic, device_id));
                     topics_to_subscribe.push(format!("{}/{}/$fw/+", self.base_topic, device_id));
                     topics_to_subscribe.push(format!("{}/{}/$stats/+", self.base_topic, device_id));
-                    Some(Event::DeviceUpdated {
+                    vec![Event::DeviceUpdated {
                         device_id: (*device_id).to_owned(),
                         has_required_attributes: false,
-                    })
+                    }]
                 } else {
-                    None
+                    vec![]
                 }
             }
             [device_id, "$name"] => {
                 let device = get_mut_device_for(devices, "Got name for", device_id)?;
                 device.name = Some(payload.to_owned());
-                Some(Event::device_updated(device))
+                vec![Event::device_updated(device)]
             }
             [device_id, "$state"] => {
                 let state = payload.parse()?;
                 let device = get_mut_device_for(devices, "Got state for", device_id)?;
                 device.state = state;
-                Some(Event::device_updated(device))
+                vec![Event::device_updated(device)]
             }
             [device_id, "$implementation"] => {
                 let device = get_mut_device_for(devices, "Got implementation for", device_id)?;
                 device.implementation = Some(payload.to_owned());
-                Some(Event::device_updated(device))
+                vec![Event::device_updated(device)]
             }
             [device_id, "$extensions"] => {
                 let device = get_mut_device_for(devices, "Got extensions for", device_id)?;
@@ -289,80 +289,80 @@ impl HomieController {
                     .split(',')
                     .map(|part| part.parse())
                     .collect::<Result<Vec<_>, _>>()?;
-                Some(Event::device_updated(device))
+                vec![Event::device_updated(device)]
             }
             [device_id, "$localip"] => {
                 let device = get_mut_device_for(devices, "Got localip for", device_id)?;
                 device.local_ip = Some(payload.to_owned());
-                Some(Event::device_updated(device))
+                vec![Event::device_updated(device)]
             }
             [device_id, "$mac"] => {
                 let device = get_mut_device_for(devices, "Got mac for", device_id)?;
                 device.mac = Some(payload.to_owned());
-                Some(Event::device_updated(device))
+                vec![Event::device_updated(device)]
             }
             [device_id, "$fw", "name"] => {
                 let device = get_mut_device_for(devices, "Got fw/name for", device_id)?;
                 device.firmware_name = Some(payload.to_owned());
-                Some(Event::device_updated(device))
+                vec![Event::device_updated(device)]
             }
             [device_id, "$fw", "version"] => {
                 let device = get_mut_device_for(devices, "Got fw/version for", device_id)?;
                 device.firmware_version = Some(payload.to_owned());
-                Some(Event::device_updated(device))
+                vec![Event::device_updated(device)]
             }
             [_device_id, "$stats"] => {
                 // Homie 3.0 list of available stats. We don't need this, so ignore it without
                 // logging a warning.
-                None
+                vec![]
             }
             [device_id, "$stats", "interval"] => {
                 let interval = payload.parse()?;
                 let device = get_mut_device_for(devices, "Got stats/interval for", device_id)?;
                 device.stats_interval = Some(Duration::from_secs(interval));
-                Some(Event::device_updated(device))
+                vec![Event::device_updated(device)]
             }
             [device_id, "$stats", "uptime"] => {
                 let uptime = payload.parse()?;
                 let device = get_mut_device_for(devices, "Got stats/uptime for", device_id)?;
                 device.stats_uptime = Some(Duration::from_secs(uptime));
-                Some(Event::device_updated(device))
+                vec![Event::device_updated(device)]
             }
             [device_id, "$stats", "signal"] => {
                 let signal = payload.parse()?;
                 let device = get_mut_device_for(devices, "Got stats/signal for", device_id)?;
                 device.stats_signal = Some(signal);
-                Some(Event::device_updated(device))
+                vec![Event::device_updated(device)]
             }
             [device_id, "$stats", "cputemp"] => {
                 let cputemp = payload.parse()?;
                 let device = get_mut_device_for(devices, "Got stats/cputemp for", device_id)?;
                 device.stats_cputemp = Some(cputemp);
-                Some(Event::device_updated(device))
+                vec![Event::device_updated(device)]
             }
             [device_id, "$stats", "cpuload"] => {
                 let cpuload = payload.parse()?;
                 let device = get_mut_device_for(devices, "Got stats/cpuload for", device_id)?;
                 device.stats_cpuload = Some(cpuload);
-                Some(Event::device_updated(device))
+                vec![Event::device_updated(device)]
             }
             [device_id, "$stats", "battery"] => {
                 let battery = payload.parse()?;
                 let device = get_mut_device_for(devices, "Got stats/battery for", device_id)?;
                 device.stats_battery = Some(battery);
-                Some(Event::device_updated(device))
+                vec![Event::device_updated(device)]
             }
             [device_id, "$stats", "freeheap"] => {
                 let freeheap = payload.parse()?;
                 let device = get_mut_device_for(devices, "Got stats/freeheap for", device_id)?;
                 device.stats_freeheap = Some(freeheap);
-                Some(Event::device_updated(device))
+                vec![Event::device_updated(device)]
             }
             [device_id, "$stats", "supply"] => {
                 let supply = payload.parse()?;
                 let device = get_mut_device_for(devices, "Got stats/supply for", device_id)?;
                 device.stats_supply = Some(supply);
-                Some(Event::device_updated(device))
+                vec![Event::device_updated(device)]
             }
             [device_id, "$nodes"] => {
                 let nodes: Vec<_> = payload.split(',').collect();
@@ -395,17 +395,17 @@ impl HomieController {
                     }
                 }
 
-                Some(Event::device_updated(device))
+                vec![Event::device_updated(device)]
             }
             [device_id, node_id, "$name"] => {
                 let node = get_mut_node_for(devices, "Got node name for", device_id, node_id)?;
                 node.name = Some(payload.to_owned());
-                Some(Event::node_updated(device_id, node))
+                vec![Event::node_updated(device_id, node)]
             }
             [device_id, node_id, "$type"] => {
                 let node = get_mut_node_for(devices, "Got node type for", device_id, node_id)?;
                 node.node_type = Some(payload.to_owned());
-                Some(Event::node_updated(device_id, node))
+                vec![Event::node_updated(device_id, node)]
             }
             [device_id, node_id, "$properties"] => {
                 let properties: Vec<_> = payload.split(',').collect();
@@ -425,6 +425,8 @@ impl HomieController {
                     kept
                 });
 
+                let mut events = vec![Event::node_updated(device_id, node)];
+
                 // Add new properties.
                 for property_id in properties {
                     if !node.properties.contains_key(property_id) {
@@ -432,6 +434,16 @@ impl HomieController {
 
                         let key = format!("{}/{}/{}", device_id, node_id, property_id);
                         new_prop.value = early_property_values.remove(&key);
+
+                        if let Some(value) = new_prop.value.clone() {
+                            events.push(Event::PropertyValueChanged {
+                                device_id: device_id.to_string(),
+                                node_id: node_id.to_string(),
+                                property_id: property_id.to_string(),
+                                value,
+                                fresh: false,
+                            });
+                        }
 
                         node.add_property(new_prop);
                         let topic = format!(
@@ -442,7 +454,7 @@ impl HomieController {
                     }
                 }
 
-                Some(Event::node_updated(device_id, node))
+                events
             }
             [device_id, node_id, property_id, "$name"] => {
                 let property = get_mut_property_for(
@@ -453,7 +465,7 @@ impl HomieController {
                     property_id,
                 )?;
                 property.name = Some(payload.to_owned());
-                Some(Event::property_updated(device_id, node_id, property))
+                vec![Event::property_updated(device_id, node_id, property)]
             }
             [device_id, node_id, property_id, "$datatype"] => {
                 let datatype = payload.parse()?;
@@ -465,7 +477,7 @@ impl HomieController {
                     property_id,
                 )?;
                 property.datatype = Some(datatype);
-                Some(Event::property_updated(device_id, node_id, property))
+                vec![Event::property_updated(device_id, node_id, property)]
             }
             [device_id, node_id, property_id, "$unit"] => {
                 let property = get_mut_property_for(
@@ -476,7 +488,7 @@ impl HomieController {
                     property_id,
                 )?;
                 property.unit = Some(payload.to_owned());
-                Some(Event::property_updated(device_id, node_id, property))
+                vec![Event::property_updated(device_id, node_id, property)]
             }
             [device_id, node_id, property_id, "$format"] => {
                 let property = get_mut_property_for(
@@ -487,7 +499,7 @@ impl HomieController {
                     property_id,
                 )?;
                 property.format = Some(payload.to_owned());
-                Some(Event::property_updated(device_id, node_id, property))
+                vec![Event::property_updated(device_id, node_id, property)]
             }
             [device_id, node_id, property_id, "$settable"] => {
                 let settable = payload
@@ -501,7 +513,7 @@ impl HomieController {
                     property_id,
                 )?;
                 property.settable = settable;
-                Some(Event::property_updated(device_id, node_id, property))
+                vec![Event::property_updated(device_id, node_id, property)]
             }
             [device_id, node_id, property_id, "$retained"] => {
                 let retained = payload
@@ -515,7 +527,7 @@ impl HomieController {
                     property_id,
                 )?;
                 property.retained = retained;
-                Some(Event::property_updated(device_id, node_id, property))
+                vec![Event::property_updated(device_id, node_id, property)]
             }
             [device_id, node_id, property_id]
                 if !device_id.starts_with('$')
@@ -531,30 +543,21 @@ impl HomieController {
                 ) {
                     Ok(mut property) => {
                         property.value = Some(payload.to_owned());
-                        Some(Event::property_value(
+                        vec![Event::property_value(
                             device_id,
                             node_id,
                             property,
                             !publish.retain,
-                        ))
+                        )]
                     }
 
                     Err(_) if publish.retain => {
                         // temporarily store payloads for unknown properties to prevent
                         // a race condition when the broker sends out the property
                         // payloads before $properties
-
                         early_property_values.insert(subtopic.to_owned(), payload.to_owned());
 
-                        // XXX is this return value correct? should we wait for $properties?
-                        // if so, how to return many PropertyValueChanged from there?
-                        Some(Event::PropertyValueChanged {
-                            device_id: device_id.to_string(),
-                            node_id: node_id.to_string(),
-                            property_id: property_id.to_string(),
-                            value: payload.to_string(),
-                            fresh: false,
-                        })
+                        vec![]
                     }
 
                     Err(e) => return Err(e.into()),
@@ -563,16 +566,16 @@ impl HomieController {
             [_device_id, _node_id, _property_id, "set"] => {
                 // Value set message may have been sent by us or another controller. Either way,
                 // ignore it, it is only for the device.
-                None
+                vec![]
             }
             _ => {
                 log::warn!("Unexpected subtopic {} = {}", subtopic, payload);
-                None
+                vec![]
             }
         };
 
         Ok(PublishResponse {
-            event,
+            events,
             topics_to_subscribe,
             topics_to_unsubscribe,
         })
@@ -725,7 +728,7 @@ mod tests {
         }
     }
 
-    async fn connect(controller: &HomieController) -> Result<Option<Event>, PollError> {
+    async fn connect(controller: &HomieController) -> Result<Vec<Event>, PollError> {
         controller
             .handle_event(Packet::ConnAck(ConnAck::new(
                 rumqttc::ConnectReturnCode::Success,
@@ -738,7 +741,7 @@ mod tests {
         controller: &HomieController,
         topic: &str,
         payload: &str,
-    ) -> Result<Option<Event>, PollError> {
+    ) -> Result<Vec<Event>, PollError> {
         controller
             .handle_event(Packet::Publish(Publish::new(
                 topic,
@@ -752,7 +755,7 @@ mod tests {
         controller: &HomieController,
         topic: &str,
         payload: &str,
-    ) -> Result<Option<Event>, PollError> {
+    ) -> Result<Vec<Event>, PollError> {
         let mut publish = Publish::new(topic, QoS::AtLeastOnce, payload);
 
         publish.retain = true;
@@ -904,29 +907,29 @@ mod tests {
         let (controller, _requests_rx) = make_test_controller();
 
         // Start discovering.
-        assert_eq!(connect(&controller).await?, Some(Event::Connected));
+        assert_eq!(connect(&controller).await?, vec![Event::Connected]);
 
         // Discover a new device.
         assert_eq!(
             publish(&controller, "base_topic/device_id/$homie", "4.0").await?,
-            Some(Event::DeviceUpdated {
+            vec![Event::DeviceUpdated {
                 device_id: "device_id".to_owned(),
                 has_required_attributes: false
-            })
+            }]
         );
         assert_eq!(
             publish(&controller, "base_topic/device_id/$name", "Device name").await?,
-            Some(Event::DeviceUpdated {
+            vec![Event::DeviceUpdated {
                 device_id: "device_id".to_owned(),
                 has_required_attributes: false
-            })
+            }]
         );
         assert_eq!(
             publish(&controller, "base_topic/device_id/$state", "ready").await?,
-            Some(Event::DeviceUpdated {
+            vec![Event::DeviceUpdated {
                 device_id: "device_id".to_owned(),
                 has_required_attributes: true
-            })
+            }]
         );
         let mut expected_device = Device::new("device_id", "4.0");
         expected_device.state = State::Ready;
@@ -939,10 +942,10 @@ mod tests {
         // A node on the device.
         assert_eq!(
             publish(&controller, "base_topic/device_id/$nodes", "node_id").await?,
-            Some(Event::DeviceUpdated {
+            vec![Event::DeviceUpdated {
                 device_id: "device_id".to_owned(),
                 has_required_attributes: false
-            })
+            }]
         );
         assert_eq!(
             publish(
@@ -951,11 +954,11 @@ mod tests {
                 "Node name"
             )
             .await?,
-            Some(Event::NodeUpdated {
+            vec![Event::NodeUpdated {
                 device_id: "device_id".to_owned(),
                 node_id: "node_id".to_owned(),
                 has_required_attributes: false
-            })
+            }]
         );
         assert_eq!(
             publish(
@@ -964,11 +967,11 @@ mod tests {
                 "Node type"
             )
             .await?,
-            Some(Event::NodeUpdated {
+            vec![Event::NodeUpdated {
                 device_id: "device_id".to_owned(),
                 node_id: "node_id".to_owned(),
                 has_required_attributes: false
-            })
+            }]
         );
 
         // A property on the node.
@@ -979,11 +982,11 @@ mod tests {
                 "property_id"
             )
             .await?,
-            Some(Event::NodeUpdated {
+            vec![Event::NodeUpdated {
                 device_id: "device_id".to_owned(),
                 node_id: "node_id".to_owned(),
                 has_required_attributes: false
-            })
+            }]
         );
         assert_eq!(
             publish(
@@ -992,12 +995,12 @@ mod tests {
                 "Property name"
             )
             .await?,
-            Some(Event::PropertyUpdated {
+            vec![Event::PropertyUpdated {
                 device_id: "device_id".to_owned(),
                 node_id: "node_id".to_owned(),
                 property_id: "property_id".to_owned(),
                 has_required_attributes: false
-            })
+            }]
         );
         assert_eq!(
             publish(
@@ -1006,12 +1009,12 @@ mod tests {
                 "integer"
             )
             .await?,
-            Some(Event::PropertyUpdated {
+            vec![Event::PropertyUpdated {
                 device_id: "device_id".to_owned(),
                 node_id: "node_id".to_owned(),
                 property_id: "property_id".to_owned(),
                 has_required_attributes: true
-            })
+            }]
         );
 
         Ok(())
