@@ -831,7 +831,12 @@ mod tests {
         publish_retained(&controller, "base_topic/device_id/$homie", "4.0").await?;
 
         // Discover a node on the device.
-        publish_retained(&controller, "base_topic/device_id/$nodes", "node_id").await?;
+        publish_retained(
+            &controller,
+            "base_topic/device_id/$nodes",
+            "node_id,second_node",
+        )
+        .await?;
 
         // Get the property payload before $properties
         publish_retained(
@@ -845,6 +850,21 @@ mod tests {
         publish_retained(
             &controller,
             "base_topic/device_id/node_id/$properties",
+            "property_id",
+        )
+        .await?;
+
+        publish_retained(
+            &controller,
+            "base_topic/device_id/second_node/property_id",
+            "hello again",
+        )
+        .await?;
+
+        // discover the property after its payload
+        publish_retained(
+            &controller,
+            "base_topic/device_id/second_node/$properties",
             "property_id",
         )
         .await?;
@@ -863,6 +883,22 @@ mod tests {
                 .value
                 .as_deref(),
             Some("HELLO WORLD")
+        );
+
+        assert_eq!(
+            controller
+                .devices()
+                .get("device_id")
+                .unwrap()
+                .nodes
+                .get("second_node")
+                .unwrap()
+                .properties
+                .get("property_id")
+                .unwrap()
+                .value
+                .as_deref(),
+            Some("hello again")
         );
 
         Ok(())
