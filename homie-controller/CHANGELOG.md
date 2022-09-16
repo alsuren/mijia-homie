@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.7.0
+
+### Breaking changes
+
+- `HomieController::poll` now returns a `Vec` of events rather than an `Option`.
+- Updated to `rumqttc` 0.16.
+
+### Bugfixes
+
+- Fixed [bug](https://github.com/alsuren/mijia-homie/issues/227) where property values arriving
+  before the corresponding `$properties` topic would be dropped.
+
 ## 0.6.0
 
 ### Breaking changes
