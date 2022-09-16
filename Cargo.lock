@@ -685,7 +685,7 @@ dependencies = [
 
 [[package]]
 name = "homie-influx"
-version = "0.2.7"
+version = "0.2.8"
 dependencies = [
  "color-backtrace",
  "eyre",
