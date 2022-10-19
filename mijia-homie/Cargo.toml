@@ -35,7 +35,7 @@ log = "0.4.17"
 mijia = { version = "0.6.0", path = "../mijia" }
 pretty_env_logger = "0.4.0"
 rumqttc = "0.17.0"
-rustls = "0.20.6"
+rustls = "0.20.7"
 rustls-native-certs = "0.6.2"
 serde_derive = "1.0.137"
 serde = "1.0.145"
