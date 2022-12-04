@@ -47,6 +47,7 @@ dependencies = [
  "homie-device",
  "log",
  "pretty_env_logger",
+ "rainbow-hat-rs",
  "rumqttc",
  "rustls",
  "rustls-native-certs",
@@ -1312,6 +1313,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "rainbow-hat-rs"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9ea5b95a2de692e97feefe0699e737a8d3a790f16d8d61eef81ba6e557febeeb"
+dependencies = [
+ "rppal",
+]
+
+[[package]]
 name = "rand"
 version = "0.8.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1439,6 +1449,16 @@ dependencies = [
  "untrusted",
  "web-sys",
  "winapi",
+]
+
+[[package]]
+name = "rppal"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eb26758c881b4837b2f4aef569e4251f75388e36b37204e1804ef429c220121c"
+dependencies = [
+ "lazy_static",
+ "libc",
 ]
 
 [[package]]
