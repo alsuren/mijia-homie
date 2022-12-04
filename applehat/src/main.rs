@@ -3,6 +3,7 @@ mod config;
 use config::{get_mqtt_options, Config};
 use eyre::Report;
 use homie_controller::{Event, HomieController, HomieEventLoop, PollError};
+use log::{error, info, trace};
 use rumqttc::ConnectionError;
 use std::{sync::Arc, time::Duration};
 use tokio::{
@@ -44,7 +45,7 @@ fn spawn_homie_poll_loop(
                     }
                 }
                 Err(e) => {
-                    log::error!(
+                    error!(
                         "Failed to poll HomieController for base topic '{}': {}",
                         controller.base_topic(),
                         e
@@ -67,7 +68,7 @@ async fn handle_event(controller: &HomieController, event: Event) {
             value,
             fresh,
         } => {
-            log::trace!(
+            trace!(
                 "{}/{}/{}/{} = {} ({})",
                 controller.base_topic(),
                 device_id,
@@ -81,7 +82,7 @@ async fn handle_event(controller: &HomieController, event: Event) {
             }
         }
         _ => {
-            log::info!("{} Event: {:?}", controller.base_topic(), event);
+            info!("{} Event: {:?}", controller.base_topic(), event);
         }
     }
 }
