@@ -1,4 +1,5 @@
 mod config;
+mod ui;
 
 use config::{get_mqtt_options, Config};
 use eyre::Report;
@@ -11,6 +12,7 @@ use tokio::{
     task::{self, JoinHandle},
     time::sleep,
 };
+use ui::UiState;
 
 #[tokio::main]
 async fn main() -> Result<(), Report> {
@@ -26,9 +28,15 @@ async fn main() -> Result<(), Report> {
     let controller = Arc::new(controller);
 
     let alphanum = Alphanum4::new()?;
+    let ui_state = UiState {
+        alphanum,
+        selected_device_id: "mijia-bridge-cottagepi".to_string(),
+        selected_node_id: "A4C138E98330".to_string(),
+        selected_property_id: "temperature".to_string(),
+    };
 
     let handle =
-        spawn_homie_poll_loop(event_loop, controller.clone(), alphanum, reconnect_interval);
+        spawn_homie_poll_loop(event_loop, controller.clone(), ui_state, reconnect_interval);
 
     handle.await?;
 
@@ -38,7 +46,7 @@ async fn main() -> Result<(), Report> {
 fn spawn_homie_poll_loop(
     mut event_loop: HomieEventLoop,
     controller: Arc<HomieController>,
-    mut alphanum: Alphanum4,
+    mut ui_state: UiState,
     reconnect_interval: Duration,
 ) -> JoinHandle<()> {
     task::spawn(async move {
@@ -46,7 +54,7 @@ fn spawn_homie_poll_loop(
             match controller.poll(&mut event_loop).await {
                 Ok(events) => {
                     for event in events {
-                        handle_event(controller.as_ref(), &mut alphanum, event).await;
+                        handle_event(controller.as_ref(), &mut ui_state, event).await;
                     }
                 }
                 Err(e) => {
@@ -64,7 +72,7 @@ fn spawn_homie_poll_loop(
     })
 }
 
-async fn handle_event(controller: &HomieController, alphanum: &mut Alphanum4, event: Event) {
+async fn handle_event(controller: &HomieController, ui_state: &mut UiState, event: Event) {
     match event {
         Event::PropertyValueChanged {
             device_id,
@@ -87,46 +95,11 @@ async fn handle_event(controller: &HomieController, alphanum: &mut Alphanum4, ev
                     "Fresh property value {}/{}/{}={}",
                     device_id, node_id, property_id, value
                 );
-                if property_id == "temperature" {
-                    let buf = format!("{}", value);
-                    print_str_decimal(alphanum, &buf);
-                    if let Err(e) = alphanum.show() {
-                        error!("Error displaying: {}", e);
-                    }
-                }
+                ui_state.update_display(controller);
             }
         }
         _ => {
             info!("{} Event: {:?}", controller.base_topic(), event);
-        }
-    }
-}
-
-fn print_str_decimal(alphanum: &mut Alphanum4, s: &str) {
-    let padding = 4usize.saturating_sub(if s.contains('.') {
-        s.len() - 1
-    } else {
-        s.len()
-    });
-    for position in 0..padding {
-        alphanum.set_digit(position, ' ', false);
-    }
-
-    let mut position = padding;
-    for c in s.chars() {
-        if c == '.' {
-            if position == 0 {
-                alphanum.set_digit(position, '0', true);
-                position += 1;
-            } else {
-                alphanum.set_decimal(position - 1, true);
-            }
-        } else {
-            alphanum.set_digit(position, c, false);
-            position += 1;
-        }
-        if position >= 4 {
-            break;
         }
     }
 }
