@@ -103,7 +103,16 @@ async fn handle_event(controller: &HomieController, alphanum: &mut Alphanum4, ev
 }
 
 fn print_str_decimal(alphanum: &mut Alphanum4, s: &str) {
-    let mut position = 0;
+    let padding = 4usize.saturating_sub(if s.contains('.') {
+        s.len() - 1
+    } else {
+        s.len()
+    });
+    for position in 0..padding {
+        alphanum.set_digit(position, ' ', false);
+    }
+
+    let mut position = padding;
     for c in s.chars() {
         if c == '.' {
             if position == 0 {
