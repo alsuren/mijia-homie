@@ -43,6 +43,7 @@ dependencies = [
  "eyre",
  "futures",
  "futures-channel",
+ "homie-controller",
  "homie-device",
  "log",
  "pretty_env_logger",
