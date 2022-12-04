@@ -36,6 +36,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "applehat"
+version = "0.2.5"
+dependencies = [
+ "color-backtrace",
+ "eyre",
+ "futures",
+ "futures-channel",
+ "homie-device",
+ "log",
+ "pretty_env_logger",
+ "rumqttc",
+ "rustls",
+ "rustls-native-certs",
+ "serde",
+ "serde_derive",
+ "stable-eyre",
+ "tokio",
+ "toml",
+ "url",
+]
+
+[[package]]
 name = "argh"
 version = "0.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
