@@ -89,7 +89,7 @@ async fn handle_event(controller: &HomieController, alphanum: &mut Alphanum4, ev
                 );
                 if property_id == "temperature" {
                     let buf = format!("{}", value);
-                    alphanum.print_str(&buf, true);
+                    print_str_decimal(alphanum, &buf);
                     if let Err(e) = alphanum.show() {
                         error!("Error displaying: {}", e);
                     }
@@ -98,6 +98,26 @@ async fn handle_event(controller: &HomieController, alphanum: &mut Alphanum4, ev
         }
         _ => {
             info!("{} Event: {:?}", controller.base_topic(), event);
+        }
+    }
+}
+
+fn print_str_decimal(alphanum: &mut Alphanum4, s: &str) {
+    let mut position = 0;
+    for c in s.chars() {
+        if c == '.' {
+            if position == 0 {
+                alphanum.set_digit(position, '0', true);
+                position += 1;
+            } else {
+                alphanum.set_decimal(position - 1, true);
+            }
+        } else {
+            alphanum.set_digit(position, c, false);
+            position += 1;
+        }
+        if position >= 4 {
+            break;
         }
     }
 }
