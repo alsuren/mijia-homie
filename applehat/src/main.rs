@@ -5,7 +5,7 @@ use config::{get_mqtt_options, Config};
 use eyre::Report;
 use homie_controller::{Event, HomieController, HomieEventLoop, PollError};
 use log::{error, info, trace};
-use rainbow_hat_rs::alphanum4::Alphanum4;
+use rainbow_hat_rs::{alphanum4::Alphanum4, apa102::APA102};
 use rumqttc::ConnectionError;
 use std::{sync::Arc, time::Duration};
 use tokio::{
@@ -28,8 +28,11 @@ async fn main() -> Result<(), Report> {
     let controller = Arc::new(controller);
 
     let alphanum = Alphanum4::new()?;
+    let mut pixels = APA102::new()?;
+    pixels.setup()?;
     let ui_state = UiState {
         alphanum,
+        pixels,
         selected_device_id: "mijia-bridge-cottagepi".to_string(),
         selected_node_id: "A4C138E98330".to_string(),
         selected_property_id: "temperature".to_string(),

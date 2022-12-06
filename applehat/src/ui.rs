@@ -1,22 +1,29 @@
 use std::collections::HashMap;
 
-use homie_controller::{Device, HomieController, Property};
+use homie_controller::{Device, HomieController, Node, Property, State};
 use log::error;
-use rainbow_hat_rs::alphanum4::Alphanum4;
+use rainbow_hat_rs::{alphanum4::Alphanum4, apa102::APA102};
+
+const TEMPERATURE_PROPERTY_ID: &str = "temperature";
+const HUMIDITY_PROPERTY_ID: &str = "humidity";
 
 #[derive(Debug)]
 pub struct UiState {
+    pub alphanum: Alphanum4,
+    pub pixels: APA102,
     pub selected_device_id: String,
     pub selected_node_id: String,
     pub selected_property_id: String,
-    pub alphanum: Alphanum4,
 }
 
 impl UiState {
     /// Updates the display based on the current state.
     pub fn update_display(&mut self, controller: &HomieController) {
+        let devices = controller.devices();
+
+        // Show currently selected value on alphanumeric display.
         if let Some(property) = get_property(
-            &controller.devices(),
+            &devices,
             &self.selected_device_id,
             &self.selected_node_id,
             &self.selected_property_id,
@@ -31,6 +38,22 @@ impl UiState {
         }
         if let Err(e) = self.alphanum.show() {
             error!("Error displaying: {}", e);
+        }
+
+        // Show first 7 nodes on RGB LEDs.
+        let nodes = find_nodes(&devices);
+        for i in 0..7 {
+            let (r, g, b) = if let Some((device_id, node_id, node)) = nodes.get(i) {
+                let selected =
+                    device_id == &self.selected_device_id && node_id == &self.selected_node_id;
+                colour_for_node(node, selected)
+            } else {
+                (0, 0, 0)
+            };
+            self.pixels.set_pixel(i, r, g, b, 1.0);
+        }
+        if let Err(e) = self.pixels.show() {
+            error!("Error setting RGB LEDs: {}", e);
         }
     }
 }
@@ -76,4 +99,49 @@ fn print_str_decimal(alphanum: &mut Alphanum4, s: &str) {
             break;
         }
     }
+}
+
+/// Finds all nodes on active devices with temperature and humidity properties.
+fn find_nodes(devices: &HashMap<String, Device>) -> Vec<(&str, &str, &Node)> {
+    let mut nodes: Vec<(&str, &str, &Node)> = vec![];
+    for (device_id, device) in devices {
+        if device.state == State::Ready {
+            for (node_id, node) in &device.nodes {
+                if node.properties.contains_key(TEMPERATURE_PROPERTY_ID)
+                    && node.properties.contains_key(HUMIDITY_PROPERTY_ID)
+                {
+                    nodes.push((device_id, node_id, node));
+                }
+            }
+        }
+    }
+    nodes
+}
+
+/// Given a node with temperature and humidity properties, returns the appropriate RGB colour to
+/// display for it.
+fn colour_for_node(node: &Node, selected: bool) -> (u8, u8, u8) {
+    let temperature: f64 = node
+        .properties
+        .get(TEMPERATURE_PROPERTY_ID)
+        .unwrap()
+        .value()
+        .unwrap();
+    let humidity: i64 = node
+        .properties
+        .get(HUMIDITY_PROPERTY_ID)
+        .unwrap()
+        .value()
+        .unwrap();
+
+    (
+        scale_to_u8(temperature, 0.0, 40.0),
+        (humidity * 255 / 100) as u8,
+        if selected { 255 } else { 0 },
+    )
+}
+
+fn scale_to_u8(value: f64, low: f64, high: f64) -> u8 {
+    // Casts from floating point to integer types in Rust are saturating.
+    (255.0 * (value - low) / (high - low)) as u8
 }
