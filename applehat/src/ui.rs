@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use homie_controller::{Datatype, Device, HomieController, Node, Property, State};
-use log::error;
+use log::{error, trace};
 use rainbow_hat_rs::{alphanum4::Alphanum4, apa102::APA102};
 
 const TEMPERATURE_PROPERTY_ID: &str = "temperature";
@@ -47,6 +47,7 @@ impl UiState {
             let (r, g, b) = if let Some((device_id, node_id, node)) = nodes.get(i) {
                 let selected =
                     device_id == &self.selected_device_id && node_id == &self.selected_node_id;
+                trace!("Showing node {:?}", node);
                 colour_for_node(node, selected)
             } else {
                 (0, 0, 0)
