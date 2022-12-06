@@ -51,7 +51,9 @@ impl UiState {
             } else {
                 (0, 0, 0)
             };
-            self.pixels.set_pixel(i, r, g, b, PIXEL_BRIGHTNESS);
+            // TODO: Fix set_pixel brightness to work.
+            self.pixels.pixels[i] = [r, g, b, (PIXEL_BRIGHTNESS * 31.0) as u8];
+            //self.pixels.set_pixel(i, r, g, b, PIXEL_BRIGHTNESS);
         }
         if let Err(e) = self.pixels.show() {
             error!("Error setting RGB LEDs: {}", e);
