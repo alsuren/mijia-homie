@@ -6,6 +6,7 @@ use rainbow_hat_rs::{alphanum4::Alphanum4, apa102::APA102};
 
 const TEMPERATURE_PROPERTY_ID: &str = "temperature";
 const HUMIDITY_PROPERTY_ID: &str = "humidity";
+const PIXEL_BRIGHTNESS: f32 = 0.4;
 
 #[derive(Debug)]
 pub struct UiState {
@@ -50,7 +51,7 @@ impl UiState {
             } else {
                 (0, 0, 0)
             };
-            self.pixels.set_pixel(i, r, g, b, 1.0);
+            self.pixels.set_pixel(i, r, g, b, PIXEL_BRIGHTNESS);
         }
         if let Err(e) = self.pixels.show() {
             error!("Error setting RGB LEDs: {}", e);
