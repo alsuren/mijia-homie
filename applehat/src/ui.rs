@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use homie_controller::{Device, HomieController, Node, Property, State};
+use homie_controller::{Datatype, Device, HomieController, Node, Property, State};
 use log::error;
 use rainbow_hat_rs::{alphanum4::Alphanum4, apa102::APA102};
 
@@ -110,10 +110,15 @@ fn find_nodes(devices: &HashMap<String, Device>) -> Vec<(&str, &str, &Node)> {
     for (device_id, device) in devices {
         if device.state == State::Ready {
             for (node_id, node) in &device.nodes {
-                if node.properties.contains_key(TEMPERATURE_PROPERTY_ID)
-                    && node.properties.contains_key(HUMIDITY_PROPERTY_ID)
-                {
-                    nodes.push((device_id, node_id, node));
+                if let (Some(temperature_node), Some(humidity_node)) = (
+                    node.properties.get(TEMPERATURE_PROPERTY_ID),
+                    node.properties.get(HUMIDITY_PROPERTY_ID),
+                ) {
+                    if temperature_node.datatype == Some(Datatype::Float)
+                        && humidity_node.datatype == Some(Datatype::Integer)
+                    {
+                        nodes.push((device_id, node_id, node));
+                    }
                 }
             }
         }
