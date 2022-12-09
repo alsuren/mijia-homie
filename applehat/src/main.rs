@@ -30,13 +30,7 @@ async fn main() -> Result<(), Report> {
     let alphanum = Alphanum4::new()?;
     let mut pixels = APA102::new()?;
     pixels.setup()?;
-    let ui_state = UiState {
-        alphanum,
-        pixels,
-        selected_device_id: "mijia-bridge-cottagepi".to_string(),
-        selected_node_id: "A4C138E98330".to_string(),
-        selected_property_id: "temperature".to_string(),
-    };
+    let ui_state = UiState::new(alphanum, pixels);
 
     let handle =
         spawn_homie_poll_loop(event_loop, controller.clone(), ui_state, reconnect_interval);

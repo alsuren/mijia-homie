@@ -12,30 +12,46 @@ const PIXEL_BRIGHTNESS: f32 = 0.4;
 pub struct UiState {
     pub alphanum: Alphanum4,
     pub pixels: APA102,
-    pub selected_device_id: String,
-    pub selected_node_id: String,
+    pub selected_device_id: Option<String>,
+    pub selected_node_id: Option<String>,
     pub selected_property_id: String,
 }
 
 impl UiState {
+    pub fn new(alphanum: Alphanum4, pixels: APA102) -> Self {
+        Self {
+            alphanum,
+            pixels,
+            selected_device_id: None,
+            selected_node_id: None,
+            selected_property_id: "temperature".to_string(),
+        }
+    }
+
     /// Updates the display based on the current state.
     pub fn update_display(&mut self, controller: &HomieController) {
         let devices = controller.devices();
 
-        // Show currently selected value on alphanumeric display.
-        if let Some(property) = get_property(
-            &devices,
-            &self.selected_device_id,
-            &self.selected_node_id,
-            &self.selected_property_id,
-        ) {
-            if let Some(value) = &property.value {
-                print_str_decimal(&mut self.alphanum, &value);
+        if let (Some(selected_device_id), Some(selected_node_id)) =
+            (&self.selected_device_id, &self.selected_node_id)
+        {
+            // Show currently selected value on alphanumeric display.
+            if let Some(property) = get_property(
+                &devices,
+                selected_device_id,
+                selected_node_id,
+                &self.selected_property_id,
+            ) {
+                if let Some(value) = &property.value {
+                    print_str_decimal(&mut self.alphanum, &value);
+                } else {
+                    self.alphanum.print_str("????", false);
+                }
             } else {
-                self.alphanum.print_str("????", false);
+                self.alphanum.print_str("gone", false);
             }
         } else {
-            self.alphanum.print_str("gone", false);
+            self.alphanum.print_str("    ", false);
         }
         if let Err(e) = self.alphanum.show() {
             error!("Error displaying: {}", e);
@@ -45,8 +61,8 @@ impl UiState {
         let nodes = find_nodes(&devices);
         for i in 0..7 {
             let (r, g, b) = if let Some((device_id, node_id, node)) = nodes.get(i) {
-                let selected =
-                    device_id == &self.selected_device_id && node_id == &self.selected_node_id;
+                let selected = Some(*device_id) == self.selected_device_id.as_deref()
+                    && Some(*node_id) == self.selected_node_id.as_deref();
                 trace!("Showing node {:?}", node);
                 colour_for_node(node, selected)
             } else {
