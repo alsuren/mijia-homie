@@ -32,6 +32,25 @@ impl UiState {
     pub fn update_display(&mut self, controller: &HomieController) {
         let devices = controller.devices();
 
+        // Show first 7 nodes on RGB LEDs.
+        let nodes = find_nodes(&devices);
+        for i in 0..7 {
+            let (r, g, b) = if let Some((device_id, node_id, node)) = nodes.get(i) {
+                let selected = Some(*device_id) == self.selected_device_id.as_deref()
+                    && Some(*node_id) == self.selected_node_id.as_deref();
+                trace!("Showing node {:?}", node);
+                colour_for_node(node, selected)
+            } else {
+                (0, 0, 0)
+            };
+            // TODO: Fix set_pixel brightness to work.
+            self.pixels.pixels[i] = [r, g, b, (PIXEL_BRIGHTNESS * 31.0) as u8];
+            //self.pixels.set_pixel(i, r, g, b, PIXEL_BRIGHTNESS);
+        }
+        if let Err(e) = self.pixels.show() {
+            error!("Error setting RGB LEDs: {}", e);
+        }
+
         if let (Some(selected_device_id), Some(selected_node_id)) =
             (&self.selected_device_id, &self.selected_node_id)
         {
@@ -55,25 +74,6 @@ impl UiState {
         }
         if let Err(e) = self.alphanum.show() {
             error!("Error displaying: {}", e);
-        }
-
-        // Show first 7 nodes on RGB LEDs.
-        let nodes = find_nodes(&devices);
-        for i in 0..7 {
-            let (r, g, b) = if let Some((device_id, node_id, node)) = nodes.get(i) {
-                let selected = Some(*device_id) == self.selected_device_id.as_deref()
-                    && Some(*node_id) == self.selected_node_id.as_deref();
-                trace!("Showing node {:?}", node);
-                colour_for_node(node, selected)
-            } else {
-                (0, 0, 0)
-            };
-            // TODO: Fix set_pixel brightness to work.
-            self.pixels.pixels[i] = [r, g, b, (PIXEL_BRIGHTNESS * 31.0) as u8];
-            //self.pixels.set_pixel(i, r, g, b, PIXEL_BRIGHTNESS);
-        }
-        if let Err(e) = self.pixels.show() {
-            error!("Error setting RGB LEDs: {}", e);
         }
     }
 }
