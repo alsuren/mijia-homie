@@ -51,6 +51,13 @@ impl UiState {
             error!("Error setting RGB LEDs: {}", e);
         }
 
+        if self.selected_device_id.is_none() || self.selected_node_id.is_none() {
+            if let Some((device_id, node_id, _)) = nodes.get(0) {
+                self.selected_device_id = Some(device_id.to_string());
+                self.selected_node_id = Some(node_id.to_string());
+            }
+        }
+
         if let (Some(selected_device_id), Some(selected_node_id)) =
             (&self.selected_device_id, &self.selected_node_id)
         {
