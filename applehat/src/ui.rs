@@ -6,7 +6,7 @@ use rainbow_hat_rs::{alphanum4::Alphanum4, apa102::APA102};
 
 const TEMPERATURE_PROPERTY_ID: &str = "temperature";
 const HUMIDITY_PROPERTY_ID: &str = "humidity";
-const PIXEL_BRIGHTNESS: f32 = 0.4;
+const PIXEL_BRIGHTNESS: f32 = 0.2;
 
 #[derive(Debug)]
 pub struct UiState {
@@ -169,7 +169,7 @@ fn colour_for_node(node: &Node, selected: bool) -> (u8, u8, u8) {
     (
         scale_to_u8(temperature, 0.0, 40.0),
         (humidity * 255 / 100) as u8,
-        if selected { 255 } else { 0 },
+        if selected { 128 } else { 0 },
     )
 }
 
