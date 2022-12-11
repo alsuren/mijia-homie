@@ -35,7 +35,11 @@ async fn main() -> Result<(), Report> {
     let mut pixels = APA102::new()?;
     pixels.setup()?;
     let buttons = Buttons::new()?;
-    let ui_state = Arc::new(Mutex::new(UiState::new(alphanum, pixels)));
+    let ui_state = Arc::new(Mutex::new(UiState::new(
+        controller.clone(),
+        alphanum,
+        pixels,
+    )));
 
     let handle = spawn_homie_poll_loop(
         event_loop,
@@ -102,7 +106,7 @@ fn handle_event(controller: &HomieController, ui_state: &Mutex<UiState>, event: 
                     "Fresh property value {}/{}/{}={}",
                     device_id, node_id, property_id, value
                 );
-                ui_state.lock().unwrap().update_display(controller);
+                ui_state.lock().unwrap().update_display();
             }
         }
         _ => {

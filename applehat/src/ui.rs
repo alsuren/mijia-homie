@@ -19,17 +19,19 @@ const BUTTON_POLL_PERIOD: Duration = Duration::from_millis(100);
 
 #[derive(Debug)]
 pub struct UiState {
-    pub alphanum: Alphanum4,
-    pub pixels: APA102,
-    pub selected_device_id: Option<String>,
-    pub selected_node_id: Option<String>,
-    pub selected_property_id: String,
-    pub button_state: [bool; 3],
+    controller: Arc<HomieController>,
+    alphanum: Alphanum4,
+    pixels: APA102,
+    selected_device_id: Option<String>,
+    selected_node_id: Option<String>,
+    selected_property_id: String,
+    button_state: [bool; 3],
 }
 
 impl UiState {
-    pub fn new(alphanum: Alphanum4, pixels: APA102) -> Self {
+    pub fn new(controller: Arc<HomieController>, alphanum: Alphanum4, pixels: APA102) -> Self {
         Self {
+            controller,
             alphanum,
             pixels,
             selected_device_id: None,
@@ -40,8 +42,8 @@ impl UiState {
     }
 
     /// Updates the display based on the current state.
-    pub fn update_display(&mut self, controller: &HomieController) {
-        let devices = controller.devices();
+    pub fn update_display(&mut self) {
+        let devices = self.controller.devices();
 
         // Show first 7 nodes on RGB LEDs.
         let nodes = find_nodes(&devices);
@@ -112,6 +114,7 @@ impl UiState {
             }
             _ => {}
         }
+        self.update_display();
     }
 
     fn update_button_state(&mut self, new_state: [bool; 3]) {
