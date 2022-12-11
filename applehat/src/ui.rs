@@ -97,6 +97,15 @@ impl UiState {
     fn button_pressed(&mut self, button_index: usize) {
         debug!("Button {} pressed.", button_index);
     }
+
+    fn update_button_state(&mut self, new_state: [bool; 3]) {
+        for i in 0..3 {
+            if new_state[i] && !self.button_state[i] {
+                self.button_pressed(i);
+            }
+        }
+        self.button_state = new_state;
+    }
 }
 
 pub fn spawn_button_poll_loop(
@@ -105,21 +114,12 @@ pub fn spawn_button_poll_loop(
 ) -> JoinHandle<()> {
     task::spawn(async move {
         loop {
-            let new_states = [
+            let new_state = [
                 buttons.a.is_pressed(),
                 buttons.b.is_pressed(),
                 buttons.c.is_pressed(),
             ];
-
-            {
-                let mut ui_state = ui_state.lock().unwrap();
-                for i in 0..3 {
-                    if new_states[i] && !ui_state.button_state[i] {
-                        ui_state.button_pressed(i);
-                    }
-                }
-                ui_state.button_state = new_states;
-            }
+            ui_state.lock().unwrap().update_button_state(new_state);
 
             sleep(BUTTON_POLL_PERIOD).await;
         }
