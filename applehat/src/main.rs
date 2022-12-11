@@ -41,6 +41,9 @@ async fn main() -> Result<(), Report> {
         pixels,
     )));
 
+    // Display initial state.
+    ui_state.lock().unwrap().update_display();
+
     let handle = spawn_homie_poll_loop(
         event_loop,
         controller.clone(),
