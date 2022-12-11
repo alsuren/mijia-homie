@@ -1,6 +1,10 @@
 use homie_controller::{Datatype, Device, HomieController, Node, Property, State};
 use log::{debug, error, trace};
-use rainbow_hat_rs::{alphanum4::Alphanum4, apa102::APA102, touch::Buttons};
+use rainbow_hat_rs::{
+    alphanum4::Alphanum4,
+    apa102::{APA102, NUM_PIXELS},
+    touch::Buttons,
+};
 use std::{
     collections::HashMap,
     sync::{Arc, Mutex},
@@ -50,7 +54,7 @@ impl UiState {
 
         // Show first 7 nodes on RGB LEDs.
         let nodes = find_nodes(&devices);
-        for i in 0..7 {
+        for i in 0..NUM_PIXELS {
             let (r, g, b) = if let Some((device_id, node_id, node)) = nodes.get(i) {
                 let selected = Some(*device_id) == self.selected_device_id.as_deref()
                     && Some(*node_id) == self.selected_node_id.as_deref();
@@ -60,7 +64,7 @@ impl UiState {
                 (0, 0, 0)
             };
             // TODO: Fix set_pixel brightness to work.
-            self.pixels.pixels[i] = [r, g, b, self.selected_brightness as u8];
+            self.pixels.pixels[NUM_PIXELS - 1 - i] = [r, g, b, self.selected_brightness as u8];
             //self.pixels.set_pixel(i, r, g, b, PIXEL_BRIGHTNESS);
         }
         if let Err(e) = self.pixels.show() {
