@@ -13,6 +13,7 @@ use tokio::{
 
 const TEMPERATURE_PROPERTY_ID: &str = "temperature";
 const HUMIDITY_PROPERTY_ID: &str = "humidity";
+const PROPERTY_IDS: [&str; 2] = [TEMPERATURE_PROPERTY_ID, HUMIDITY_PROPERTY_ID];
 const PIXEL_BRIGHTNESS: f32 = 0.2;
 const BUTTON_POLL_PERIOD: Duration = Duration::from_millis(100);
 
@@ -33,7 +34,7 @@ impl UiState {
             pixels,
             selected_device_id: None,
             selected_node_id: None,
-            selected_property_id: "temperature".to_string(),
+            selected_property_id: TEMPERATURE_PROPERTY_ID.to_string(),
             button_state: Default::default(),
         }
     }
@@ -96,6 +97,21 @@ impl UiState {
 
     fn button_pressed(&mut self, button_index: usize) {
         debug!("Button {} pressed.", button_index);
+        match button_index {
+            0 => {
+                // Select next node.
+            }
+            1 => {
+                // Select next property.
+                let current_index = PROPERTY_IDS
+                    .iter()
+                    .position(|x| x == &self.selected_property_id)
+                    .unwrap_or(0);
+                self.selected_property_id =
+                    PROPERTY_IDS[(current_index + 1) % PROPERTY_IDS.len()].to_string();
+            }
+            _ => {}
+        }
     }
 
     fn update_button_state(&mut self, new_state: [bool; 3]) {
