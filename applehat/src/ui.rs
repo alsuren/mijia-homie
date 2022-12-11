@@ -110,6 +110,23 @@ impl UiState {
         match button_index {
             0 => {
                 // Select next node.
+                let devices = self.controller.devices();
+                let nodes = find_nodes(&devices);
+                if !nodes.is_empty() {
+                    let new_index = if let Some(selected_node_id) = &self.selected_node_id {
+                        if let Some(current_index) = nodes
+                            .iter()
+                            .position(|(_, node_id, _)| node_id == selected_node_id)
+                        {
+                            (current_index + 1) % nodes.len()
+                        } else {
+                            0
+                        }
+                    } else {
+                        0
+                    };
+                    self.selected_node_id = Some(nodes[new_index].1.to_string());
+                }
             }
             1 => {
                 // Select next property.
