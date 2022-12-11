@@ -3,16 +3,20 @@ mod ui;
 
 use config::{get_mqtt_options, Config};
 use eyre::Report;
+use futures::future::try_join;
 use homie_controller::{Event, HomieController, HomieEventLoop, PollError};
 use log::{error, info, trace};
-use rainbow_hat_rs::{alphanum4::Alphanum4, apa102::APA102};
+use rainbow_hat_rs::{alphanum4::Alphanum4, apa102::APA102, touch::Buttons};
 use rumqttc::ConnectionError;
-use std::{sync::Arc, time::Duration};
+use std::{
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 use tokio::{
     task::{self, JoinHandle},
     time::sleep,
 };
-use ui::UiState;
+use ui::{spawn_button_poll_loop, UiState};
 
 #[tokio::main]
 async fn main() -> Result<(), Report> {
@@ -30,12 +34,18 @@ async fn main() -> Result<(), Report> {
     let alphanum = Alphanum4::new()?;
     let mut pixels = APA102::new()?;
     pixels.setup()?;
-    let ui_state = UiState::new(alphanum, pixels);
+    let buttons = Buttons::new()?;
+    let ui_state = Arc::new(Mutex::new(UiState::new(alphanum, pixels)));
 
-    let handle =
-        spawn_homie_poll_loop(event_loop, controller.clone(), ui_state, reconnect_interval);
+    let handle = spawn_homie_poll_loop(
+        event_loop,
+        controller.clone(),
+        ui_state.clone(),
+        reconnect_interval,
+    );
+    let button_handle = spawn_button_poll_loop(buttons, ui_state);
 
-    handle.await?;
+    try_join(handle, button_handle).await?;
 
     Ok(())
 }
@@ -43,7 +53,7 @@ async fn main() -> Result<(), Report> {
 fn spawn_homie_poll_loop(
     mut event_loop: HomieEventLoop,
     controller: Arc<HomieController>,
-    mut ui_state: UiState,
+    ui_state: Arc<Mutex<UiState>>,
     reconnect_interval: Duration,
 ) -> JoinHandle<()> {
     task::spawn(async move {
@@ -51,7 +61,7 @@ fn spawn_homie_poll_loop(
             match controller.poll(&mut event_loop).await {
                 Ok(events) => {
                     for event in events {
-                        handle_event(controller.as_ref(), &mut ui_state, event).await;
+                        handle_event(controller.as_ref(), &ui_state, event);
                     }
                 }
                 Err(e) => {
@@ -69,7 +79,7 @@ fn spawn_homie_poll_loop(
     })
 }
 
-async fn handle_event(controller: &HomieController, ui_state: &mut UiState, event: Event) {
+fn handle_event(controller: &HomieController, ui_state: &Mutex<UiState>, event: Event) {
     match event {
         Event::PropertyValueChanged {
             device_id,
@@ -92,7 +102,7 @@ async fn handle_event(controller: &HomieController, ui_state: &mut UiState, even
                     "Fresh property value {}/{}/{}={}",
                     device_id, node_id, property_id, value
                 );
-                ui_state.update_display(controller);
+                ui_state.lock().unwrap().update_display(controller);
             }
         }
         _ => {

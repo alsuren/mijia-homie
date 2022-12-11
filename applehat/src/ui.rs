@@ -1,12 +1,20 @@
-use std::collections::HashMap;
-
 use homie_controller::{Datatype, Device, HomieController, Node, Property, State};
-use log::{error, trace};
-use rainbow_hat_rs::{alphanum4::Alphanum4, apa102::APA102};
+use log::{debug, error, trace};
+use rainbow_hat_rs::{alphanum4::Alphanum4, apa102::APA102, touch::Buttons};
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+    time::Duration,
+};
+use tokio::{
+    task::{self, JoinHandle},
+    time::sleep,
+};
 
 const TEMPERATURE_PROPERTY_ID: &str = "temperature";
 const HUMIDITY_PROPERTY_ID: &str = "humidity";
 const PIXEL_BRIGHTNESS: f32 = 0.2;
+const BUTTON_POLL_PERIOD: Duration = Duration::from_millis(100);
 
 #[derive(Debug)]
 pub struct UiState {
@@ -15,6 +23,7 @@ pub struct UiState {
     pub selected_device_id: Option<String>,
     pub selected_node_id: Option<String>,
     pub selected_property_id: String,
+    pub button_state: [bool; 3],
 }
 
 impl UiState {
@@ -25,6 +34,7 @@ impl UiState {
             selected_device_id: None,
             selected_node_id: None,
             selected_property_id: "temperature".to_string(),
+            button_state: Default::default(),
         }
     }
 
@@ -83,6 +93,37 @@ impl UiState {
             error!("Error displaying: {}", e);
         }
     }
+
+    fn button_pressed(&mut self, button_index: usize) {
+        debug!("Button {} pressed.", button_index);
+    }
+}
+
+pub fn spawn_button_poll_loop(
+    mut buttons: Buttons,
+    ui_state: Arc<Mutex<UiState>>,
+) -> JoinHandle<()> {
+    task::spawn(async move {
+        loop {
+            let new_states = [
+                buttons.a.is_pressed(),
+                buttons.b.is_pressed(),
+                buttons.c.is_pressed(),
+            ];
+
+            {
+                let mut ui_state = ui_state.lock().unwrap();
+                for i in 0..3 {
+                    if new_states[i] && !ui_state.button_state[i] {
+                        ui_state.button_pressed(i);
+                    }
+                }
+                ui_state.button_state = new_states;
+            }
+
+            sleep(BUTTON_POLL_PERIOD).await;
+        }
+    })
 }
 
 fn get_property<'a>(
