@@ -82,7 +82,15 @@ impl UiState {
                 &self.selected_property_id,
             ) {
                 if let Some(value) = &property.value {
-                    print_str_decimal(&mut self.alphanum, &value);
+                    print_str_decimal(
+                        &mut self.alphanum,
+                        &value,
+                        if self.selected_property_id == HUMIDITY_PROPERTY_ID {
+                            Some('%')
+                        } else {
+                            None
+                        },
+                    );
                 } else {
                     self.alphanum.print_str("????", false);
                 }
@@ -159,8 +167,10 @@ fn get_property<'a>(
         .get(property_id)
 }
 
-fn print_str_decimal(alphanum: &mut Alphanum4, s: &str) {
-    let padding = 4usize.saturating_sub(if s.contains('.') {
+fn print_str_decimal(alphanum: &mut Alphanum4, s: &str, unit: Option<char>) {
+    let number_width = if unit.is_some() { 3usize } else { 4 };
+
+    let padding = number_width.saturating_sub(if s.contains('.') {
         s.len() - 1
     } else {
         s.len()
@@ -182,9 +192,13 @@ fn print_str_decimal(alphanum: &mut Alphanum4, s: &str) {
             alphanum.set_digit(position, c, false);
             position += 1;
         }
-        if position >= 4 {
+        if position >= number_width {
             break;
         }
+    }
+
+    if let Some(unit) = unit {
+        alphanum.set_digit(3, unit, false);
     }
 }
 
