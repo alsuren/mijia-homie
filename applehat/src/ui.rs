@@ -14,7 +14,8 @@ use tokio::{
 const TEMPERATURE_PROPERTY_ID: &str = "temperature";
 const HUMIDITY_PROPERTY_ID: &str = "humidity";
 const PROPERTY_IDS: [&str; 2] = [TEMPERATURE_PROPERTY_ID, HUMIDITY_PROPERTY_ID];
-const PIXEL_BRIGHTNESS: f32 = 0.2;
+/// Brightness out of 31 for pixels.
+const BRIGHTNESS_LEVELS: [u8; 4] = [10, 3, 0, 31];
 const BUTTON_POLL_PERIOD: Duration = Duration::from_millis(100);
 
 #[derive(Debug)]
@@ -25,6 +26,7 @@ pub struct UiState {
     selected_device_id: Option<String>,
     selected_node_id: Option<String>,
     selected_property_id: String,
+    selected_brightness: u8,
     button_state: [bool; 3],
 }
 
@@ -37,6 +39,7 @@ impl UiState {
             selected_device_id: None,
             selected_node_id: None,
             selected_property_id: TEMPERATURE_PROPERTY_ID.to_string(),
+            selected_brightness: BRIGHTNESS_LEVELS[0],
             button_state: Default::default(),
         }
     }
@@ -57,7 +60,7 @@ impl UiState {
                 (0, 0, 0)
             };
             // TODO: Fix set_pixel brightness to work.
-            self.pixels.pixels[i] = [r, g, b, (PIXEL_BRIGHTNESS * 31.0) as u8];
+            self.pixels.pixels[i] = [r, g, b, self.selected_brightness as u8];
             //self.pixels.set_pixel(i, r, g, b, PIXEL_BRIGHTNESS);
         }
         if let Err(e) = self.pixels.show() {
@@ -71,7 +74,9 @@ impl UiState {
             }
         }
 
-        if let (Some(selected_device_id), Some(selected_node_id)) =
+        if self.selected_brightness == 0 {
+            self.alphanum.print_str("    ", false);
+        } else if let (Some(selected_device_id), Some(selected_node_id)) =
             (&self.selected_device_id, &self.selected_node_id)
         {
             // Show currently selected value on alphanumeric display.
@@ -136,6 +141,15 @@ impl UiState {
                     .unwrap_or(0);
                 self.selected_property_id =
                     PROPERTY_IDS[(current_index + 1) % PROPERTY_IDS.len()].to_string();
+            }
+            2 => {
+                // Change brightness.
+                let current_index = BRIGHTNESS_LEVELS
+                    .iter()
+                    .position(|&level| level == self.selected_brightness)
+                    .unwrap_or(0);
+                self.selected_brightness =
+                    BRIGHTNESS_LEVELS[(current_index + 1) % BRIGHTNESS_LEVELS.len()];
             }
             _ => {}
         }
