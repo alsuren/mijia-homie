@@ -13,7 +13,6 @@ categories = ["network-programming"]
 color-backtrace = "0.5.1"
 eyre = "0.6.8"
 futures = "0.3.25"
-futures-channel = "0.3.25"
 homie-controller = { version = "0.7.0", path = "../homie-controller" }
 homie-device = { version = "0.7.0", path = "../homie-device" }
 log = "0.4.17"
@@ -23,8 +22,7 @@ rumqttc = "0.18.0"
 rustls = "0.20.7"
 rustls-native-certs = "0.6.2"
 serde_derive = "1.0.137"
-serde = "1.0.148"
+serde = { version = "1.0.148", features = ["derive"] }
 stable-eyre = "0.2.2"
 tokio = { version = "1.22.0", features = ["macros", "rt-multi-thread"] }
 toml = "0.5.9"
-url = { version = "2.3.0", features = ["serde"] }
