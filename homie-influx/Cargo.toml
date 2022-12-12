@@ -21,7 +21,7 @@ rumqttc = "0.18.0"
 rustls = "0.20.7"
 rustls-native-certs = "0.6.2"
 serde_derive = "1.0.137"
-serde = "1.0.149"
+serde = "1.0.150"
 stable-eyre = "0.2.2"
 tokio = { version = "1.23.0", features = ["macros", "rt-multi-thread"] }
 toml = "0.5.9"
