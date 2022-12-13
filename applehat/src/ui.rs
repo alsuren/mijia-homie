@@ -274,7 +274,7 @@ fn colour_for_node(node: &Node, selected: bool) -> (u8, u8, u8) {
 
     (
         scale_to_u8(temperature, 0.0, 40.0),
-        (humidity * 255 / 100) as u8,
+        scale_to_u8(humidity as f64, 30.0, 100.0),
         if selected { 128 } else { 0 },
     )
 }
