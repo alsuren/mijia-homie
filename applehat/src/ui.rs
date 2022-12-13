@@ -1,4 +1,4 @@
-use homie_controller::{Datatype, Device, HomieController, Node, Property, State};
+use homie_controller::{Datatype, Device, HomieController, Node, State};
 use log::{debug, error, trace};
 use rainbow_hat_rs::{
     alphanum4::Alphanum4,
@@ -17,7 +17,8 @@ use tokio::{
 
 const TEMPERATURE_PROPERTY_ID: &str = "temperature";
 const HUMIDITY_PROPERTY_ID: &str = "humidity";
-const PROPERTY_IDS: [&str; 2] = [TEMPERATURE_PROPERTY_ID, HUMIDITY_PROPERTY_ID];
+const NAME_ID: &str = "name";
+const PROPERTY_IDS: [&str; 3] = [TEMPERATURE_PROPERTY_ID, HUMIDITY_PROPERTY_ID, NAME_ID];
 /// Brightness out of 31 for pixels.
 const BRIGHTNESS_LEVELS: [u8; 4] = [10, 3, 0, 31];
 const BUTTON_POLL_PERIOD: Duration = Duration::from_millis(100);
@@ -84,25 +85,21 @@ impl UiState {
             (&self.selected_device_id, &self.selected_node_id)
         {
             // Show currently selected value on alphanumeric display.
-            if let Some(property) = get_property(
+            if let Some(value) = get_property(
                 &devices,
                 selected_device_id,
                 selected_node_id,
                 &self.selected_property_id,
             ) {
-                if let Some(value) = &property.value {
-                    print_str_decimal(
-                        &mut self.alphanum,
-                        &value,
-                        if self.selected_property_id == HUMIDITY_PROPERTY_ID {
-                            Some('%')
-                        } else {
-                            None
-                        },
-                    );
-                } else {
-                    self.alphanum.print_str("????", false);
-                }
+                print_str_decimal(
+                    &mut self.alphanum,
+                    &value,
+                    if self.selected_property_id == HUMIDITY_PROPERTY_ID {
+                        Some('%')
+                    } else {
+                        None
+                    },
+                );
             } else {
                 self.alphanum.print_str("gone", false);
             }
@@ -193,13 +190,13 @@ fn get_property<'a>(
     device_id: &str,
     node_id: &str,
     property_id: &str,
-) -> Option<&'a Property> {
-    devices
-        .get(device_id)?
-        .nodes
-        .get(node_id)?
-        .properties
-        .get(property_id)
+) -> Option<&'a str> {
+    let node = devices.get(device_id)?.nodes.get(node_id)?;
+    if property_id == NAME_ID {
+        node.name.as_deref()
+    } else {
+        node.properties.get(property_id)?.value.as_deref()
+    }
 }
 
 fn print_str_decimal(alphanum: &mut Alphanum4, s: &str, unit: Option<char>) {
