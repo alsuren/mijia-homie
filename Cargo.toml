@@ -1,6 +1,7 @@
 [workspace]
 
 members = [
+    "applehat",
     "homie-controller",
     "homie-device",
     "homie-influx",

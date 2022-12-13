@@ -1,0 +1,39 @@
+[package]
+name = "applehat"
+version = "0.2.5"
+authors = ["Andrew Walbran <qwandor@google.com>"]
+edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "Service to use a Rainbow HAT on a Raspberry Pi to show sensor data from Homie."
+repository = "https://github.com/alsuren/mijia-homie/"
+keywords = ["homie", "mqtt", "raspberrypi"]
+categories = ["network-programming"]
+
+[dependencies]
+color-backtrace = "0.5.1"
+eyre = "0.6.8"
+futures = "0.3.25"
+homie-controller = { version = "0.7.0", path = "../homie-controller" }
+homie-device = { version = "0.7.0", path = "../homie-device" }
+log = "0.4.17"
+pretty_env_logger = "0.4.0"
+rainbow-hat-rs = "0.2.1"
+rumqttc = "0.18.0"
+rustls = "0.20.7"
+rustls-native-certs = "0.6.2"
+serde_derive = "1.0.137"
+serde = { version = "1.0.148", features = ["derive"] }
+stable-eyre = "0.2.2"
+tokio = { version = "1.22.0", features = ["macros", "rt-multi-thread"] }
+toml = "0.5.9"
+
+[package.metadata.deb]
+# $auto doesn't work because we don't build packages in the same container as we build the binaries.
+depends = "libc6"
+section = "net"
+conf-files = ["/etc/applehat/applehat.toml"]
+assets = [
+	["target/release/applehat", "usr/bin/", "755"],
+	["applehat.example.toml", "etc/applehat/applehat.toml", "640"],
+	["README.md", "usr/share/doc/applehat/", "644"],
+]

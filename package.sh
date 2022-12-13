@@ -4,13 +4,14 @@
 
 set -euo pipefail
 
+CRATE=${CRATE:-"mijia-homie"}
 TARGET=${TARGET:-}
 
 if [ -z "$TARGET" ]; then
-  cd mijia-homie
+  cd "$CRATE"
   cargo deb
 else
-  cross build --release --target "$TARGET" --bin mijia-homie
-  cd mijia-homie
+  cross build --release --target "$TARGET" --bin "$CRATE"
+  cd "$CRATE"
   cargo deb --target "$TARGET" --no-build
 fi
