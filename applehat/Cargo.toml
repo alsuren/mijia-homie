@@ -1,6 +1,6 @@
 [package]
 name = "applehat"
-version = "0.2.5"
+version = "0.1.0"
 authors = ["Andrew Walbran <qwandor@google.com>"]
 edition = "2021"
 license = "MIT OR Apache-2.0"
