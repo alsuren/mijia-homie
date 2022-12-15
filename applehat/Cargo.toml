@@ -31,6 +31,7 @@ toml = "0.5.10"
 # $auto doesn't work because we don't build packages in the same container as we build the binaries.
 depends = "libc6"
 section = "net"
+maintainer-scripts = "debian-scripts"
 conf-files = ["/etc/applehat/applehat.toml"]
 assets = [
 	["target/release/applehat", "usr/bin/", "755"],
