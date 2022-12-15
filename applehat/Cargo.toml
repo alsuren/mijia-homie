@@ -38,3 +38,6 @@ assets = [
 	["applehat.example.toml", "etc/applehat/applehat.toml", "640"],
 	["README.md", "usr/share/doc/applehat/", "644"],
 ]
+
+# This section needs to be here even if it's empty, for the systemd integration to work.
+[package.metadata.deb.systemd-units]
