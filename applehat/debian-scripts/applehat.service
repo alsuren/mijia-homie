@@ -1,0 +1,16 @@
+[Unit]
+Description=Service to use a Rainbow HAT on a Raspberry Pi to show sensor data from Homie.
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/etc/applehat
+Environment=RUST_BACKTRACE=1
+Environment=RUST_LIB_BACKTRACE=1
+Environment=RUST_LOG=info
+ExecStart=/usr/bin/applehat
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
