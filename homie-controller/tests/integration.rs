@@ -5,8 +5,8 @@
 use futures::future::ready;
 use homie_controller::{Event, HomieController, State};
 use homie_device::{HomieDevice, Node, Property, SpawnError};
-use librumqttd::{Broker, Config, ConnectionSettings, ConsoleSettings, ServerSettings};
 use rumqttc::{ConnectionError, MqttOptions, StateError};
+use rumqttd::{Broker, Config, ConnectionSettings, ConsoleSettings, RouterConfig, ServerSettings};
 use std::collections::HashMap;
 use std::env;
 use std::io::ErrorKind;
@@ -205,33 +205,42 @@ async fn test_device() {
 
 /// Spawn an MQTT broker listening on the given port on localhost.
 fn spawn_mqtt_broker(port: u16) {
-    let mut servers = HashMap::new();
-    servers.insert(
+    let mut v4 = HashMap::new();
+    v4.insert(
         "1".to_string(),
         ServerSettings {
+            name: "Test broker".to_string(),
             listen: SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), port),
-            cert: None,
+            tls: None,
             next_connection_delay_ms: 1,
             connections: ConnectionSettings {
                 connection_timeout_ms: 100,
-                max_client_id_len: 100,
                 throttle_delay_ms: 0,
                 max_payload_size: 2048,
                 max_inflight_count: 500,
                 max_inflight_size: 1024,
-                login_credentials: None,
+                auth: None,
+                dynamic_filters: false,
             },
         },
     );
     let broker_config = Config {
         id: 0,
-        router: Default::default(),
-        servers,
-        cluster: None,
-        replicator: None,
-        console: ConsoleSettings {
-            listen: SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 0),
+        router: RouterConfig {
+            instant_ack: false,
+            max_segment_size: 2000,
+            max_segment_count: 10,
+            max_read_len: 2000,
+            max_connections: 20,
+            initialized_filters: None,
         },
+        v4,
+        v5: Default::default(),
+        ws: Default::default(),
+        cluster: None,
+        console: ConsoleSettings::default(),
+        bridge: None,
+        prometheus: None,
     };
     let mut broker = Broker::new(broker_config);
     thread::spawn(move || {
