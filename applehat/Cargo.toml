@@ -13,8 +13,8 @@ categories = ["network-programming"]
 color-backtrace = "0.5.1"
 eyre = "0.6.8"
 futures = "0.3.25"
-homie-controller = { version = "0.7.0", path = "../homie-controller" }
-homie-device = { version = "0.7.0", path = "../homie-device" }
+homie-controller = { version = "0.8.0", path = "../homie-controller" }
+homie-device = { version = "0.8.0", path = "../homie-device" }
 log = "0.4.17"
 pretty_env_logger = "0.4.0"
 rainbow-hat-rs = "0.2.1"

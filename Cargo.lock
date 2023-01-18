@@ -802,7 +802,7 @@ dependencies = [
 
 [[package]]
 name = "homie-controller"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "flume",
  "futures",
@@ -818,7 +818,7 @@ dependencies = [
 
 [[package]]
 name = "homie-device"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "flume",
  "futures",
@@ -834,7 +834,7 @@ dependencies = [
 
 [[package]]
 name = "homie-influx"
-version = "0.2.8"
+version = "0.2.9"
 dependencies = [
  "color-backtrace",
  "eyre",
@@ -1256,7 +1256,7 @@ dependencies = [
 
 [[package]]
 name = "mijia"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "backoff",
  "bluez-async",
@@ -1273,7 +1273,7 @@ dependencies = [
 
 [[package]]
 name = "mijia-homie"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "backoff",
  "color-backtrace",

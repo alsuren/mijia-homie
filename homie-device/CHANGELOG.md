@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.0
+
+### Breaking changes
+
+- Updated to `rumqttc` 0.20.
+
 ## 0.7.0
 
 ### Breaking changes

@@ -1,6 +1,6 @@
 [package]
 name = "homie-controller"
-version = "0.7.0"
+version = "0.8.0"
 authors = ["Andrew Walbran <qwandor@google.com>", "David Laban <alsuren@gmail.com>"]
 edition = "2018"
 license = "MIT OR Apache-2.0"
@@ -17,7 +17,7 @@ thiserror = "1.0.38"
 [dev-dependencies]
 flume = "0.10.14"
 futures = "0.3.25"
-homie-device = { version = "0.7.0", path = "../homie-device" }
+homie-device = { version = "0.8.0", path = "../homie-device" }
 pretty_env_logger = "0.4.0"
 rumqttd = "0.12.2"
 rumqttlog = "0.9.0"
