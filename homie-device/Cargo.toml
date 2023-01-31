@@ -11,7 +11,7 @@ categories = ["network-programming"]
 
 [dependencies]
 flume = "0.10.14"
-futures = "0.3.25"
+futures = "0.3.26"
 local_ipaddress = "0.1.3"
 log = "0.4.17"
 mac_address = "1.1.4"
