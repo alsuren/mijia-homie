@@ -112,9 +112,9 @@ checksum = "d92bec98840b8f03a5ff5413de5293bfcd8bf96467cf5452609f939ec6f5de16"
 
 [[package]]
 name = "async-trait"
-version = "0.1.61"
+version = "0.1.64"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "705339e0e4a9690e2908d2b3d049d85682cf19fbd5782494498fbf7003a6a282"
+checksum = "1cd7fce9ba8c3c042128ce72d8b2ddbf3a05747efb67ea0313c635e10bda47a2"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -202,9 +202,9 @@ dependencies = [
 
 [[package]]
 name = "bluez-async"
-version = "0.7.0"
+version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0a4d1ee27d560ed9f7783a420f3618ba9a6a3ee206829806c65d82bc42d88c08"
+checksum = "b225f1cfc5a97ac6480314fe2d83093a57eaa7be15cd0188a21faf8d821edd50"
 dependencies = [
  "async-trait",
  "bitflags",
