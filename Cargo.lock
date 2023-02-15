@@ -2023,9 +2023,9 @@ dependencies = [
 
 [[package]]
 name = "rumqttd"
-version = "0.12.5"
+version = "0.12.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dd5097c6d450d1e403c5260a1dba853d333671ca2ba0cc70dcdedaa8734873d0"
+checksum = "9ca444b8b66e23ea843f4b4a1fefac1bd99eae01a5e9584fcd63c8b78f9459d1"
 dependencies = [
  "bytes",
  "clap",
