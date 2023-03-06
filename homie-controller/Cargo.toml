@@ -19,6 +19,6 @@ flume = "0.10.14"
 futures = "0.3.26"
 homie-device = { version = "0.8.0", path = "../homie-device" }
 pretty_env_logger = "0.4.0"
-rumqttd = "0.12.6"
+rumqttd = "0.12.7"
 rumqttlog = "0.9.0"
 tokio = { version = "1.26.0", features = ["macros", "rt", "rt-multi-thread", "time"] }
