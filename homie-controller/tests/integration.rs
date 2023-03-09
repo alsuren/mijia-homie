@@ -6,7 +6,7 @@ use futures::future::ready;
 use homie_controller::{Event, HomieController, State};
 use homie_device::{HomieDevice, Node, Property, SpawnError};
 use rumqttc::{ConnectionError, MqttOptions, StateError};
-use rumqttd::{Broker, Config, ConnectionSettings, ConsoleSettings, RouterConfig, ServerSettings};
+use rumqttd::{Broker, Config, ConnectionSettings, RouterConfig, ServerSettings};
 use std::collections::HashMap;
 use std::env;
 use std::io::ErrorKind;
@@ -235,12 +235,7 @@ fn spawn_mqtt_broker(port: u16) {
             initialized_filters: None,
         },
         v4,
-        v5: Default::default(),
-        ws: Default::default(),
-        cluster: None,
-        console: ConsoleSettings::default(),
-        bridge: None,
-        prometheus: None,
+        ..Config::default()
     };
     let mut broker = Broker::new(broker_config);
     thread::spawn(move || {
