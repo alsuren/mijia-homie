@@ -1885,9 +1885,9 @@ dependencies = [
 
 [[package]]
 name = "rumqttd"
-version = "0.13.0"
+version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "81017677ad65762559cfd1c35497a503d3d904570407117e541990eab507dc5f"
+checksum = "072b4f2a111c8541f1460573fcd01119e410beb2e08b28957f9462c2df5da69b"
 dependencies = [
  "axum",
  "bytes",
