@@ -66,21 +66,22 @@ async fn test_device() {
             let devices = controller.devices();
             if let Some(device) = devices.get("device_id") {
                 // For some reason we get the ready state before all the attributes of the property
-                // have been filled in, so we need to explicitly check for the unit being set.
+                // have been filled in, so we need to explicitly check for the unit and settable
+                // being set.
                 if device.state == State::Ready
                     && device.has_required_attributes()
                     && device.nodes.len() == 1
-                    && device
+                {
+                    let property = device
                         .nodes
                         .get("node_id")
                         .unwrap()
                         .properties
                         .get("property_id")
-                        .unwrap()
-                        .unit
-                        .is_some()
-                {
-                    break 'outer0;
+                        .unwrap();
+                    if property.unit.is_some() && property.settable {
+                        break 'outer0;
+                    }
                 }
             }
         }
