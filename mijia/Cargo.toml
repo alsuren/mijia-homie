@@ -12,7 +12,7 @@ categories = ["hardware-support"]
 [dependencies]
 bluez-async = "0.7.1"
 futures = "0.3.27"
-log = "0.4.17"
+log = "0.4.18"
 thiserror = "1.0.40"
 tokio = "1.28.1"
 tokio-stream = "0.1.14"
