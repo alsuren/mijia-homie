@@ -15,7 +15,7 @@ eyre = "0.6.8"
 futures = "0.3.27"
 homie-controller = { version = "0.8.0", path = "../homie-controller" }
 influx_db_client = { version = "0.5.1", default-features = false, features = ["rustls-tls"] }
-log = "0.4.18"
+log = "0.4.19"
 pretty_env_logger = "0.5.0"
 rumqttc = "0.21.0"
 rustls = "0.20.8"
