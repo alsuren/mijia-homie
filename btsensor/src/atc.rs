@@ -91,8 +91,10 @@ impl SensorReading {
         match data.len() {
             13 => {
                 // atc1441 format
+                let mut mac: [u8; 6] = data[0..6].try_into().unwrap();
+                mac.reverse();
                 Some(Self::Atc {
-                    mac: data[0..6].try_into().unwrap(),
+                    mac,
                     temperature: i16::from_le_bytes(data[6..=7].try_into().unwrap()),
                     humidity: data[8],
                     battery_percent: data[9],
@@ -129,7 +131,7 @@ impl SensorReading {
                 packet_counter,
             } => {
                 let mut data = Vec::with_capacity(13);
-                data.extend_from_slice(mac);
+                data.extend(mac.iter().rev());
                 data.extend_from_slice(&temperature.to_le_bytes());
                 data.push(*humidity);
                 data.push(*battery_percent);
@@ -201,7 +203,7 @@ mod tests {
     fn decode_atc1441() {
         assert_eq!(
             SensorReading::decode(&[
-                0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x37, 0x08, 42, 89, 0xf6, 0x05, 0x00
+                0xff, 0xee, 0xdd, 0xcc, 0xbb, 0xaa, 0x37, 0x08, 42, 89, 0xf6, 0x05, 0x00
             ]),
             Some(SensorReading::Atc {
                 mac: [0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff],
@@ -226,7 +228,7 @@ mod tests {
                 packet_counter: 0,
             }
             .encode(),
-            &[0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x37, 0x08, 42, 89, 0xf6, 0x05, 0x00]
+            &[0xff, 0xee, 0xdd, 0xcc, 0xbb, 0xaa, 0x37, 0x08, 42, 89, 0xf6, 0x05, 0x00]
         );
     }
 
