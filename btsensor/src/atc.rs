@@ -2,8 +2,11 @@
 //! [atc1441 format](https://github.com/atc1441/ATC_MiThermometer#advertising-format-of-the-custom-firmware)
 //! and [pvvx custom format](https://github.com/pvvx/ATC_MiThermometer#custom-format-all-data-little-endian).
 
-/// GATT service 0x1a, environmental sensing.
-pub const UUID: u16 = 0x181a;
+use bluez_async::uuid_from_u16;
+use uuid::Uuid;
+
+/// GATT service 0x181a, environmental sensing.
+pub const UUID: Uuid = uuid_from_u16(0x181a);
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SensorReading {
