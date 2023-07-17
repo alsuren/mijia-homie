@@ -22,7 +22,7 @@ async fn main() -> Result<(), eyre::Report> {
             println!("{}: {:?}", id, service_data);
             if let Some(data) = service_data.get(&UUID) {
                 if let Some(reading) = SensorReading::decode(data) {
-                    println!("  {:?}", reading);
+                    println!("  {}", reading);
                 } else {
                     println!("  (Failed to decode.)");
                 }

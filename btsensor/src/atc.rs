@@ -3,6 +3,7 @@
 //! and [pvvx custom format](https://github.com/pvvx/ATC_MiThermometer#custom-format-all-data-little-endian).
 
 use bluez_async::uuid_from_u16;
+use std::fmt::{self, Display, Formatter};
 use uuid::Uuid;
 
 /// GATT service 0x181a, environmental sensing.
@@ -16,6 +17,26 @@ pub struct SensorReading {
     battery_percent: u8,
     battery_mv: u16,
     packet_counter: u8,
+}
+
+impl Display for SensorReading {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(
+            f,
+            "{:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}",
+            self.mac[0], self.mac[1], self.mac[2], self.mac[3], self.mac[4], self.mac[5],
+        )?;
+        write!(
+            f,
+            " ({}): {:0.2}°C, {}% humidity, {}%/{}mV battery",
+            self.packet_counter,
+            self.temperature as f64 / 100.0,
+            self.humidity,
+            self.battery_percent,
+            self.battery_mv
+        )?;
+        Ok(())
+    }
 }
 
 impl SensorReading {
@@ -57,6 +78,22 @@ mod tests {
     use super::*;
 
     #[test]
+    fn format_reading() {
+        assert_eq!(
+            SensorReading {
+                mac: [0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff],
+                temperature: 2103,   // 21.03°
+                humidity: 42,        // 42%
+                battery_percent: 89, // 89%
+                battery_mv: 1526,    // 1526 mV
+                packet_counter: 0,
+            }
+            .to_string(),
+            "aa:bb:cc:dd:ee:ff (0): 21.03°C, 42% humidity, 89%/1526mV battery"
+        );
+    }
+
+    #[test]
     fn decode_atc1441() {
         assert_eq!(
             SensorReading::decode(&[
@@ -67,7 +104,7 @@ mod tests {
                 temperature: 2103,   // 21.03°
                 humidity: 42,        // 42%
                 battery_percent: 89, // 89%
-                battery_mv: 1526,    // 1.526 mV
+                battery_mv: 1526,    // 1526 mV
                 packet_counter: 0,
             })
         );
@@ -81,7 +118,7 @@ mod tests {
                 temperature: 2103,   // 21.03°
                 humidity: 42,        // 42%
                 battery_percent: 89, // 89%
-                battery_mv: 1526,    // 1.526 mV
+                battery_mv: 1526,    // 1526 mV
                 packet_counter: 0,
             }
             .encode(),
@@ -92,6 +129,7 @@ mod tests {
     #[test]
     fn decode_pvvx() {}
 
+    #[test]
     fn decode_empty() {
         assert_eq!(SensorReading::decode(&[]), None);
     }
