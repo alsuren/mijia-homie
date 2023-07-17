@@ -300,6 +300,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "btsensor"
+version = "0.1.0"
+dependencies = [
+ "backoff",
+ "bluez-async",
+ "chrono",
+ "eyre",
+ "futures",
+ "log",
+ "pretty_env_logger",
+ "thiserror",
+ "tokio",
+ "tokio-stream",
+ "uuid",
+]
+
+[[package]]
 name = "bumpalo"
 version = "3.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
