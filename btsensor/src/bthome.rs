@@ -142,6 +142,10 @@ impl From<&Value> for i64 {
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum Property {
+    // Misc data.
+    PacketId = 0x00,
+
+    // Sensor data.
     Battery = 0x01,
     Temperature = 0x02,
     Humidity = 0x03,
@@ -177,6 +181,7 @@ impl TryFrom<u8> for Property {
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
+            0x00 => Ok(Self::PacketId),
             0x01 => Ok(Self::Battery),
             0x02 => Ok(Self::Temperature),
             0x03 => Ok(Self::Humidity),
@@ -213,6 +218,7 @@ impl Display for Property {
 impl Property {
     pub fn name(self) -> &'static str {
         match self {
+            Self::PacketId => "packet ID",
             Self::Battery => "battery",
             Self::Temperature => "temperature",
             Self::Humidity | Self::HumidityShort => "humidity",
@@ -237,6 +243,7 @@ impl Property {
 
     pub fn unit(self) -> &'static str {
         match self {
+            Self::PacketId | Self::Count | Self::Timestamp => "",
             Self::Battery
             | Self::Humidity
             | Self::HumidityShort
@@ -248,7 +255,6 @@ impl Property {
             Self::MassKg => "kg",
             Self::MassLb => "lb",
             Self::Dewpoint => "°C",
-            Self::Count | Self::Timestamp => "",
             Self::Energy => "kWh",
             Self::Power => "W",
             Self::Voltage => "V",
@@ -265,7 +271,8 @@ impl Property {
     /// the actual value.
     fn decimal_point(self) -> i32 {
         match self {
-            Self::Battery
+            Self::PacketId
+            | Self::Battery
             | Self::HumidityShort
             | Self::Count
             | Self::Pm2_5
@@ -330,6 +337,27 @@ mod tests {
                 Element {
                     property: Property::Humidity,
                     value: Value::UnsignedInt(5055),
+                },
+            ]
+        );
+        assert_eq!(
+            decode(&[2, 0, 140, 35, 2, 203, 8, 3, 3, 171, 20, 2, 1, 100]).unwrap(),
+            vec![
+                Element {
+                    property: Property::PacketId,
+                    value: Value::UnsignedInt(140),
+                },
+                Element {
+                    property: Property::Temperature,
+                    value: Value::SignedInt(2251),
+                },
+                Element {
+                    property: Property::Humidity,
+                    value: Value::UnsignedInt(5291),
+                },
+                Element {
+                    property: Property::Battery,
+                    value: Value::UnsignedInt(100),
                 },
             ]
         );
