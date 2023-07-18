@@ -1,5 +1,5 @@
 use bluez_async::{BluetoothEvent, BluetoothSession, DeviceEvent};
-use btsensor::atc::{SensorReading, UUID};
+use btsensor::Reading;
 use futures::stream::StreamExt;
 
 #[tokio::main]
@@ -20,12 +20,10 @@ async fn main() -> Result<(), eyre::Report> {
         } = event
         {
             println!("{}: {:?}", id, service_data);
-            if let Some(data) = service_data.get(&UUID) {
-                if let Some(reading) = SensorReading::decode(data) {
-                    println!("  {}", reading);
-                } else {
-                    println!("  (Failed to decode.)");
-                }
+            if let Some(reading) = Reading::decode(&service_data) {
+                println!("  {}", reading);
+            } else {
+                println!("  (Failed to decode.)");
             }
         }
     }
