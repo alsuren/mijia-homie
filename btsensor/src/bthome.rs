@@ -24,7 +24,6 @@ pub enum DecodeError {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Element {
-    format: DataType,
     pub property: Property,
     value: Value,
 }
@@ -303,11 +302,7 @@ pub fn decode(mut data: &[u8]) -> Result<Vec<Element>, DecodeError> {
         let property = data[1].try_into()?;
         let element_end = usize::from(length) + 1;
         let value = Value::from_bytes(&data[2..element_end], format)?;
-        elements.push(Element {
-            format,
-            property,
-            value,
-        });
+        elements.push(Element { property, value });
 
         data = &data[element_end..];
     }
@@ -329,12 +324,10 @@ mod tests {
             decode(&[0x23, 0x02, 0xC4, 0x09, 0x03, 0x03, 0xBF, 0x13]).unwrap(),
             vec![
                 Element {
-                    format: DataType::SignedInt,
                     property: Property::Temperature,
                     value: Value::SignedInt(2500),
                 },
                 Element {
-                    format: DataType::UnsignedInt,
                     property: Property::Humidity,
                     value: Value::UnsignedInt(5055),
                 },
@@ -346,7 +339,6 @@ mod tests {
     fn format_element() {
         assert_eq!(
             Element {
-                format: DataType::UnsignedInt,
                 property: Property::Humidity,
                 value: Value::UnsignedInt(5055),
             }
@@ -355,7 +347,6 @@ mod tests {
         );
         assert_eq!(
             Element {
-                format: DataType::SignedInt,
                 property: Property::Temperature,
                 value: Value::SignedInt(2500),
             }
@@ -364,7 +355,6 @@ mod tests {
         );
         assert_eq!(
             Element {
-                format: DataType::UnsignedInt,
                 property: Property::HumidityShort,
                 value: Value::UnsignedInt(42),
             }
