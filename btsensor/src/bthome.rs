@@ -168,6 +168,36 @@ pub enum Property {
     Timestamp = 0x50,
     Acceleration = 0x51,
     Gyroscope = 0x52,
+
+    // Binary sensor data.
+    GenericBoolean = 0x0f,
+    PowerOn = 0x10,
+    Open = 0x11,
+    BatteryLow = 0x15,
+    BatteryCharging = 0x16,
+    CarbonMonoxideDetected = 0x17,
+    Cold = 0x18,
+    Connected = 0x19,
+    DoorOpen = 0x1a,
+    GarageDoorOpen = 0x1b,
+    GasDetected = 0x1c,
+    HeatAbnormal = 0x1d,
+    LightDetected = 0x1e,
+    Unlocked = 0x1f,
+    Wet = 0x20,
+    MotionDetected = 0x21,
+    Moving = 0x22,
+    OccupancyDetected = 0x23,
+    Plugged = 0x24,
+    Present = 0x25,
+    Problem = 0x26,
+    Running = 0x27,
+    Safe = 0x28,
+    SmokeDetected = 0x29,
+    Sound = 0x2a,
+    Tamper = 0x2b,
+    VibrationDetected = 0x2c,
+    WindowOpen = 0x2d,
 }
 
 impl From<Property> for u8 {
@@ -204,6 +234,34 @@ impl TryFrom<u8> for Property {
             0x50 => Ok(Self::Timestamp),
             0x51 => Ok(Self::Acceleration),
             0x52 => Ok(Self::Gyroscope),
+            0x0f => Ok(Self::GenericBoolean),
+            0x10 => Ok(Self::PowerOn),
+            0x11 => Ok(Self::Open),
+            0x15 => Ok(Self::BatteryLow),
+            0x16 => Ok(Self::BatteryCharging),
+            0x17 => Ok(Self::CarbonMonoxideDetected),
+            0x18 => Ok(Self::Cold),
+            0x19 => Ok(Self::Connected),
+            0x1a => Ok(Self::DoorOpen),
+            0x1b => Ok(Self::GarageDoorOpen),
+            0x1c => Ok(Self::GasDetected),
+            0x1d => Ok(Self::HeatAbnormal),
+            0x1e => Ok(Self::LightDetected),
+            0x1f => Ok(Self::Unlocked),
+            0x20 => Ok(Self::Wet),
+            0x21 => Ok(Self::MotionDetected),
+            0x22 => Ok(Self::Moving),
+            0x23 => Ok(Self::OccupancyDetected),
+            0x24 => Ok(Self::Plugged),
+            0x25 => Ok(Self::Present),
+            0x26 => Ok(Self::Problem),
+            0x27 => Ok(Self::Running),
+            0x28 => Ok(Self::Safe),
+            0x29 => Ok(Self::SmokeDetected),
+            0x2a => Ok(Self::Sound),
+            0x2b => Ok(Self::Tamper),
+            0x2c => Ok(Self::VibrationDetected),
+            0x2d => Ok(Self::WindowOpen),
             _ => Err(DecodeError::InvalidProperty(value)),
         }
     }
@@ -238,12 +296,70 @@ impl Property {
             Self::Timestamp => "timestamp",
             Self::Acceleration => "acceleration",
             Self::Gyroscope => "gyroscope",
+            Self::GenericBoolean => "generic boolean",
+            Self::PowerOn => "power on",
+            Self::Open => "open",
+            Self::BatteryLow => "battery low",
+            Self::BatteryCharging => "battery charging",
+            Self::CarbonMonoxideDetected => "carbon monoxide detected",
+            Self::Cold => "cold",
+            Self::Connected => "connected",
+            Self::DoorOpen => "door open",
+            Self::GarageDoorOpen => "garage door open",
+            Self::GasDetected => "gas detected",
+            Self::HeatAbnormal => "abnormal heat",
+            Self::LightDetected => "light detected",
+            Self::Unlocked => "unlocked",
+            Self::Wet => "wet",
+            Self::MotionDetected => "motion detected",
+            Self::Moving => "moving",
+            Self::OccupancyDetected => "occupancy detected",
+            Self::Plugged => "plugged",
+            Self::Present => "present",
+            Self::Problem => "problem",
+            Self::Running => "running",
+            Self::Safe => "safe",
+            Self::SmokeDetected => "smoke detected",
+            Self::Sound => "sound",
+            Self::Tamper => "tampered",
+            Self::VibrationDetected => "vibration detected",
+            Self::WindowOpen => "window open",
         }
     }
 
     pub fn unit(self) -> &'static str {
         match self {
-            Self::PacketId | Self::Count | Self::Timestamp => "",
+            Self::PacketId
+            | Self::Count
+            | Self::Timestamp
+            | Self::GenericBoolean
+            | Self::PowerOn
+            | Self::Open
+            | Self::BatteryLow
+            | Self::BatteryCharging
+            | Self::CarbonMonoxideDetected
+            | Self::Cold
+            | Self::Connected
+            | Self::DoorOpen
+            | Self::GarageDoorOpen
+            | Self::GasDetected
+            | Self::HeatAbnormal
+            | Self::LightDetected
+            | Self::Unlocked
+            | Self::Wet
+            | Self::MotionDetected
+            | Self::Moving
+            | Self::OccupancyDetected
+            | Self::Plugged
+            | Self::Present
+            | Self::Problem
+            | Self::Running
+            | Self::Safe
+            | Self::SmokeDetected
+            | Self::Sound
+            | Self::Tamper
+            | Self::VibrationDetected
+            | Self::WindowOpen => "",
             Self::Battery
             | Self::Humidity
             | Self::HumidityShort
@@ -280,7 +396,35 @@ impl Property {
             | Self::Co2
             | Self::Tvoc
             | Self::MoistureShort
-            | Self::Timestamp => 0,
+            | Self::Timestamp
+            | Self::GenericBoolean
+            | Self::PowerOn
+            | Self::Open
+            | Self::BatteryLow
+            | Self::BatteryCharging
+            | Self::CarbonMonoxideDetected
+            | Self::Cold
+            | Self::Connected
+            | Self::DoorOpen
+            | Self::GarageDoorOpen
+            | Self::GasDetected
+            | Self::HeatAbnormal
+            | Self::LightDetected
+            | Self::Unlocked
+            | Self::Wet
+            | Self::MotionDetected
+            | Self::Moving
+            | Self::OccupancyDetected
+            | Self::Plugged
+            | Self::Present
+            | Self::Problem
+            | Self::Running
+            | Self::Safe
+            | Self::SmokeDetected
+            | Self::Sound
+            | Self::Tamper
+            | Self::VibrationDetected
+            | Self::WindowOpen => 0,
             Self::Temperature
             | Self::Humidity
             | Self::Pressure
@@ -359,6 +503,23 @@ mod tests {
                     property: Property::Battery,
                     value: Value::UnsignedInt(100),
                 },
+            ]
+        );
+        assert_eq!(
+            decode(&[2, 0, 137, 2, 16, 0, 3, 12, 182, 11]).unwrap(),
+            vec![
+                Element {
+                    property: Property::PacketId,
+                    value: Value::UnsignedInt(137),
+                },
+                Element {
+                    property: Property::PowerOn,
+                    value: Value::UnsignedInt(0),
+                },
+                Element {
+                    property: Property::Voltage,
+                    value: Value::UnsignedInt(2998),
+                }
             ]
         );
     }
