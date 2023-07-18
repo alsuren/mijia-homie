@@ -35,11 +35,11 @@ impl Display for SensorReading {
         match self {
             Self::Atc {
                 mac,
-                temperature,
                 humidity,
                 battery_percent,
                 battery_mv,
                 packet_counter,
+                ..
             } => {
                 write!(
                     f,
@@ -50,7 +50,7 @@ impl Display for SensorReading {
                     f,
                     " ({}): {:0.2}°C, {}% humidity, {}%/{}mV battery",
                     packet_counter,
-                    *temperature as f64 / 100.0,
+                    self.temperature(),
                     humidity,
                     battery_percent,
                     battery_mv
@@ -58,12 +58,11 @@ impl Display for SensorReading {
             }
             Self::Pvvx {
                 mac,
-                temperature,
-                humidity,
                 battery_mv,
                 battery_percent,
                 counter,
                 flags,
+                ..
             } => {
                 write!(
                     f,
@@ -74,8 +73,8 @@ impl Display for SensorReading {
                     f,
                     " ({}): {:0.2}°C, {:0.2}% humidity, {}%/{}mV battery, flags {:#04x}",
                     counter,
-                    *temperature as f64 / 100.0,
-                    *humidity as f64 / 100.0,
+                    self.temperature(),
+                    self.humidity(),
                     battery_percent,
                     battery_mv,
                     flags,
@@ -160,6 +159,51 @@ impl SensorReading {
             }
         }
     }
+
+    /// Returns the MAC address of the sensor.
+    pub fn mac(&self) -> &[u8; 6] {
+        match self {
+            Self::Atc { mac, .. } => mac,
+            Self::Pvvx { mac, .. } => mac,
+        }
+    }
+
+    /// Returns the temperature reading in °C.
+    pub fn temperature(&self) -> f32 {
+        let temperature = match self {
+            Self::Atc { temperature, .. } => *temperature,
+            Self::Pvvx { temperature, .. } => *temperature,
+        };
+        f32::from(temperature) / 100.0
+    }
+
+    /// Returns the humidity reading, as a percentage.
+    pub fn humidity(&self) -> f32 {
+        match self {
+            Self::Atc { humidity, .. } => (*humidity).into(),
+            Self::Pvvx { humidity, .. } => f32::from(*humidity) / 100.0,
+        }
+    }
+
+    /// Returns the battery level, as a percentage.
+    pub fn battery_percent(&self) -> u8 {
+        match self {
+            Self::Atc {
+                battery_percent, ..
+            } => *battery_percent,
+            Self::Pvvx {
+                battery_percent, ..
+            } => *battery_percent,
+        }
+    }
+
+    /// Returns the battery voltage, in mV.
+    pub fn battery_mv(&self) -> u16 {
+        match self {
+            Self::Atc { battery_mv, .. } => *battery_mv,
+            Self::Pvvx { battery_mv, .. } => *battery_mv,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -201,19 +245,25 @@ mod tests {
 
     #[test]
     fn decode_atc1441() {
+        let decoded = SensorReading::decode(&[
+            0xff, 0xee, 0xdd, 0xcc, 0xbb, 0xaa, 0x37, 0x08, 42, 89, 0xf6, 0x05, 0x00,
+        ])
+        .unwrap();
         assert_eq!(
-            SensorReading::decode(&[
-                0xff, 0xee, 0xdd, 0xcc, 0xbb, 0xaa, 0x37, 0x08, 42, 89, 0xf6, 0x05, 0x00
-            ]),
-            Some(SensorReading::Atc {
+            decoded,
+            SensorReading::Atc {
                 mac: [0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff],
                 temperature: 2103,   // 21.03°
                 humidity: 42,        // 42%
                 battery_percent: 89, // 89%
                 battery_mv: 1526,    // 1526 mV
                 packet_counter: 0,
-            })
+            }
         );
+        assert_eq!(decoded.temperature(), 21.03);
+        assert_eq!(decoded.humidity(), 42.00);
+        assert_eq!(decoded.battery_mv(), 1526);
+        assert_eq!(decoded.battery_percent(), 89);
     }
 
     #[test]
@@ -234,12 +284,13 @@ mod tests {
 
     #[test]
     fn decode_pvvx() {
+        let decoded = SensorReading::decode(&[
+            0x93, 0x41, 0x8c, 0x38, 0xc1, 0xa4, 0xac, 0x08, 0x9e, 0x14, 0xa0, 0x0b, 100, 136, 0x04,
+        ])
+        .unwrap();
         assert_eq!(
-            SensorReading::decode(&[
-                0x93, 0x41, 0x8c, 0x38, 0xc1, 0xa4, 0xac, 0x08, 0x9e, 0x14, 0xa0, 0x0b, 100, 136,
-                0x04
-            ]),
-            Some(SensorReading::Pvvx {
+            decoded,
+            SensorReading::Pvvx {
                 mac: [0xa4, 0xc1, 0x38, 0x8c, 0x41, 0x93],
                 temperature: 2220,
                 humidity: 5278,
@@ -247,8 +298,12 @@ mod tests {
                 battery_percent: 100,
                 counter: 136,
                 flags: 0x04,
-            })
+            }
         );
+        assert_eq!(decoded.temperature(), 22.20);
+        assert_eq!(decoded.humidity(), 52.78);
+        assert_eq!(decoded.battery_mv(), 2976);
+        assert_eq!(decoded.battery_percent(), 100);
     }
 
     #[test]
