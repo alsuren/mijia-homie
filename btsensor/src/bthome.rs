@@ -1,6 +1,7 @@
 //! Support for the [BTHome](https://bthome.io/) v1 format.
 
 use bluez_async::uuid_from_u16;
+use std::fmt::{self, Display, Formatter};
 use thiserror::Error;
 use uuid::Uuid;
 
@@ -24,8 +25,38 @@ pub enum DecodeError {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Element {
     format: DataType,
-    property: Property,
+    pub property: Property,
     value: Value,
+}
+
+impl Element {
+    pub fn float_value(&self) -> f64 {
+        f64::from(&self.value) / 10.0f64.powi(self.property.decimal_point())
+    }
+
+    pub fn int_value(&self) -> Option<i64> {
+        if self.property.decimal_point() == 0 {
+            Some((&self.value).into())
+        } else {
+            None
+        }
+    }
+}
+
+impl Display for Element {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        if let Some(value) = self.int_value() {
+            write!(f, "{}: {}{}", self.property, value, self.property.unit())
+        } else {
+            write!(
+                f,
+                "{}: {}{}",
+                self.property,
+                self.float_value(),
+                self.property.unit(),
+            )
+        }
+    }
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -88,6 +119,24 @@ impl Value {
             )),
             (DataType::SignedInt, 1) => Ok(Self::SignedInt((bytes[0] as i8).into())),
             _ => Err(DecodeError::UnsupportedFormat(format)),
+        }
+    }
+}
+
+impl From<&Value> for f64 {
+    fn from(value: &Value) -> Self {
+        match value {
+            &Value::SignedInt(v) => v.into(),
+            &Value::UnsignedInt(v) => v.into(),
+        }
+    }
+}
+
+impl From<&Value> for i64 {
+    fn from(value: &Value) -> Self {
+        match value {
+            &Value::SignedInt(v) => v.into(),
+            &Value::UnsignedInt(v) => v.into(),
         }
     }
 }
@@ -156,6 +205,90 @@ impl TryFrom<u8> for Property {
     }
 }
 
+impl Display for Property {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        f.write_str(self.name())
+    }
+}
+
+impl Property {
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Battery => "battery",
+            Self::Temperature => "temperature",
+            Self::Humidity | Self::HumidityShort => "humidity",
+            Self::Pressure => "pressure",
+            Self::Illuminance => "illuminance",
+            Self::MassKg | Self::MassLb => "mass",
+            Self::Dewpoint => "dew point",
+            Self::Count => "count",
+            Self::Energy => "energy",
+            Self::Power => "power",
+            Self::Voltage => "voltage",
+            Self::Pm2_5 => "pm2.5",
+            Self::Pm10 => "pm10",
+            Self::Co2 => "CO2",
+            Self::Tvoc => "tvoc",
+            Self::Moisture | Self::MoistureShort => "moisture",
+            Self::Timestamp => "timestamp",
+            Self::Acceleration => "acceleration",
+            Self::Gyroscope => "gyroscope",
+        }
+    }
+
+    pub fn unit(self) -> &'static str {
+        match self {
+            Self::Battery
+            | Self::Humidity
+            | Self::HumidityShort
+            | Self::Moisture
+            | Self::MoistureShort => "%",
+            Self::Temperature => "°C",
+            Self::Pressure => "hPa",
+            Self::Illuminance => "lux",
+            Self::MassKg => "kg",
+            Self::MassLb => "lb",
+            Self::Dewpoint => "°C",
+            Self::Count | Self::Timestamp => "",
+            Self::Energy => "kWh",
+            Self::Power => "W",
+            Self::Voltage => "V",
+            Self::Pm2_5 | Self::Pm10 | Self::Tvoc => "ug/m3",
+            Self::Co2 => "ppm",
+            Self::Acceleration => "m/s²",
+            Self::Gyroscope => "°/s",
+        }
+    }
+
+    /// The number of spaces to the left to move the decimal point.
+    ///
+    /// In other words, the value stored should be divided by 10 to the power of this number to get
+    /// the actual value.
+    fn decimal_point(self) -> i32 {
+        match self {
+            Self::Battery
+            | Self::HumidityShort
+            | Self::Count
+            | Self::Pm2_5
+            | Self::Pm10
+            | Self::Co2
+            | Self::Tvoc
+            | Self::MoistureShort
+            | Self::Timestamp => 0,
+            Self::Temperature
+            | Self::Humidity
+            | Self::Pressure
+            | Self::Illuminance
+            | Self::MassKg
+            | Self::MassLb
+            | Self::Dewpoint
+            | Self::Power
+            | Self::Moisture => 2,
+            Self::Energy | Self::Voltage | Self::Acceleration | Self::Gyroscope => 3,
+        }
+    }
+}
+
 pub fn decode(mut data: &[u8]) -> Result<Vec<Element>, DecodeError> {
     let mut elements = Vec::new();
 
@@ -206,6 +339,37 @@ mod tests {
                     value: Value::UnsignedInt(5055),
                 },
             ]
+        );
+    }
+
+    #[test]
+    fn format_element() {
+        assert_eq!(
+            Element {
+                format: DataType::UnsignedInt,
+                property: Property::Humidity,
+                value: Value::UnsignedInt(5055),
+            }
+            .to_string(),
+            "humidity: 50.55%"
+        );
+        assert_eq!(
+            Element {
+                format: DataType::SignedInt,
+                property: Property::Temperature,
+                value: Value::SignedInt(2500),
+            }
+            .to_string(),
+            "temperature: 25°C"
+        );
+        assert_eq!(
+            Element {
+                format: DataType::UnsignedInt,
+                property: Property::HumidityShort,
+                value: Value::UnsignedInt(42),
+            }
+            .to_string(),
+            "humidity: 42%"
         );
     }
 }
