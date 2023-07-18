@@ -44,6 +44,7 @@ impl Element {
 
 impl Display for Element {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        // TODO: Special handling for timestamp.
         if let Some(value) = self.int_value() {
             write!(f, "{}: {}{}", self.property, value, self.property.unit())
         } else {
