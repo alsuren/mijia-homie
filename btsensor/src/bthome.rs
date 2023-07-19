@@ -13,7 +13,7 @@ pub const ENCRYPTED_UUID: Uuid = uuid_from_u16(0x181e);
 pub enum DecodeError {
     #[error("Invalid data type {0:#03x}")]
     InvalidDataType(u8),
-    #[error("Invalid property {0:#03x}")]
+    #[error("Invalid property {0:#04x}")]
     InvalidProperty(u8),
     #[error("Premature end of data")]
     PrematureEnd,
