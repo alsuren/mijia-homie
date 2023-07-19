@@ -1,5 +1,8 @@
 //! Support for the [BTHome](https://bthome.io/) v1 format.
 
+mod events;
+
+use self::events::{ButtonEventType, DimmerEventType, Event};
 use bluez_async::uuid_from_u16;
 use num_enum::IntoPrimitive;
 use std::fmt::{self, Display, Formatter};
@@ -21,29 +24,70 @@ pub enum DecodeError {
     ExtraData(Vec<u8>),
     #[error("Unsupported format {0:?}")]
     UnsupportedFormat(DataType),
+    #[error("Invalid event type {0:#04x}")]
+    InvalidEventType(u8),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Element {
-    pub property: Property,
-    value: Value,
+pub enum Element {
+    Sensor(Sensor),
+    Event(Event),
 }
 
 impl Element {
     pub fn new_unsigned(property: Property, value: u32) -> Self {
-        Self {
+        Self::Sensor(Sensor {
             property,
             value: Value::UnsignedInt(value),
-        }
+        })
     }
 
     pub fn new_signed(property: Property, value: i32) -> Self {
-        Self {
+        Self::Sensor(Sensor {
             property,
             value: Value::SignedInt(value),
-        }
+        })
     }
 
+    pub fn new_event(event: Event) -> Self {
+        Self::Event(event)
+    }
+
+    fn decode(format: DataType, data: &[u8]) -> Result<Self, DecodeError> {
+        let property = Property::try_from(data[0])?;
+        let value = &data[1..];
+        match property {
+            Property::ButtonEvent => {
+                let event_type = ButtonEventType::from_bytes(value)?;
+                let event = Event::Button(event_type);
+                Ok(Self::Event(event))
+            }
+            Property::DimmerEvent => {
+                let event_type = DimmerEventType::from_bytes(value)?;
+                let event = Event::Dimmer(event_type);
+                Ok(Self::Event(event))
+            }
+            _ => Ok(Self::Sensor(Sensor::decode(format, property, value)?)),
+        }
+    }
+}
+
+impl Display for Element {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        match self {
+            Self::Sensor(sensor) => sensor.fmt(f),
+            Self::Event(event) => event.fmt(f),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Sensor {
+    pub property: Property,
+    value: Value,
+}
+
+impl Sensor {
     pub fn float_value(&self) -> f64 {
         f64::from(&self.value) / 10.0f64.powi(self.property.decimal_point())
     }
@@ -55,10 +99,15 @@ impl Element {
             None
         }
     }
+
+    fn decode(format: DataType, property: Property, value: &[u8]) -> Result<Self, DecodeError> {
+        let value = Value::from_bytes(value, format)?;
+        Ok(Self { property, value })
+    }
 }
 
-impl Display for Element {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+impl Display for Sensor {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         // TODO: Special handling for timestamp.
         if let Some(value) = self.int_value() {
             write!(f, "{}: {}{}", self.property, value, self.property.unit())
@@ -463,15 +512,13 @@ pub fn decode(mut data: &[u8]) -> Result<Vec<Element>, DecodeError> {
     while data.len() > 2 {
         let length_format = data[0];
         let length = length_format & 0x1f;
+        let element_end = usize::from(length) + 1;
         // length includes the measurement type byte but not the length/format byte.
         if data.len() <= length.into() {
             return Err(DecodeError::PrematureEnd);
         }
         let format = ((length_format & 0xe0) >> 5).try_into()?;
-        let property = data[1].try_into()?;
-        let element_end = usize::from(length) + 1;
-        let value = Value::from_bytes(&data[2..element_end], format)?;
-        elements.push(Element { property, value });
+        elements.push(Element::decode(format, &data[1..element_end])?);
 
         data = &data[element_end..];
     }
@@ -492,52 +539,52 @@ mod tests {
         assert_eq!(
             decode(&[0x23, 0x02, 0xC4, 0x09, 0x03, 0x03, 0xBF, 0x13]).unwrap(),
             vec![
-                Element {
+                Element::Sensor(Sensor {
                     property: Property::Temperature,
                     value: Value::SignedInt(2500),
-                },
-                Element {
+                }),
+                Element::Sensor(Sensor {
                     property: Property::Humidity,
                     value: Value::UnsignedInt(5055),
-                },
+                }),
             ]
         );
         assert_eq!(
             decode(&[2, 0, 140, 35, 2, 203, 8, 3, 3, 171, 20, 2, 1, 100]).unwrap(),
             vec![
-                Element {
+                Element::Sensor(Sensor {
                     property: Property::PacketId,
                     value: Value::UnsignedInt(140),
-                },
-                Element {
+                }),
+                Element::Sensor(Sensor {
                     property: Property::Temperature,
                     value: Value::SignedInt(2251),
-                },
-                Element {
+                }),
+                Element::Sensor(Sensor {
                     property: Property::Humidity,
                     value: Value::UnsignedInt(5291),
-                },
-                Element {
+                }),
+                Element::Sensor(Sensor {
                     property: Property::Battery,
                     value: Value::UnsignedInt(100),
-                },
+                }),
             ]
         );
         assert_eq!(
             decode(&[2, 0, 137, 2, 16, 0, 3, 12, 182, 11]).unwrap(),
             vec![
-                Element {
+                Element::Sensor(Sensor {
                     property: Property::PacketId,
                     value: Value::UnsignedInt(137),
-                },
-                Element {
+                }),
+                Element::Sensor(Sensor {
                     property: Property::PowerOn,
                     value: Value::UnsignedInt(0),
-                },
-                Element {
+                }),
+                Element::Sensor(Sensor {
                     property: Property::Voltage,
                     value: Value::UnsignedInt(2998),
-                }
+                }),
             ]
         );
     }
@@ -547,14 +594,8 @@ mod tests {
         assert_eq!(
             decode(&[0x02, 0x3a, 0x00, 0x02, 0x3a, 0x05]).unwrap(),
             vec![
-                Element {
-                    property: Property::ButtonEvent,
-                    value: Value::UnsignedInt(0),
-                },
-                Element {
-                    property: Property::ButtonEvent,
-                    value: Value::UnsignedInt(0x05),
-                },
+                Element::Event(Event::Button(None)),
+                Element::Event(Event::Button(Some(ButtonEventType::LongDoublePress))),
             ]
         );
     }
@@ -564,43 +605,53 @@ mod tests {
         assert_eq!(
             decode(&[0x02, 0x3c, 0x00, 0x03, 0x3c, 0x01, 0x03]).unwrap(),
             vec![
-                Element {
-                    property: Property::DimmerEvent,
-                    value: Value::UnsignedInt(0),
-                },
-                Element {
-                    property: Property::DimmerEvent,
-                    value: Value::UnsignedInt(0x0301),
-                },
+                Element::Event(Event::Dimmer(None)),
+                Element::Event(Event::Dimmer(Some(DimmerEventType::RotateLeft(3)))),
             ]
         );
     }
 
     #[test]
-    fn format_element() {
+    fn format_sensor_element() {
         assert_eq!(
-            Element {
+            Element::Sensor(Sensor {
                 property: Property::Humidity,
                 value: Value::UnsignedInt(5055),
-            }
+            })
             .to_string(),
             "humidity: 50.55%"
         );
         assert_eq!(
-            Element {
+            Element::Sensor(Sensor {
                 property: Property::Temperature,
                 value: Value::SignedInt(2500),
-            }
+            })
             .to_string(),
             "temperature: 25°C"
         );
         assert_eq!(
-            Element {
+            Element::Sensor(Sensor {
                 property: Property::HumidityShort,
                 value: Value::UnsignedInt(42),
-            }
+            })
             .to_string(),
             "humidity: 42%"
+        );
+    }
+
+    #[test]
+    fn format_event_element() {
+        assert_eq!(
+            Element::Event(Event::Button(None)).to_string(),
+            "button: none"
+        );
+        assert_eq!(
+            Element::Event(Event::Button(Some(ButtonEventType::LongDoublePress))).to_string(),
+            "button: long double press"
+        );
+        assert_eq!(
+            Element::Event(Event::Dimmer(Some(DimmerEventType::RotateRight(42)))).to_string(),
+            "dimmer: rotate right 42 steps"
         );
     }
 }
