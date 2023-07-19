@@ -213,6 +213,10 @@ pub enum Property {
     Tamper = 0x2b,
     VibrationDetected = 0x2c,
     WindowOpen = 0x2d,
+
+    // Events.
+    ButtonEvent = 0x3a,
+    DimmerEvent = 0x3c,
 }
 
 impl From<Property> for u8 {
@@ -277,6 +281,8 @@ impl TryFrom<u8> for Property {
             0x2b => Ok(Self::Tamper),
             0x2c => Ok(Self::VibrationDetected),
             0x2d => Ok(Self::WindowOpen),
+            0x3a => Ok(Self::ButtonEvent),
+            0x3c => Ok(Self::DimmerEvent),
             _ => Err(DecodeError::InvalidProperty(value)),
         }
     }
@@ -339,6 +345,8 @@ impl Property {
             Self::Tamper => "tampered",
             Self::VibrationDetected => "vibration detected",
             Self::WindowOpen => "window open",
+            Self::ButtonEvent => "button event",
+            Self::DimmerEvent => "dimmer event",
         }
     }
 
@@ -374,7 +382,9 @@ impl Property {
             | Self::Sound
             | Self::Tamper
             | Self::VibrationDetected
-            | Self::WindowOpen => "",
+            | Self::WindowOpen
+            | Self::ButtonEvent
+            | Self::DimmerEvent => "",
             Self::Battery
             | Self::Humidity
             | Self::HumidityShort
@@ -439,7 +449,9 @@ impl Property {
             | Self::Sound
             | Self::Tamper
             | Self::VibrationDetected
-            | Self::WindowOpen => 0,
+            | Self::WindowOpen
+            | Self::ButtonEvent
+            | Self::DimmerEvent => 0,
             Self::Temperature
             | Self::Humidity
             | Self::Pressure
@@ -535,6 +547,40 @@ mod tests {
                     property: Property::Voltage,
                     value: Value::UnsignedInt(2998),
                 }
+            ]
+        );
+    }
+
+    #[test]
+    fn decode_button_events() {
+        assert_eq!(
+            decode(&[0x02, 0x3a, 0x00, 0x02, 0x3a, 0x05]).unwrap(),
+            vec![
+                Element {
+                    property: Property::ButtonEvent,
+                    value: Value::UnsignedInt(0),
+                },
+                Element {
+                    property: Property::ButtonEvent,
+                    value: Value::UnsignedInt(0x05),
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn decode_dimmer_events() {
+        assert_eq!(
+            decode(&[0x02, 0x3c, 0x00, 0x03, 0x3c, 0x01, 0x03]).unwrap(),
+            vec![
+                Element {
+                    property: Property::DimmerEvent,
+                    value: Value::UnsignedInt(0),
+                },
+                Element {
+                    property: Property::DimmerEvent,
+                    value: Value::UnsignedInt(0x0301),
+                },
             ]
         );
     }
