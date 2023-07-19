@@ -29,6 +29,20 @@ pub struct Element {
 }
 
 impl Element {
+    pub fn new_unsigned(property: Property, value: u32) -> Self {
+        Self {
+            property,
+            value: Value::UnsignedInt(value),
+        }
+    }
+
+    pub fn new_signed(property: Property, value: i32) -> Self {
+        Self {
+            property,
+            value: Value::SignedInt(value),
+        }
+    }
+
     pub fn float_value(&self) -> f64 {
         f64::from(&self.value) / 10.0f64.powi(self.property.decimal_point())
     }
