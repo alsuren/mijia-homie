@@ -1,6 +1,7 @@
 //! Support for the [BTHome](https://bthome.io/) v1 format.
 
 use bluez_async::uuid_from_u16;
+use num_enum::IntoPrimitive;
 use std::fmt::{self, Display, Formatter};
 use thiserror::Error;
 use uuid::Uuid;
@@ -73,19 +74,14 @@ impl Display for Element {
     }
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, IntoPrimitive, PartialEq)]
+#[repr(u8)]
 pub enum DataType {
     UnsignedInt = 0b000,
     SignedInt = 0b001,
     Float = 0b010,
     String = 0b011,
     Mac = 0b100,
-}
-
-impl From<DataType> for u8 {
-    fn from(value: DataType) -> Self {
-        value as Self
-    }
 }
 
 impl TryFrom<u8> for DataType {
@@ -155,7 +151,8 @@ impl From<&Value> for i64 {
     }
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, IntoPrimitive, PartialEq)]
+#[repr(u8)]
 pub enum Property {
     // Misc data.
     PacketId = 0x00,
@@ -217,12 +214,6 @@ pub enum Property {
     // Events.
     ButtonEvent = 0x3a,
     DimmerEvent = 0x3c,
-}
-
-impl From<Property> for u8 {
-    fn from(value: Property) -> Self {
-        value as Self
-    }
 }
 
 impl TryFrom<u8> for Property {

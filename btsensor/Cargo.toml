@@ -13,6 +13,7 @@ categories = ["hardware-support"]
 bluez-async = "0.7.1"
 futures = "0.3.27"
 log = "0.4.19"
+num_enum = "0.6.1"
 thiserror = "1.0.43"
 tokio = "1.29.1"
 tokio-stream = "0.1.14"
