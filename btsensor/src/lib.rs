@@ -3,7 +3,7 @@
 pub mod atc;
 pub mod bthome;
 
-use crate::{atc::SensorReading, bthome::Element};
+use crate::{atc::SensorReading, bthome::v1::Element};
 use log::warn;
 use std::{
     collections::HashMap,
@@ -24,8 +24,8 @@ impl Reading {
                 return Some(Self::Atc(reading));
             }
         }
-        if let Some(data) = service_data.get(&bthome::UNENCRYPTED_UUID) {
-            match bthome::decode(data) {
+        if let Some(data) = service_data.get(&bthome::v1::UNENCRYPTED_UUID) {
+            match bthome::v1::decode(data) {
                 Ok(elements) => {
                     return Some(Self::BtHome(elements));
                 }
@@ -58,7 +58,7 @@ impl Display for Reading {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::bthome::Property;
+    use crate::bthome::v1::Property;
 
     #[test]
     fn decode_none() {
@@ -103,7 +103,9 @@ mod tests {
 
     #[test]
     fn decode_bthome_v1_empty() {
-        let service_data = [(bthome::UNENCRYPTED_UUID, vec![])].into_iter().collect();
+        let service_data = [(bthome::v1::UNENCRYPTED_UUID, vec![])]
+            .into_iter()
+            .collect();
         assert_eq!(
             Reading::decode(&service_data),
             Some(Reading::BtHome(vec![]))
@@ -113,7 +115,7 @@ mod tests {
     #[test]
     fn decode_bthome_v1_valid() {
         let service_data = [(
-            bthome::UNENCRYPTED_UUID,
+            bthome::v1::UNENCRYPTED_UUID,
             vec![0x23, 0x02, 0xC4, 0x09, 0x03, 0x03, 0xBF, 0x13],
         )]
         .into_iter()
