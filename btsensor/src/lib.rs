@@ -4,6 +4,7 @@ pub mod atc;
 pub mod bthome;
 
 use crate::{atc::SensorReading, bthome::v1::Element};
+use bthome::v2::BtHomeV2;
 use log::warn;
 use std::{
     collections::HashMap,
@@ -14,7 +15,8 @@ use uuid::Uuid;
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Reading {
     Atc(SensorReading),
-    BtHome(Vec<Element>),
+    BtHomeV1(Vec<Element>),
+    BtHomeV2(BtHomeV2),
 }
 
 impl Reading {
@@ -26,12 +28,16 @@ impl Reading {
         }
         if let Some(data) = service_data.get(&bthome::v1::UNENCRYPTED_UUID) {
             match bthome::v1::decode(data) {
-                Ok(elements) => {
-                    return Some(Self::BtHome(elements));
-                }
+                Ok(elements) => return Some(Self::BtHomeV1(elements)),
                 Err(e) => {
-                    warn!("Error decoding BTHome data: {}", e);
+                    warn!("Error decoding BTHome v1 data: {}", e)
                 }
+            }
+        }
+        if let Some(data) = service_data.get(&bthome::v2::UUID) {
+            match bthome::v2::BtHomeV2::decode(data) {
+                Ok(bthome) => return Some(Self::BtHomeV2(bthome)),
+                Err(e) => warn!("Error decoding BTHome v2 data: {}", e),
             }
         }
         None
@@ -42,7 +48,7 @@ impl Display for Reading {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
             Self::Atc(reading) => reading.fmt(f),
-            Self::BtHome(elements) => {
+            Self::BtHomeV1(elements) => {
                 for (i, element) in elements.into_iter().enumerate() {
                     if i != 0 {
                         f.write_str(", ")?;
@@ -51,6 +57,7 @@ impl Display for Reading {
                 }
                 Ok(())
             }
+            Self::BtHomeV2(bthome) => bthome.fmt(f),
         }
     }
 }
@@ -108,7 +115,7 @@ mod tests {
             .collect();
         assert_eq!(
             Reading::decode(&service_data),
-            Some(Reading::BtHome(vec![]))
+            Some(Reading::BtHomeV1(vec![]))
         );
     }
 
@@ -122,7 +129,7 @@ mod tests {
         .collect();
         assert_eq!(
             Reading::decode(&service_data),
-            Some(Reading::BtHome(vec![
+            Some(Reading::BtHomeV1(vec![
                 Element::new_signed(Property::Temperature, 2500),
                 Element::new_unsigned(Property::Humidity, 5055),
             ]))
