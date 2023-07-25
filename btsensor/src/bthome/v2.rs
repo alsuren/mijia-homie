@@ -18,6 +18,8 @@ pub enum DecodeError {
     UnsupportedVersion(u8),
     #[error("Invalid property {0:#04x}")]
     InvalidProperty(u8),
+    #[error("Premature end of data")]
+    PrematureEnd,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -54,53 +56,65 @@ impl BtHomeV2 {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Element {
-    property: Property,
-    value: Value,
+pub enum Element {
+    Acceleration(u16),
+    Temperature(i16),
 }
 
 impl Element {
     fn decode(data: &[u8]) -> Result<(usize, Self), DecodeError> {
         let object_id = data[0];
         let remaining = &data[1..];
-        let (value_length, value) = match object_id {
-            0x51 => Ok(Self::read_u16(remaining, Property::Acceleration)),
-            0x02 => Ok(Self::read_i16(remaining, Property::Temperature)),
+        match object_id {
+            0x51 => Ok((3, Self::Acceleration(read_u16(remaining)?))),
+            0x02 => Ok((3, Self::Temperature(read_i16(remaining)?))),
             object_id => Err(DecodeError::InvalidProperty(object_id)),
-        }?;
-        Ok((value_length + 1, value))
+        }
     }
 
-    fn read_u16(data: &[u8], property: Property) -> (usize, Self) {
-        (
-            2,
-            Element {
-                property,
-                value: Value::U16(u16::from_le_bytes(data[0..2].try_into().unwrap())),
-            },
-        )
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::Acceleration(_) => "acceleration",
+            Self::Temperature(_) => "temperature",
+        }
     }
 
-    fn read_i16(data: &[u8], property: Property) -> (usize, Self) {
-        (
-            2,
-            Element {
-                property,
-                value: Value::I16(i16::from_le_bytes(data[0..2].try_into().unwrap())),
-            },
-        )
+    pub fn unit(&self) -> &'static str {
+        match self {
+            Self::Acceleration(_) => "m/s²",
+            Self::Temperature(_) => "°C",
+        }
     }
+
+    pub fn value(&self) -> f32 {
+        match self {
+            &Self::Acceleration(value) => f32::from(value) / 1000.0,
+            &Self::Temperature(value) => f32::from(value) / 100.0,
+        }
+    }
+}
+
+fn read_u16(data: &[u8]) -> Result<u16, DecodeError> {
+    Ok(u16::from_le_bytes(
+        data.get(0..2)
+            .ok_or(DecodeError::PrematureEnd)?
+            .try_into()
+            .unwrap(),
+    ))
+}
+
+fn read_i16(data: &[u8]) -> Result<i16, DecodeError> {
+    Ok(i16::from_le_bytes(
+        data.get(0..2)
+            .ok_or(DecodeError::PrematureEnd)?
+            .try_into()
+            .unwrap(),
+    ))
 }
 
 impl Display for Element {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(
-            f,
-            "{}: {}{}",
-            self.property.name(),
-            self.value,
-            self.property.unit()
-        )
+        write!(f, "{}: {}{}", self.name(), self.value(), self.unit())
     }
 }
 
@@ -115,28 +129,6 @@ impl Display for Value {
         match self {
             Self::U16(value) => value.fmt(f),
             Self::I16(value) => value.fmt(f),
-        }
-    }
-}
-
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub enum Property {
-    Acceleration,
-    Temperature,
-}
-
-impl Property {
-    pub fn name(self) -> &'static str {
-        match self {
-            Self::Acceleration => "acceleration",
-            Self::Temperature => "temperature",
-        }
-    }
-
-    pub fn unit(self) -> &'static str {
-        match self {
-            Self::Acceleration => "m/s²",
-            Self::Temperature => "°C",
         }
     }
 }
@@ -176,10 +168,7 @@ mod tests {
             BtHomeV2 {
                 encrypted: false,
                 trigger_based: false,
-                elements: vec![Element {
-                    property: Property::Temperature,
-                    value: Value::I16(2500),
-                }],
+                elements: vec![Element::Temperature(2500)],
             }
         );
     }
@@ -190,19 +179,10 @@ mod tests {
             BtHomeV2 {
                 encrypted: false,
                 trigger_based: false,
-                elements: vec![
-                    Element {
-                        property: Property::Acceleration,
-                        value: Value::U16(22151),
-                    },
-                    Element {
-                        property: Property::Temperature,
-                        value: Value::I16(2506),
-                    }
-                ]
+                elements: vec![Element::Acceleration(22151), Element::Temperature(2506)]
             }
             .to_string(),
-            "(unencrypted) acceleration: 22.151m/s², temperature: 25.06°"
+            "(unencrypted) acceleration: 22.151m/s², temperature: 25.06°C"
         );
     }
 }
