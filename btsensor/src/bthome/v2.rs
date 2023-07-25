@@ -1,10 +1,7 @@
 //! Support for the [BTHome](https://bthome.io/) v2 format.
 
 use bluez_async::uuid_from_u16;
-use std::{
-    fmt::{self, Display, Formatter},
-    mem::size_of,
-};
+use std::fmt::{self, Display, Formatter};
 use thiserror::Error;
 use uuid::Uuid;
 
@@ -45,7 +42,7 @@ impl BtHomeV2 {
         let mut remaining_data = &data[1..];
         let mut elements = Vec::new();
         while remaining_data.len() >= 2 {
-            let (element_length, element) = Element::decode(remaining_data)?;
+            let (element, element_length) = Element::decode(remaining_data)?;
             remaining_data = &remaining_data[element_length..];
             elements.push(element);
         }
@@ -78,16 +75,22 @@ macro_rules! generate_element {
                 }
             }
 
-            fn decode(data: &[u8]) -> Result<(usize, Self), DecodeError> {
+            fn decode(data: &[u8]) -> Result<(Self, usize), DecodeError> {
                 let object_id = data[0];
                 let remaining = &data[1..];
                 match object_id {
-                    0x0a => Ok((4, Self::Energy(read_u24(remaining)?))),
-                    0x4b => Ok((4, Self::Gas(read_u24(remaining)?))),
-                    $( $object_id => Ok((
-                        size_of::<$type>() + 1,
-                        Self::$name($reader(remaining)?),
-                    )), )*
+                    0x0a => {
+                        let (value, length) = read_u24(remaining)?;
+                        Ok((Self::Energy(value), length + 1))
+                    }
+                    0x4b => {
+                        let (value, length) = read_u24(remaining)?;
+                        Ok((Self::Gas(value), length + 1))
+                    }
+                    $( $object_id => {
+                        let (value, length) = $reader(remaining)?;
+                        Ok((Self::$name(value), length + 1))
+                    } )*
                     object_id => Err(DecodeError::InvalidProperty(object_id)),
                 }
             }
@@ -194,42 +197,51 @@ impl Element {
     }
 }
 
-fn read_u8(data: &[u8]) -> Result<u8, DecodeError> {
-    Ok(*data.get(0).ok_or(DecodeError::PrematureEnd)?)
+fn read_u8(data: &[u8]) -> Result<(u8, usize), DecodeError> {
+    Ok((*data.get(0).ok_or(DecodeError::PrematureEnd)?, 1))
 }
 
-fn read_u16(data: &[u8]) -> Result<u16, DecodeError> {
-    Ok(u16::from_le_bytes(
-        data.get(0..2)
-            .ok_or(DecodeError::PrematureEnd)?
-            .try_into()
-            .unwrap(),
+fn read_u16(data: &[u8]) -> Result<(u16, usize), DecodeError> {
+    Ok((
+        u16::from_le_bytes(
+            data.get(0..2)
+                .ok_or(DecodeError::PrematureEnd)?
+                .try_into()
+                .unwrap(),
+        ),
+        2,
     ))
 }
 
-fn read_u24(data: &[u8]) -> Result<u32, DecodeError> {
+fn read_u24(data: &[u8]) -> Result<(u32, usize), DecodeError> {
     if let &[a, b, c, ..] = data {
-        Ok(u32::from(a) | u32::from(b) << 8 | u32::from(c) << 16)
+        Ok((u32::from(a) | u32::from(b) << 8 | u32::from(c) << 16, 3))
     } else {
         Err(DecodeError::PrematureEnd)
     }
 }
 
-fn read_u32(data: &[u8]) -> Result<u32, DecodeError> {
-    Ok(u32::from_le_bytes(
-        data.get(0..4)
-            .ok_or(DecodeError::PrematureEnd)?
-            .try_into()
-            .unwrap(),
+fn read_u32(data: &[u8]) -> Result<(u32, usize), DecodeError> {
+    Ok((
+        u32::from_le_bytes(
+            data.get(0..4)
+                .ok_or(DecodeError::PrematureEnd)?
+                .try_into()
+                .unwrap(),
+        ),
+        4,
     ))
 }
 
-fn read_i16(data: &[u8]) -> Result<i16, DecodeError> {
-    Ok(i16::from_le_bytes(
-        data.get(0..2)
-            .ok_or(DecodeError::PrematureEnd)?
-            .try_into()
-            .unwrap(),
+fn read_i16(data: &[u8]) -> Result<(i16, usize), DecodeError> {
+    Ok((
+        i16::from_le_bytes(
+            data.get(0..2)
+                .ok_or(DecodeError::PrematureEnd)?
+                .try_into()
+                .unwrap(),
+        ),
+        2,
     ))
 }
 
@@ -300,6 +312,18 @@ mod tests {
                 encrypted: false,
                 trigger_based: false,
                 elements: vec![Element::TemperatureSmall(2500)],
+            }
+        );
+    }
+
+    #[test]
+    fn decode_u24() {
+        assert_eq!(
+            BtHomeV2::decode(&[0x40, 0x42, 0x4e, 0x34, 0x00, 0x0a, 0x13, 0x8a, 0x14]).unwrap(),
+            BtHomeV2 {
+                encrypted: false,
+                trigger_based: false,
+                elements: vec![Element::Duration(13390), Element::Energy(1346067)],
             }
         );
     }
