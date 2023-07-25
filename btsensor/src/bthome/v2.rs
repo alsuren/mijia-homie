@@ -1,7 +1,10 @@
 //! Support for the [BTHome](https://bthome.io/) v2 format.
 
 use bluez_async::uuid_from_u16;
-use std::fmt::{self, Display, Formatter};
+use std::{
+    fmt::{self, Display, Formatter},
+    mem::size_of,
+};
 use thiserror::Error;
 use uuid::Uuid;
 
@@ -55,140 +58,86 @@ impl BtHomeV2 {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum Element {
-    Acceleration(u16),
-    Battery(u8),
-    Co2(u16),
-    Count8(u8),
-    Count16(u16),
-    Count32(u32),
-    Current(u16),
-    Dewpoint(i16),
-    DistanceMm(u16),
-    DistanceM(u16),
-    Duration(u32),
-    Energy(u32),
-    Gas(u32),
-    Gyroscope(u16),
-    Humidity(u16),
-    HumidityShort(u8),
-    Illuminance(u32),
-    MassKg(u16),
-    MassLb(u16),
-    Moisture(u16),
-    MoistureShort(u8),
-    Pm2_5(u16),
-    Pm10(u16),
-    Power(u32),
-    Pressure(u32),
-    Rotation(i16),
-    Speed(u16),
-    Temperature(i16),
-    TemperatureSmall(i16),
-    Timestamp(u32),
-    Tvoc(u16),
-    VoltageSmall(u16),
-    Voltage(u16),
-    VolumeLong(u32),
-    Volume(u16),
-    VolumeMl(u16),
-    FlowRate(u16),
-    UvIndex(u8),
-    Water(u32),
+macro_rules! generate_element {
+    [$({$object_id:literal, $name:ident, $type:ty, $reader:ident, $display_name:literal, $unit:literal},)*] => {
+        #[derive(Clone, Debug, Eq, PartialEq)]
+        pub enum Element {
+            $( $name($type), )*
+        }
+
+        impl Element {
+            pub fn name(&self) -> &'static str {
+                match self {
+                    $( Self::$name(_) => $display_name, )*
+                }
+            }
+
+            pub fn unit(&self) -> &'static str {
+                match self {
+                    $( Self::$name(_) => $unit, )*
+                }
+            }
+
+            fn decode(data: &[u8]) -> Result<(usize, Self), DecodeError> {
+                let object_id = data[0];
+                let remaining = &data[1..];
+                match object_id {
+                    0x0a => Ok((4, Self::Energy(read_u24(remaining)?))),
+                    0x4b => Ok((4, Self::Gas(read_u24(remaining)?))),
+                    $( $object_id => Ok((
+                        size_of::<$type>() + 1,
+                        Self::$name($reader(remaining)?),
+                    )), )*
+                    object_id => Err(DecodeError::InvalidProperty(object_id)),
+                }
+            }
+        }
+    };
 }
 
+generate_element![
+    { 0x51, Acceleration, u16, read_u16, "acceleration", "m/s²" },
+    { 0x01, Battery, u8, read_u8, "battery", "%"},
+    { 0x12, Co2, u16, read_u16, "CO2", "ppm"},
+    { 0x09, Count8, u8, read_u8, "count", ""},
+    { 0x3d, Count16, u16, read_u16, "count", ""},
+    { 0x3e, Count32, u32, read_u32, "count", ""},
+    { 0x43, Current, u16, read_u16, "current", "A"},
+    { 0x08, Dewpoint, i16, read_i16, "dewpoint", "°C"},
+    { 0x40, DistanceMm, u16, read_u16, "distance", "mm"},
+    { 0x41, DistanceM, u16, read_u16, "distance", "m"},
+    { 0x42, Duration, u32, read_u24, "duration", "s"},
+    { 0x4d, Energy, u32, read_u32, "energy", "kWh"},
+    { 0x4c, Gas, u32, read_u32, "gas", "m3"},
+    { 0x52, Gyroscope, u16, read_u16, "gyroscope", "°/s"},
+    { 0x03, Humidity, u16, read_u16, "humidity", "%"},
+    { 0x2e, HumidityShort, u8, read_u8, "humidity", "%"},
+    { 0x05, Illuminance, u32, read_u24, "illuminance", "lux"},
+    { 0x06, MassKg, u16, read_u16, "mass", "kg"},
+    { 0x07, MassLb, u16, read_u16, "mass", "lb"},
+    { 0x14, Moisture, u16, read_u16, "moisture", "%"},
+    { 0x2f, MoistureShort, u8, read_u8, "moisture", "%"},
+    { 0x0d, Pm2_5, u16, read_u16, "pm2.5", "ug/m3"},
+    { 0x0e, Pm10, u16, read_u16, "pm10", "ug/m3"},
+    { 0x0b, Power, u32, read_u24, "power", "W"},
+    { 0x04, Pressure, u32, read_u24, "pressure", "hPa"},
+    { 0x3f, Rotation, i16, read_i16, "rotation", "°"},
+    { 0x44, Speed, u16, read_u16, "speed", "m/s"},
+    { 0x45, Temperature, i16, read_i16, "temperature", "°C"},
+    { 0x02, TemperatureSmall, i16, read_i16, "temperature", "°C"},
+    { 0x50, Timestamp, u32, read_u32, "timestamp", ""},
+    { 0x13, Tvoc, u16, read_u16, "tvoc", "ug/m3"},
+    { 0x0c, VoltageSmall, u16, read_u16, "voltage", "V"},
+    { 0x4a, Voltage, u16, read_u16, "voltage", "V"},
+    { 0x4e, VolumeLong, u32, read_u32, "volume", "L"},
+    { 0x47, Volume, u16, read_u16, "volume", "L"},
+    { 0x48, VolumeMl, u16, read_u16, "volume", "mL"},
+    { 0x49, FlowRate, u16, read_u16, "volume flow rate", "m3/hr"},
+    { 0x46, UvIndex, u8, read_u8, "UV index", ""},
+    { 0x4f, Water, u32, read_u32, "water", "L"},
+];
+
 impl Element {
-    fn decode(data: &[u8]) -> Result<(usize, Self), DecodeError> {
-        let object_id = data[0];
-        let remaining = &data[1..];
-        match object_id {
-            0x51 => Ok((3, Self::Acceleration(read_u16(remaining)?))),
-            0x01 => Ok((2, Self::Battery(read_u8(remaining)?))),
-            0x12 => Ok((3, Self::Co2(read_u16(remaining)?))),
-            0x09 => Ok((2, Self::Count8(read_u8(remaining)?))),
-            0x3d => Ok((3, Self::Count16(read_u16(remaining)?))),
-            0x3e => Ok((5, Self::Count32(read_u32(remaining)?))),
-            0x43 => Ok((3, Self::Current(read_u16(remaining)?))),
-            0x08 => Ok((3, Self::Dewpoint(read_i16(remaining)?))),
-            0x40 => Ok((3, Self::DistanceMm(read_u16(remaining)?))),
-            0x41 => Ok((3, Self::DistanceM(read_u16(remaining)?))),
-            0x02 => Ok((3, Self::TemperatureSmall(read_i16(remaining)?))),
-            object_id => Err(DecodeError::InvalidProperty(object_id)),
-        }
-    }
-
-    pub fn name(&self) -> &'static str {
-        match self {
-            Self::Acceleration(_) => "acceleration",
-            Self::Battery(_) => "battery",
-            Self::Co2(_) => "CO2",
-            Self::Count8(_) | Self::Count16(_) | Self::Count32(_) => "count",
-            Self::Current(_) => "current",
-            Self::Dewpoint(_) => "dewpoint",
-            Self::DistanceMm(_) | Self::DistanceM(_) => "distance",
-            Self::Duration(_) => "duration",
-            Self::Energy(_) => "energy",
-            Self::Gas(_) => "gas",
-            Self::Gyroscope(_) => "gyroscope",
-            Self::Humidity(_) | Self::HumidityShort(_) => "humidity",
-            Self::Illuminance(_) => "illuminance",
-            Self::MassKg(_) | Self::MassLb(_) => "mass",
-            Self::Moisture(_) | Self::MoistureShort(_) => "moisture",
-            Self::Pm2_5(_) => "pm2.5",
-            Self::Pm10(_) => "pm10",
-            Self::Power(_) => "power",
-            Self::Pressure(_) => "pressure",
-            Self::Rotation(_) => "rotation",
-            Self::Speed(_) => "speed",
-            Self::Temperature(_) | Self::TemperatureSmall(_) => "temperature",
-            Self::Timestamp(_) => "timestamp",
-            Self::Tvoc(_) => "tvoc",
-            Self::VoltageSmall(_) | Self::Voltage(_) => "voltage",
-            Self::VolumeLong(_) | Self::Volume(_) | Self::VolumeMl(_) => "volume",
-            Self::FlowRate(_) => "volume flow rate",
-            Self::UvIndex(_) => "UV index",
-            Self::Water(_) => "water",
-        }
-    }
-
-    pub fn unit(&self) -> &'static str {
-        match self {
-            Self::Acceleration(_) => "m/s²",
-            Self::Battery(_)
-            | Self::Humidity(_)
-            | Self::HumidityShort(_)
-            | Self::Moisture(_)
-            | Self::MoistureShort(_) => "%",
-            Self::Co2(_) => "ppm",
-            Self::Count8(_)
-            | Self::Count16(_)
-            | Self::Count32(_)
-            | Self::Timestamp(_)
-            | Self::UvIndex(_) => "",
-            Self::Current(_) => "A",
-            Self::Dewpoint(_) | Self::Temperature(_) | Self::TemperatureSmall(_) => "°C",
-            Self::DistanceMm(_) => "mm",
-            Self::DistanceM(_) => "m",
-            Self::Duration(_) => "s",
-            Self::Energy(_) => "kWh",
-            Self::Gas(_) => "m3",
-            Self::Gyroscope(_) => "°/s",
-            Self::Illuminance(_) => "lux",
-            Self::MassKg(_) => "kg",
-            Self::MassLb(_) => "lb",
-            Self::Pm2_5(_) | Self::Pm10(_) | Self::Tvoc(_) => "ug/m3",
-            Self::Power(_) => "W",
-            Self::Pressure(_) => "hPa",
-            Self::Rotation(_) => "°",
-            Self::Speed(_) => "m/s",
-            Self::VoltageSmall(_) | Self::Voltage(_) => "V",
-            Self::VolumeLong(_) | Self::Volume(_) | Self::Water(_) => "L",
-            Self::VolumeMl(_) => "mL",
-            Self::FlowRate(_) => "m3/hr",
-        }
-    }
-
     pub fn value_int(&self) -> Option<i64> {
         match self {
             &Self::Battery(value) => Some(value.into()),
@@ -256,6 +205,14 @@ fn read_u16(data: &[u8]) -> Result<u16, DecodeError> {
             .try_into()
             .unwrap(),
     ))
+}
+
+fn read_u24(data: &[u8]) -> Result<u32, DecodeError> {
+    if let &[a, b, c, ..] = data {
+        Ok(u32::from(a) | u32::from(b) << 8 | u32::from(c) << 16)
+    } else {
+        Err(DecodeError::PrematureEnd)
+    }
 }
 
 fn read_u32(data: &[u8]) -> Result<u32, DecodeError> {
