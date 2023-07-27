@@ -1,8 +1,8 @@
 //! Support for the [BTHome](https://bthome.io/) v2 format.
 
+use super::DecodeError;
 use bluez_async::uuid_from_u16;
 use std::fmt::{self, Display, Formatter};
-use thiserror::Error;
 use uuid::Uuid;
 
 pub const UUID: Uuid = uuid_from_u16(0xfcd2);
@@ -11,18 +11,6 @@ const DEVICE_INFO_ENCRYPTED: u8 = 0x01;
 const DEVICE_INFO_TRIGGER_BASED: u8 = 0x04;
 const DEVICE_INFO_VERSION_MASK: u8 = 0xe0;
 const DEVICE_INFO_VERSION_OFFSET: usize = 5;
-
-#[derive(Clone, Debug, Error, Eq, PartialEq)]
-pub enum DecodeError {
-    #[error("Unsupported BTHome version {0}")]
-    UnsupportedVersion(u8),
-    #[error("Invalid property {0:#04x}")]
-    InvalidProperty(u8),
-    #[error("Premature end of data")]
-    PrematureEnd,
-    #[error("Invalid boolean value {0:#04x}")]
-    InvalidBooleanValue(u8),
-}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct BtHomeV2 {

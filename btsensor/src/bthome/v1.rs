@@ -1,30 +1,14 @@
 //! Support for the [BTHome](https://bthome.io/) v1 format.
 
 use super::events::{ButtonEventType, DimmerEventType, Event};
+use super::DecodeError;
 use bluez_async::uuid_from_u16;
 use num_enum::IntoPrimitive;
 use std::fmt::{self, Display, Formatter};
-use thiserror::Error;
 use uuid::Uuid;
 
 pub const UNENCRYPTED_UUID: Uuid = uuid_from_u16(0x181c);
 pub const ENCRYPTED_UUID: Uuid = uuid_from_u16(0x181e);
-
-#[derive(Clone, Debug, Error, Eq, PartialEq)]
-pub enum DecodeError {
-    #[error("Invalid data type {0:#03x}")]
-    InvalidDataType(u8),
-    #[error("Invalid property {0:#04x}")]
-    InvalidProperty(u8),
-    #[error("Premature end of data")]
-    PrematureEnd,
-    #[error("Extra data {0:?}")]
-    ExtraData(Vec<u8>),
-    #[error("Unsupported format {0:?}")]
-    UnsupportedFormat(DataType),
-    #[error("Invalid event type {0:#04x}")]
-    InvalidEventType(u8),
-}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Element {
