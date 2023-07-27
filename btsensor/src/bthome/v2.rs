@@ -20,6 +20,8 @@ pub enum DecodeError {
     InvalidProperty(u8),
     #[error("Premature end of data")]
     PrematureEnd,
+    #[error("Invalid boolean value {0:#04x}")]
+    InvalidBooleanValue(u8),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -138,9 +140,72 @@ generate_element![
     { 0x49, FlowRate, u16, read_u16, "volume flow rate", "m3/hr"},
     { 0x46, UvIndex, u8, read_u8, "UV index", ""},
     { 0x4f, Water, u32, read_u32, "water", "L"},
+    { 0x15, BatteryLow, bool, read_bool, "battery low", ""},
+    { 0x16, BatteryCharging, bool, read_bool, "battery charging", ""},
+    { 0x17, CarbonMonoxideDetected, bool, read_bool, "carbon monoxide detected", "" },
+    { 0x18, Cold, bool, read_bool, "cold", "" },
+    { 0x19, Connected, bool, read_bool, "connected", "" },
+    { 0x1a, DoorOpen, bool, read_bool, "door open", "" },
+    { 0x1b, GarageDoorOpen, bool, read_bool, "garade door open", "" },
+    { 0x1c, GasDetected, bool, read_bool, "gas detected", "" },
+    { 0x0f, GenericBoolean, bool, read_bool, "generic boolean", "" },
+    { 0x1d, Hot, bool, read_bool, "hot", "" },
+    { 0x1e, LightDetected, bool, read_bool, "light detected", "" },
+    { 0x1f, Unlocked, bool, read_bool, "unlocked", "" },
+    { 0x20, Wet, bool, read_bool, "wet", "" },
+    { 0x21, MotionDetected, bool, read_bool, "motion detected", "" },
+    { 0x22, Moving, bool, read_bool, "moving", "" },
+    { 0x23, OccupancyDetected, bool, read_bool, "occupancy detected", "" },
+    { 0x11, Open, bool, read_bool, "open", "" },
+    { 0x24, Plugged, bool, read_bool, "plugged in", "" },
+    { 0x10, PowerOn, bool, read_bool, "power on", "" },
+    { 0x25, Present, bool, read_bool, "home", "" },
+    { 0x26, Problem, bool, read_bool, "problem", "" },
+    { 0x27, Running, bool, read_bool, "running", "" },
+    { 0x28, Safe, bool, read_bool, "safe", "" },
+    { 0x29, SmokeDetected, bool, read_bool, "smoke detected", "" },
+    { 0x2a, Sound, bool, read_bool, "sound detected", "" },
+    { 0x2b, Tamper, bool, read_bool, "tampered", "" },
+    { 0x2c, VibrationDetected, bool, read_bool, "vibration detected", "" },
+    { 0x2d, WindowOpen, bool, read_bool, "window open", "" },
+
 ];
 
 impl Element {
+    pub fn value_bool(&self) -> Option<bool> {
+        match self {
+            &Self::BatteryCharging(value)
+            | &Self::BatteryLow(value)
+            | &Self::CarbonMonoxideDetected(value)
+            | &Self::Cold(value)
+            | &Self::Connected(value)
+            | &Self::DoorOpen(value)
+            | &Self::GarageDoorOpen(value)
+            | &Self::GasDetected(value)
+            | &Self::GenericBoolean(value)
+            | &Self::Hot(value)
+            | &Self::LightDetected(value)
+            | &Self::Unlocked(value)
+            | &Self::Wet(value)
+            | &Self::MotionDetected(value)
+            | &Self::Moving(value)
+            | &Self::OccupancyDetected(value)
+            | &Self::Open(value)
+            | &Self::Plugged(value)
+            | &Self::PowerOn(value)
+            | &Self::Present(value)
+            | &Self::Problem(value)
+            | &Self::Running(value)
+            | &Self::Safe(value)
+            | &Self::SmokeDetected(value)
+            | &Self::Sound(value)
+            | &Self::Tamper(value)
+            | &Self::VibrationDetected(value)
+            | &Self::WindowOpen(value) => Some(value),
+            _ => None,
+        }
+    }
+
     pub fn value_int(&self) -> Option<i64> {
         match self {
             &Self::Battery(value) => Some(value.into()),
@@ -245,9 +310,21 @@ fn read_i16(data: &[u8]) -> Result<(i16, usize), DecodeError> {
     ))
 }
 
+fn read_bool(data: &[u8]) -> Result<(bool, usize), DecodeError> {
+    let (value, length) = read_u8(data)?;
+    let value = match value {
+        0x00 => false,
+        0x01 => true,
+        _ => return Err(DecodeError::InvalidBooleanValue(value)),
+    };
+    Ok((value, length))
+}
+
 impl Display for Element {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        if let Some(value) = self.value_int() {
+        if let Some(value) = self.value_bool() {
+            write!(f, "{}: {}{}", self.name(), value, self.unit())
+        } else if let Some(value) = self.value_int() {
             write!(f, "{}: {}{}", self.name(), value, self.unit())
         } else {
             write!(
@@ -329,6 +406,18 @@ mod tests {
     }
 
     #[test]
+    fn decode_bool() {
+        assert_eq!(
+            BtHomeV2::decode(&[0x40, 0x15, 0x01, 0x16, 0x00]).unwrap(),
+            BtHomeV2 {
+                encrypted: false,
+                trigger_based: false,
+                elements: vec![Element::BatteryLow(true), Element::BatteryCharging(false)],
+            }
+        );
+    }
+
+    #[test]
     fn format() {
         assert_eq!(
             BtHomeV2 {
@@ -337,10 +426,11 @@ mod tests {
                 elements: vec![
                     Element::Acceleration(22151),
                     Element::TemperatureSmall(2506),
+                    Element::BatteryCharging(true),
                 ]
             }
             .to_string(),
-            "(unencrypted) acceleration: 22.151m/s², temperature: 25.06°C"
+            "(unencrypted) acceleration: 22.151m/s², temperature: 25.06°C, battery charging: true"
         );
     }
 }
