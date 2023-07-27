@@ -1,4 +1,4 @@
-use super::{DecodeError, Property};
+use super::v1::{DecodeError, Property};
 use num_enum::IntoPrimitive;
 use std::fmt::{self, Display, Formatter};
 

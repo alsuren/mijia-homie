@@ -1,8 +1,6 @@
 //! Support for the [BTHome](https://bthome.io/) v1 format.
 
-mod events;
-
-use self::events::{ButtonEventType, DimmerEventType, Event};
+use super::events::{ButtonEventType, DimmerEventType, Event};
 use bluez_async::uuid_from_u16;
 use num_enum::IntoPrimitive;
 use std::fmt::{self, Display, Formatter};
