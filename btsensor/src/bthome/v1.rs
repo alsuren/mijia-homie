@@ -249,8 +249,8 @@ pub enum Property {
     MotionDetected = 0x21,
     Moving = 0x22,
     OccupancyDetected = 0x23,
-    Plugged = 0x24,
-    Present = 0x25,
+    PluggedIn = 0x24,
+    Home = 0x25,
     Problem = 0x26,
     Running = 0x27,
     Safe = 0x28,
@@ -311,8 +311,8 @@ impl TryFrom<u8> for Property {
             0x21 => Ok(Self::MotionDetected),
             0x22 => Ok(Self::Moving),
             0x23 => Ok(Self::OccupancyDetected),
-            0x24 => Ok(Self::Plugged),
-            0x25 => Ok(Self::Present),
+            0x24 => Ok(Self::PluggedIn),
+            0x25 => Ok(Self::Home),
             0x26 => Ok(Self::Problem),
             0x27 => Ok(Self::Running),
             0x28 => Ok(Self::Safe),
@@ -375,13 +375,13 @@ impl Property {
             Self::MotionDetected => "motion detected",
             Self::Moving => "moving",
             Self::OccupancyDetected => "occupancy detected",
-            Self::Plugged => "plugged",
-            Self::Present => "present",
+            Self::PluggedIn => "plugged in",
+            Self::Home => "home",
             Self::Problem => "problem",
             Self::Running => "running",
             Self::Safe => "safe",
             Self::SmokeDetected => "smoke detected",
-            Self::Sound => "sound",
+            Self::Sound => "sound detected",
             Self::Tamper => "tampered",
             Self::VibrationDetected => "vibration detected",
             Self::WindowOpen => "window open",
@@ -413,8 +413,8 @@ impl Property {
             | Self::MotionDetected
             | Self::Moving
             | Self::OccupancyDetected
-            | Self::Plugged
-            | Self::Present
+            | Self::PluggedIn
+            | Self::Home
             | Self::Problem
             | Self::Running
             | Self::Safe
@@ -480,8 +480,8 @@ impl Property {
             | Self::MotionDetected
             | Self::Moving
             | Self::OccupancyDetected
-            | Self::Plugged
-            | Self::Present
+            | Self::PluggedIn
+            | Self::Home
             | Self::Problem
             | Self::Running
             | Self::Safe
