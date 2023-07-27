@@ -1,5 +1,6 @@
 //! Support for the [BTHome](https://bthome.io/) v2 format.
 
+use super::events::{ButtonEventType, DimmerEventType};
 use super::DecodeError;
 use bluez_async::uuid_from_u16;
 use std::fmt::{self, Display, Formatter};
@@ -156,7 +157,8 @@ generate_element![
     { 0x2b, Tamper, bool, read_bool, "tampered", "" },
     { 0x2c, VibrationDetected, bool, read_bool, "vibration detected", "" },
     { 0x2d, WindowOpen, bool, read_bool, "window open", "" },
-
+    { 0x3a, ButtonEvent, Option<ButtonEventType>, read_button_event, "button event", "" },
+    { 0x3c, DimmerEvent, Option<DimmerEventType>, read_dimmer_event, "dimmer event", "" },
 ];
 
 impl Element {
@@ -308,6 +310,21 @@ fn read_bool(data: &[u8]) -> Result<(bool, usize), DecodeError> {
     Ok((value, length))
 }
 
+fn read_button_event(data: &[u8]) -> Result<(Option<ButtonEventType>, usize), DecodeError> {
+    let event_type = ButtonEventType::from_bytes(data.get(0..1).ok_or(DecodeError::PrematureEnd)?)?;
+    Ok((event_type, 1))
+}
+
+fn read_dimmer_event(data: &[u8]) -> Result<(Option<DimmerEventType>, usize), DecodeError> {
+    if data[0] == 0x00 {
+        Ok((None, 1))
+    } else {
+        let event_type =
+            DimmerEventType::from_bytes(data.get(0..2).ok_or(DecodeError::PrematureEnd)?)?;
+        Ok((event_type, 2))
+    }
+}
+
 impl Display for Element {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         if let Some(value) = self.value_bool() {
@@ -401,6 +418,36 @@ mod tests {
                 encrypted: false,
                 trigger_based: false,
                 elements: vec![Element::BatteryLow(true), Element::BatteryCharging(false)],
+            }
+        );
+    }
+
+    #[test]
+    fn decode_button_events() {
+        assert_eq!(
+            BtHomeV2::decode(&[0x44, 0x3a, 0x00, 0x3a, 0x05]).unwrap(),
+            BtHomeV2 {
+                encrypted: false,
+                trigger_based: true,
+                elements: vec![
+                    Element::ButtonEvent(None),
+                    Element::ButtonEvent(Some(ButtonEventType::LongDoublePress)),
+                ],
+            }
+        );
+    }
+
+    #[test]
+    fn decode_dimmer_events() {
+        assert_eq!(
+            BtHomeV2::decode(&[0x44, 0x3c, 0x00, 0x3c, 0x01, 0x03]).unwrap(),
+            BtHomeV2 {
+                encrypted: false,
+                trigger_based: true,
+                elements: vec![
+                    Element::DimmerEvent(None),
+                    Element::DimmerEvent(Some(DimmerEventType::RotateLeft(3))),
+                ],
             }
         );
     }
