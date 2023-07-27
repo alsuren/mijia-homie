@@ -1,6 +1,6 @@
 //! Support for the [BTHome](https://bthome.io/) v2 format.
 
-use super::events::{ButtonEventType, DimmerEventType};
+use super::events::{ButtonEventType, DimmerEventType, Event};
 use super::DecodeError;
 use bluez_async::uuid_from_u16;
 use std::fmt::{self, Display, Formatter};
@@ -250,6 +250,14 @@ impl Element {
             _ => None,
         }
     }
+
+    pub fn event(&self) -> Option<Event> {
+        match self {
+            &Self::ButtonEvent(event_type) => Some(Event::Button(event_type)),
+            &Self::DimmerEvent(event_type) => Some(Event::Dimmer(event_type)),
+            _ => None,
+        }
+    }
 }
 
 fn read_u8(data: &[u8]) -> Result<(u8, usize), DecodeError> {
@@ -327,7 +335,9 @@ fn read_dimmer_event(data: &[u8]) -> Result<(Option<DimmerEventType>, usize), De
 
 impl Display for Element {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        if let Some(value) = self.value_bool() {
+        if let Some(event) = self.event() {
+            event.fmt(f)
+        } else if let Some(value) = self.value_bool() {
             write!(f, "{}: {}{}", self.name(), value, self.unit())
         } else if let Some(value) = self.value_int() {
             write!(f, "{}: {}{}", self.name(), value, self.unit())
@@ -462,10 +472,13 @@ mod tests {
                     Element::Acceleration(22151),
                     Element::TemperatureSmall(2506),
                     Element::BatteryCharging(true),
+                    Element::ButtonEvent(None),
+                    Element::ButtonEvent(Some(ButtonEventType::LongDoublePress)),
+                    Element::DimmerEvent(Some(DimmerEventType::RotateLeft(3))),
                 ]
             }
             .to_string(),
-            "(unencrypted) acceleration: 22.151m/s², temperature: 25.06°C, battery charging: true"
+            "(unencrypted) acceleration: 22.151m/s², temperature: 25.06°C, battery charging: true, button: none, button: long double press, dimmer: rotate left 3 steps"
         );
     }
 }
