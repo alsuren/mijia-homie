@@ -49,7 +49,7 @@ impl Display for Reading {
         match self {
             Self::Atc(reading) => reading.fmt(f),
             Self::BtHomeV1(elements) => {
-                for (i, element) in elements.into_iter().enumerate() {
+                for (i, element) in elements.iter().enumerate() {
                     if i != 0 {
                         f.write_str(", ")?;
                     }

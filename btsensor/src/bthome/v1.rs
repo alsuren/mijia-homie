@@ -166,18 +166,18 @@ impl Value {
 
 impl From<&Value> for f64 {
     fn from(value: &Value) -> Self {
-        match value {
-            &Value::SignedInt(v) => v.into(),
-            &Value::UnsignedInt(v) => v.into(),
+        match *value {
+            Value::SignedInt(v) => v.into(),
+            Value::UnsignedInt(v) => v.into(),
         }
     }
 }
 
 impl From<&Value> for i64 {
     fn from(value: &Value) -> Self {
-        match value {
-            &Value::SignedInt(v) => v.into(),
-            &Value::UnsignedInt(v) => v.into(),
+        match *value {
+            Value::SignedInt(v) => v.into(),
+            Value::UnsignedInt(v) => v.into(),
         }
     }
 }

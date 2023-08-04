@@ -163,105 +163,105 @@ generate_element![
 
 impl Element {
     pub fn value_bool(&self) -> Option<bool> {
-        match self {
-            &Self::BatteryCharging(value)
-            | &Self::BatteryLow(value)
-            | &Self::CarbonMonoxideDetected(value)
-            | &Self::Cold(value)
-            | &Self::Connected(value)
-            | &Self::DoorOpen(value)
-            | &Self::GarageDoorOpen(value)
-            | &Self::GasDetected(value)
-            | &Self::GenericBoolean(value)
-            | &Self::Hot(value)
-            | &Self::LightDetected(value)
-            | &Self::Unlocked(value)
-            | &Self::Wet(value)
-            | &Self::MotionDetected(value)
-            | &Self::Moving(value)
-            | &Self::OccupancyDetected(value)
-            | &Self::Open(value)
-            | &Self::Plugged(value)
-            | &Self::PowerOn(value)
-            | &Self::Present(value)
-            | &Self::Problem(value)
-            | &Self::Running(value)
-            | &Self::Safe(value)
-            | &Self::SmokeDetected(value)
-            | &Self::Sound(value)
-            | &Self::Tamper(value)
-            | &Self::VibrationDetected(value)
-            | &Self::WindowOpen(value) => Some(value),
+        match *self {
+            Self::BatteryCharging(value)
+            | Self::BatteryLow(value)
+            | Self::CarbonMonoxideDetected(value)
+            | Self::Cold(value)
+            | Self::Connected(value)
+            | Self::DoorOpen(value)
+            | Self::GarageDoorOpen(value)
+            | Self::GasDetected(value)
+            | Self::GenericBoolean(value)
+            | Self::Hot(value)
+            | Self::LightDetected(value)
+            | Self::Unlocked(value)
+            | Self::Wet(value)
+            | Self::MotionDetected(value)
+            | Self::Moving(value)
+            | Self::OccupancyDetected(value)
+            | Self::Open(value)
+            | Self::Plugged(value)
+            | Self::PowerOn(value)
+            | Self::Present(value)
+            | Self::Problem(value)
+            | Self::Running(value)
+            | Self::Safe(value)
+            | Self::SmokeDetected(value)
+            | Self::Sound(value)
+            | Self::Tamper(value)
+            | Self::VibrationDetected(value)
+            | Self::WindowOpen(value) => Some(value),
             _ => None,
         }
     }
 
     pub fn value_int(&self) -> Option<i64> {
-        match self {
-            &Self::Battery(value) => Some(value.into()),
-            &Self::Co2(value) => Some(value.into()),
-            &Self::Count8(value) => Some(value.into()),
-            &Self::Count16(value) => Some(value.into()),
-            &Self::Count32(value) => Some(value.into()),
-            &Self::DistanceMm(value) => Some(value.into()),
-            &Self::HumidityShort(value) => Some(value.into()),
-            &Self::MoistureShort(value) => Some(value.into()),
-            &Self::Pm2_5(value) => Some(value.into()),
-            &Self::Pm10(value) => Some(value.into()),
-            &Self::Timestamp(value) => Some(value.into()),
-            &Self::Tvoc(value) => Some(value.into()),
-            &Self::VolumeMl(value) => Some(value.into()),
+        match *self {
+            Self::Battery(value) => Some(value.into()),
+            Self::Co2(value) => Some(value.into()),
+            Self::Count8(value) => Some(value.into()),
+            Self::Count16(value) => Some(value.into()),
+            Self::Count32(value) => Some(value.into()),
+            Self::DistanceMm(value) => Some(value.into()),
+            Self::HumidityShort(value) => Some(value.into()),
+            Self::MoistureShort(value) => Some(value.into()),
+            Self::Pm2_5(value) => Some(value.into()),
+            Self::Pm10(value) => Some(value.into()),
+            Self::Timestamp(value) => Some(value.into()),
+            Self::Tvoc(value) => Some(value.into()),
+            Self::VolumeMl(value) => Some(value.into()),
             _ => None,
         }
     }
 
     pub fn value_float(&self) -> Option<f64> {
-        match self {
-            &Self::Acceleration(value) => Some(f64::from(value) / 1000.0),
-            &Self::Current(value) => Some(f64::from(value) / 1000.0),
-            &Self::Dewpoint(value) => Some(f64::from(value) / 100.0),
-            &Self::DistanceMm(value) => Some(f64::from(value)),
-            &Self::DistanceM(value) => Some(f64::from(value) / 10.0),
-            &Self::Duration(value) => Some(f64::from(value) / 1000.0),
-            &Self::Energy(value) => Some(f64::from(value) / 1000.0),
-            &Self::Gas(value) => Some(f64::from(value) / 1000.0),
-            &Self::Gyroscope(value) => Some(f64::from(value) / 1000.0),
-            &Self::Humidity(value) => Some(f64::from(value) / 100.0),
-            &Self::HumidityShort(value) => Some(f64::from(value)),
-            &Self::Illuminance(value) => Some(f64::from(value) / 100.0),
-            &Self::MassKg(value) => Some(f64::from(value) / 100.0),
-            &Self::MassLb(value) => Some(f64::from(value) / 100.0),
-            &Self::Moisture(value) => Some(f64::from(value) / 100.0),
-            &Self::MoistureShort(value) => Some(f64::from(value)),
-            &Self::Power(value) => Some(f64::from(value) / 100.0),
-            &Self::Pressure(value) => Some(f64::from(value) / 100.0),
-            &Self::Rotation(value) => Some(f64::from(value) / 10.0),
-            &Self::Speed(value) => Some(f64::from(value) / 100.0),
-            &Self::Temperature(value) => Some(f64::from(value) / 10.0),
-            &Self::TemperatureSmall(value) => Some(f64::from(value) / 100.0),
-            &Self::VoltageSmall(value) => Some(f64::from(value) / 1000.0),
-            &Self::Voltage(value) => Some(f64::from(value) / 10.0),
-            &Self::VolumeLong(value) => Some(f64::from(value) / 1000.0),
-            &Self::Volume(value) => Some(f64::from(value) / 10.0),
-            &Self::VolumeMl(value) => Some(f64::from(value)),
-            &Self::FlowRate(value) => Some(f64::from(value) / 1000.0),
-            &Self::UvIndex(value) => Some(f64::from(value) / 10.0),
-            &Self::Water(value) => Some(f64::from(value) / 1000.0),
+        match *self {
+            Self::Acceleration(value) => Some(f64::from(value) / 1000.0),
+            Self::Current(value) => Some(f64::from(value) / 1000.0),
+            Self::Dewpoint(value) => Some(f64::from(value) / 100.0),
+            Self::DistanceMm(value) => Some(f64::from(value)),
+            Self::DistanceM(value) => Some(f64::from(value) / 10.0),
+            Self::Duration(value) => Some(f64::from(value) / 1000.0),
+            Self::Energy(value) => Some(f64::from(value) / 1000.0),
+            Self::Gas(value) => Some(f64::from(value) / 1000.0),
+            Self::Gyroscope(value) => Some(f64::from(value) / 1000.0),
+            Self::Humidity(value) => Some(f64::from(value) / 100.0),
+            Self::HumidityShort(value) => Some(f64::from(value)),
+            Self::Illuminance(value) => Some(f64::from(value) / 100.0),
+            Self::MassKg(value) => Some(f64::from(value) / 100.0),
+            Self::MassLb(value) => Some(f64::from(value) / 100.0),
+            Self::Moisture(value) => Some(f64::from(value) / 100.0),
+            Self::MoistureShort(value) => Some(f64::from(value)),
+            Self::Power(value) => Some(f64::from(value) / 100.0),
+            Self::Pressure(value) => Some(f64::from(value) / 100.0),
+            Self::Rotation(value) => Some(f64::from(value) / 10.0),
+            Self::Speed(value) => Some(f64::from(value) / 100.0),
+            Self::Temperature(value) => Some(f64::from(value) / 10.0),
+            Self::TemperatureSmall(value) => Some(f64::from(value) / 100.0),
+            Self::VoltageSmall(value) => Some(f64::from(value) / 1000.0),
+            Self::Voltage(value) => Some(f64::from(value) / 10.0),
+            Self::VolumeLong(value) => Some(f64::from(value) / 1000.0),
+            Self::Volume(value) => Some(f64::from(value) / 10.0),
+            Self::VolumeMl(value) => Some(f64::from(value)),
+            Self::FlowRate(value) => Some(f64::from(value) / 1000.0),
+            Self::UvIndex(value) => Some(f64::from(value) / 10.0),
+            Self::Water(value) => Some(f64::from(value) / 1000.0),
             _ => None,
         }
     }
 
     pub fn event(&self) -> Option<Event> {
-        match self {
-            &Self::ButtonEvent(event_type) => Some(Event::Button(event_type)),
-            &Self::DimmerEvent(event_type) => Some(Event::Dimmer(event_type)),
+        match *self {
+            Self::ButtonEvent(event_type) => Some(Event::Button(event_type)),
+            Self::DimmerEvent(event_type) => Some(Event::Dimmer(event_type)),
             _ => None,
         }
     }
 }
 
 fn read_u8(data: &[u8]) -> Result<(u8, usize), DecodeError> {
-    Ok((*data.get(0).ok_or(DecodeError::PrematureEnd)?, 1))
+    Ok((*data.first().ok_or(DecodeError::PrematureEnd)?, 1))
 }
 
 fn read_u16(data: &[u8]) -> Result<(u16, usize), DecodeError> {
