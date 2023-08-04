@@ -3,7 +3,7 @@
 use super::events::{ButtonEventType, DimmerEventType, Event};
 use super::DecodeError;
 use bluez_async::uuid_from_u16;
-use num_enum::IntoPrimitive;
+use num_enum::{IntoPrimitive, TryFromPrimitive};
 use std::fmt::{self, Display, Formatter};
 use uuid::Uuid;
 
@@ -105,7 +105,8 @@ impl Display for Sensor {
     }
 }
 
-#[derive(Copy, Clone, Debug, Eq, IntoPrimitive, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, IntoPrimitive, PartialEq, TryFromPrimitive)]
+#[num_enum(error_type(name = DecodeError, constructor = DecodeError::InvalidDataType))]
 #[repr(u8)]
 pub enum DataType {
     UnsignedInt = 0b000,
@@ -113,21 +114,6 @@ pub enum DataType {
     Float = 0b010,
     String = 0b011,
     Mac = 0b100,
-}
-
-impl TryFrom<u8> for DataType {
-    type Error = DecodeError;
-
-    fn try_from(value: u8) -> Result<Self, Self::Error> {
-        match value {
-            0b000 => Ok(Self::UnsignedInt),
-            0b001 => Ok(Self::SignedInt),
-            0b010 => Ok(Self::Float),
-            0b011 => Ok(Self::String),
-            0b100 => Ok(Self::Mac),
-            _ => Err(DecodeError::InvalidDataType(value)),
-        }
-    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -182,7 +168,8 @@ impl From<&Value> for i64 {
     }
 }
 
-#[derive(Copy, Clone, Debug, Eq, IntoPrimitive, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, IntoPrimitive, PartialEq, TryFromPrimitive)]
+#[num_enum(error_type(name = DecodeError, constructor = DecodeError::InvalidProperty))]
 #[repr(u8)]
 pub enum Property {
     // Misc data.
@@ -245,69 +232,6 @@ pub enum Property {
     // Events.
     ButtonEvent = 0x3a,
     DimmerEvent = 0x3c,
-}
-
-impl TryFrom<u8> for Property {
-    type Error = DecodeError;
-
-    fn try_from(value: u8) -> Result<Self, Self::Error> {
-        match value {
-            0x00 => Ok(Self::PacketId),
-            0x01 => Ok(Self::Battery),
-            0x02 => Ok(Self::Temperature),
-            0x03 => Ok(Self::Humidity),
-            0x2e => Ok(Self::HumidityShort),
-            0x04 => Ok(Self::Pressure),
-            0x05 => Ok(Self::Illuminance),
-            0x06 => Ok(Self::MassKg),
-            0x07 => Ok(Self::MassLb),
-            0x08 => Ok(Self::Dewpoint),
-            0x09 => Ok(Self::Count),
-            0x0a => Ok(Self::Energy),
-            0x0b => Ok(Self::Power),
-            0x0c => Ok(Self::Voltage),
-            0x0d => Ok(Self::Pm2_5),
-            0x0e => Ok(Self::Pm10),
-            0x12 => Ok(Self::Co2),
-            0x13 => Ok(Self::Tvoc),
-            0x14 => Ok(Self::Moisture),
-            0x2f => Ok(Self::MoistureShort),
-            0x50 => Ok(Self::Timestamp),
-            0x51 => Ok(Self::Acceleration),
-            0x52 => Ok(Self::Gyroscope),
-            0x0f => Ok(Self::GenericBoolean),
-            0x10 => Ok(Self::PowerOn),
-            0x11 => Ok(Self::Open),
-            0x15 => Ok(Self::BatteryLow),
-            0x16 => Ok(Self::BatteryCharging),
-            0x17 => Ok(Self::CarbonMonoxideDetected),
-            0x18 => Ok(Self::Cold),
-            0x19 => Ok(Self::Connected),
-            0x1a => Ok(Self::DoorOpen),
-            0x1b => Ok(Self::GarageDoorOpen),
-            0x1c => Ok(Self::GasDetected),
-            0x1d => Ok(Self::HeatAbnormal),
-            0x1e => Ok(Self::LightDetected),
-            0x1f => Ok(Self::Unlocked),
-            0x20 => Ok(Self::Wet),
-            0x21 => Ok(Self::MotionDetected),
-            0x22 => Ok(Self::Moving),
-            0x23 => Ok(Self::OccupancyDetected),
-            0x24 => Ok(Self::PluggedIn),
-            0x25 => Ok(Self::Home),
-            0x26 => Ok(Self::Problem),
-            0x27 => Ok(Self::Running),
-            0x28 => Ok(Self::Safe),
-            0x29 => Ok(Self::SmokeDetected),
-            0x2a => Ok(Self::Sound),
-            0x2b => Ok(Self::Tamper),
-            0x2c => Ok(Self::VibrationDetected),
-            0x2d => Ok(Self::WindowOpen),
-            0x3a => Ok(Self::ButtonEvent),
-            0x3c => Ok(Self::DimmerEvent),
-            _ => Err(DecodeError::InvalidProperty(value)),
-        }
-    }
 }
 
 impl Display for Property {
