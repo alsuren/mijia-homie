@@ -114,7 +114,7 @@ dependencies = [
  "pretty_env_logger",
  "rainbow-hat-rs",
  "rumqttc",
- "rustls 0.21.6",
+ "rustls",
  "rustls-native-certs",
  "serde",
  "serde_derive",
@@ -879,7 +879,7 @@ dependencies = [
  "log",
  "pretty_env_logger",
  "rumqttc",
- "rustls 0.21.6",
+ "rustls",
  "rustls-native-certs",
  "serde",
  "serde_derive",
@@ -961,9 +961,9 @@ checksum = "0646026eb1b3eea4cd9ba47912ea5ce9cc07713d105b1a14698f4e6433d348b7"
 dependencies = [
  "http",
  "hyper",
- "rustls 0.21.6",
+ "rustls",
  "tokio",
- "tokio-rustls 0.24.1",
+ "tokio-rustls",
 ]
 
 [[package]]
@@ -1346,7 +1346,7 @@ dependencies = [
  "mijia",
  "pretty_env_logger",
  "rumqttc",
- "rustls 0.21.6",
+ "rustls",
  "rustls-native-certs",
  "serde",
  "serde_derive",
@@ -1872,13 +1872,13 @@ dependencies = [
  "once_cell",
  "percent-encoding",
  "pin-project-lite",
- "rustls 0.21.6",
+ "rustls",
  "rustls-pemfile",
  "serde",
  "serde_json",
  "serde_urlencoded",
  "tokio",
- "tokio-rustls 0.24.1",
+ "tokio-rustls",
  "tower-service",
  "url",
  "wasm-bindgen",
@@ -1939,14 +1939,14 @@ dependencies = [
  "rustls-webpki 0.100.1",
  "thiserror",
  "tokio",
- "tokio-rustls 0.24.1",
+ "tokio-rustls",
 ]
 
 [[package]]
 name = "rumqttd"
-version = "0.13.0"
+version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "81017677ad65762559cfd1c35497a503d3d904570407117e541990eab507dc5f"
+checksum = "35b152dd2869261479475ccc60b1dc6f20236bcaad230c081db114ed70be247a"
 dependencies = [
  "axum",
  "bytes",
@@ -1957,12 +1957,13 @@ dependencies = [
  "metrics-exporter-prometheus",
  "parking_lot 0.11.2",
  "rustls-pemfile",
+ "rustls-webpki 0.100.1",
  "serde",
  "serde_json",
  "slab",
  "thiserror",
  "tokio",
- "tokio-rustls 0.23.4",
+ "tokio-rustls",
  "tracing",
  "tracing-subscriber",
  "x509-parser",
@@ -2022,18 +2023,6 @@ dependencies = [
  "libc",
  "linux-raw-sys",
  "windows-sys",
-]
-
-[[package]]
-name = "rustls"
-version = "0.20.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fff78fc74d175294f4e83b28343315ffcfb114b156f0185e9741cb5570f50e2f"
-dependencies = [
- "log",
- "ring",
- "sct",
- "webpki",
 ]
 
 [[package]]
@@ -2463,22 +2452,11 @@ dependencies = [
 
 [[package]]
 name = "tokio-rustls"
-version = "0.23.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c43ee83903113e03984cb9e5cebe6c04a5116269e900e3ddba8f068a62adda59"
-dependencies = [
- "rustls 0.20.8",
- "tokio",
- "webpki",
-]
-
-[[package]]
-name = "tokio-rustls"
 version = "0.24.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c28327cf380ac148141087fbfb9de9d7bd4e84ab5d2c28fbc911d753de8a7081"
 dependencies = [
- "rustls 0.21.6",
+ "rustls",
  "tokio",
 ]
 
