@@ -135,7 +135,7 @@ pub enum DataType {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum Value {
+enum Value {
     UnsignedInt(u32),
     SignedInt(i32),
 }
