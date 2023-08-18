@@ -6,6 +6,7 @@ use bluez_async::uuid_from_u16;
 use std::fmt::{self, Display, Formatter};
 use uuid::Uuid;
 
+/// The service data UUID used for BTHome v2 advertisements.
 pub const UUID: Uuid = uuid_from_u16(0xfcd2);
 
 const DEVICE_INFO_ENCRYPTED: u8 = 0x01;
@@ -13,14 +14,20 @@ const DEVICE_INFO_TRIGGER_BASED: u8 = 0x04;
 const DEVICE_INFO_VERSION_MASK: u8 = 0xe0;
 const DEVICE_INFO_VERSION_OFFSET: usize = 5;
 
+/// A decoded BTHome v2 advertisement.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct BtHomeV2 {
+    /// Whether the data is expected to be encrypted.
     pub encrypted: bool,
+    /// Whether the receiver should expect the device to send BLE advertisements at an irregular
+    /// interval, e.g. only when someone pushes a button.
     pub trigger_based: bool,
+    /// Sensor data and events from the device.
     pub elements: Vec<Element>,
 }
 
 impl BtHomeV2 {
+    /// Attempts to decode the given service data as a BTHome v2 advertisement.
     pub fn decode(data: &[u8]) -> Result<Self, DecodeError> {
         let device_info = data[0];
         let encrypted = device_info & DEVICE_INFO_ENCRYPTED != 0;
@@ -48,18 +55,21 @@ impl BtHomeV2 {
 
 macro_rules! generate_element {
     [$({$object_id:literal, $name:ident, $type:ty, $reader:ident, $display_name:literal, $unit:literal},)*] => {
+        /// A single element of a BTHome v2 advertisement: either a sensor reading or an event.
         #[derive(Clone, Debug, Eq, PartialEq)]
         pub enum Element {
             $( $name($type), )*
         }
 
         impl Element {
+            /// Returns the name of the property.
             pub fn name(&self) -> &'static str {
                 match self {
                     $( Self::$name(_) => $display_name, )*
                 }
             }
 
+            /// Returns the standard unit for the property.
             pub fn unit(&self) -> &'static str {
                 match self {
                     $( Self::$name(_) => $unit, )*
@@ -162,6 +172,9 @@ generate_element![
 ];
 
 impl Element {
+    /// Returns the boolean value of the reading, if it is a boolean property.
+    ///
+    /// Returns `None` if it is an event, floating-point or integer property.
     pub fn value_bool(&self) -> Option<bool> {
         match *self {
             Self::BatteryCharging(value)
@@ -196,6 +209,9 @@ impl Element {
         }
     }
 
+    /// Returns the integer value of the reading, if it is for a property with no scaling factor.
+    ///
+    /// Returns `None` if it is an event, floating-point or boolean property.
     pub fn value_int(&self) -> Option<i64> {
         match *self {
             Self::Battery(value) => Some(value.into()),
@@ -215,6 +231,10 @@ impl Element {
         }
     }
 
+    /// Returns the value of the reading as a floating-point number, properly scaled according to
+    /// the property it is for.
+    ///
+    /// Returns `None` if it is an event, integer or boolean property.
     pub fn value_float(&self) -> Option<f64> {
         match *self {
             Self::Acceleration(value) => Some(f64::from(value) / 1000.0),
@@ -251,6 +271,9 @@ impl Element {
         }
     }
 
+    /// Returns the event, if the element is one.
+    ///
+    /// Returns `None` if it is a sensor value property.
     pub fn event(&self) -> Option<Event> {
         match *self {
             Self::ButtonEvent(event_type) => Some(Event::Button(event_type)),

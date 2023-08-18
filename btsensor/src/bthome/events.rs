@@ -1,7 +1,10 @@
+//! Types related to BTHome events, shared between both v1 and v2.
+
 use super::{v1::Property, DecodeError};
 use num_enum::IntoPrimitive;
 use std::fmt::{self, Display, Formatter};
 
+/// The particular type of a button event, indicating how the button was pressed.
 #[derive(Copy, Clone, Debug, Eq, IntoPrimitive, PartialEq)]
 #[repr(u8)]
 pub enum ButtonEventType {
@@ -29,6 +32,7 @@ impl ButtonEventType {
         }
     }
 
+    /// Returns a string describing how the button was pressed.
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Press => "press",
@@ -47,6 +51,7 @@ impl Display for ButtonEventType {
     }
 }
 
+/// Details of a dimmer event, including which direction it was rotated and by how many steps.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum DimmerEventType {
     RotateLeft(u8),
@@ -75,6 +80,7 @@ impl Display for DimmerEventType {
     }
 }
 
+/// A BTHome event.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Event {
     Button(Option<ButtonEventType>),
@@ -82,6 +88,7 @@ pub enum Event {
 }
 
 impl Event {
+    /// The BTHome v1 property for the event.
     pub fn property(&self) -> Property {
         match self {
             Self::Button(_) => Property::ButtonEvent,

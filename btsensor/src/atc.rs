@@ -9,8 +9,10 @@ use uuid::Uuid;
 /// GATT service 0x181a, environmental sensing.
 pub const UUID: Uuid = uuid_from_u16(0x181a);
 
+/// A sensor reading in the atc1411 or pvvx custom format.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum SensorReading {
+    /// [atc1441 format](https://github.com/atc1441/ATC_MiThermometer#advertising-format-of-the-custom-firmware)
     Atc {
         mac: [u8; 6],
         temperature: i16,
@@ -19,6 +21,7 @@ pub enum SensorReading {
         battery_mv: u16,
         packet_counter: u8,
     },
+    /// [pvvx custom format](https://github.com/pvvx/ATC_MiThermometer#custom-format-all-data-little-endian)
     Pvvx {
         mac: [u8; 6],
         temperature: i16,
@@ -86,6 +89,10 @@ impl Display for SensorReading {
 }
 
 impl SensorReading {
+    /// Tries to decode the given bytestring (from service data with UUID [`UUID`] of a BLE
+    /// advertisement) as a sensor reading.
+    ///
+    /// Returns `None` if it is not a recognised format.
     pub fn decode(data: &[u8]) -> Option<Self> {
         match data.len() {
             13 => {
@@ -119,6 +126,8 @@ impl SensorReading {
         }
     }
 
+    /// Encodes the given sensor reading to be sent in a BLE advertisement, as service data for UUID
+    /// [`UUID`].
     pub fn encode(&self) -> Vec<u8> {
         match self {
             Self::Atc {

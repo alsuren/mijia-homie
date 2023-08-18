@@ -7,9 +7,13 @@ use num_enum::{IntoPrimitive, TryFromPrimitive};
 use std::fmt::{self, Display, Formatter};
 use uuid::Uuid;
 
+/// The service data UUID used for unencrypted BTHome v1 advertisements.
 pub const UNENCRYPTED_UUID: Uuid = uuid_from_u16(0x181c);
+
+/// The service data UUID used for encrypted BTHome v1 advertisements.
 pub const ENCRYPTED_UUID: Uuid = uuid_from_u16(0x181e);
 
+/// A single element of a BTHome v1 advertisement: either a sensor reading or an event.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Element {
     Sensor(Sensor),
@@ -17,6 +21,8 @@ pub enum Element {
 }
 
 impl Element {
+    /// Constructs a new sensor reading element for the given property, with an unsigned integer
+    /// value.
     pub fn new_unsigned(property: Property, value: u32) -> Self {
         Self::Sensor(Sensor {
             property,
@@ -24,6 +30,7 @@ impl Element {
         })
     }
 
+    /// Constructs a new sensor reading element for the given property, with a signed integer value.
     pub fn new_signed(property: Property, value: i32) -> Self {
         Self::Sensor(Sensor {
             property,
@@ -31,6 +38,7 @@ impl Element {
         })
     }
 
+    /// Constructs a new element for the given event.
     pub fn new_event(event: Event) -> Self {
         Self::Event(event)
     }
@@ -63,17 +71,27 @@ impl Display for Element {
     }
 }
 
+/// A sensor reading from a device.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Sensor {
+    /// The property for which the reading is taken. This implies the unit and scale.
     pub property: Property,
+    /// The raw value of the reading as sent by the device, before the scaling factor for the
+    /// property is applied.
     value: Value,
 }
 
 impl Sensor {
+    /// Returns the value of the reading as a floating-point number, properly scaled according to
+    /// the property it is for.
     pub fn float_value(&self) -> f64 {
         f64::from(&self.value) / 10.0f64.powi(self.property.decimal_point())
     }
 
+    /// Returns the integer value of the reading, if it is for a property with no scaling factor.
+    ///
+    /// Returns `None` if the property has a scaling factor meaning that the value may not be an
+    /// integer.
     pub fn int_value(&self) -> Option<i64> {
         if self.property.decimal_point() == 0 {
             Some((&self.value).into())
@@ -168,6 +186,10 @@ impl From<&Value> for i64 {
     }
 }
 
+/// A BTHome v1 property type.
+///
+/// Each property type has an associated unit and scale defined by the
+/// standard.
 #[derive(Copy, Clone, Debug, Eq, IntoPrimitive, PartialEq, TryFromPrimitive)]
 #[num_enum(error_type(name = DecodeError, constructor = DecodeError::InvalidProperty))]
 #[repr(u8)]
@@ -241,6 +263,7 @@ impl Display for Property {
 }
 
 impl Property {
+    /// Returns the name of the property.
     pub fn name(self) -> &'static str {
         match self {
             Self::PacketId => "packet ID",
@@ -296,6 +319,7 @@ impl Property {
         }
     }
 
+    /// Returns the standard unit for the property.
     pub fn unit(self) -> &'static str {
         match self {
             Self::PacketId
@@ -412,6 +436,7 @@ impl Property {
     }
 }
 
+/// Attempts to decode the given service data as a BTHome v1 advertisement.
 pub fn decode(mut data: &[u8]) -> Result<Vec<Element>, DecodeError> {
     let mut elements = Vec::new();
 

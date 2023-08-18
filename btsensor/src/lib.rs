@@ -1,4 +1,8 @@
 //! A library for decoding sensor readings from BLE advertisements.
+//!
+//! This supports [BTHome](https://bthome.io/) (v1 and v2), the
+//! [atc1441 format](https://github.com/atc1441/ATC_MiThermometer#advertising-format-of-the-custom-firmware),
+//! and the [pvvx custom format](https://github.com/pvvx/ATC_MiThermometer#custom-format-all-data-little-endian).
 
 pub mod atc;
 pub mod bthome;
@@ -12,6 +16,7 @@ use std::{
 };
 use uuid::Uuid;
 
+/// A reading from some BLE sensor advertisement.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Reading {
     Atc(SensorReading),
@@ -20,6 +25,14 @@ pub enum Reading {
 }
 
 impl Reading {
+    /// Attempts to decode any relevant entries in the given service data map as either atc1441
+    /// format, pvvx custom format, or BTHome (v1 or v2).
+    ///
+    /// If UUIDs are present for more than one of the above formats then only the first valid one is
+    /// returned.
+    ///
+    /// Returns `None` if none of the UUIDs for the above formats are present, or there is an error
+    /// decoding them.
     pub fn decode(service_data: &HashMap<Uuid, Vec<u8>>) -> Option<Self> {
         if let Some(data) = service_data.get(&atc::UUID) {
             if let Some(reading) = atc::SensorReading::decode(data) {
