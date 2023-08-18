@@ -1350,6 +1350,7 @@ name = "mijia-homie"
 version = "0.2.6"
 dependencies = [
  "backoff",
+ "btsensor",
  "color-backtrace",
  "eyre",
  "futures",

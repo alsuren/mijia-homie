@@ -5,12 +5,17 @@ mod config;
 use crate::config::{get_mqtt_options, read_sensor_names, Config};
 use backoff::future::retry;
 use backoff::ExponentialBackoff;
+use btsensor::bthome::{self, v1::Element};
+use btsensor::Reading;
 use eyre::{eyre, Report};
 use futures::stream::StreamExt;
 use futures::TryFutureExt;
 use homie_device::{HomieDevice, Node, Property};
 use itertools::Itertools;
-use mijia::bluetooth::{BluetoothError, BluetoothSession, DeviceId, MacAddress};
+use log::info;
+use mijia::bluetooth::{
+    BluetoothError, BluetoothEvent, BluetoothSession, DeviceEvent, DeviceId, MacAddress,
+};
 use mijia::{MijiaEvent, MijiaSession, Readings, SensorProps};
 use stable_eyre::eyre;
 use stable_eyre::eyre::WrapErr;
@@ -81,6 +86,8 @@ enum ConnectionStatus {
     MarkedDisconnected,
     /// Connected and subscribed to updates
     Connected { id: DeviceId },
+    /// This sensor gives updates by advertisements only, there is no need to connect.
+    AdvertisementOnly,
 }
 
 #[derive(Debug, Clone)]
@@ -101,7 +108,11 @@ impl Sensor {
     const PROPERTY_ID_HUMIDITY: &'static str = "humidity";
     const PROPERTY_ID_BATTERY: &'static str = "battery";
 
-    pub fn new(props: SensorProps, sensor_names: &HashMap<MacAddress, String>) -> Self {
+    pub fn new(
+        props: SensorProps,
+        sensor_names: &HashMap<MacAddress, String>,
+        connection_status: ConnectionStatus,
+    ) -> Self {
         let name = sensor_names
             .get(&props.mac_address)
             .cloned()
@@ -113,7 +124,7 @@ impl Sensor {
             // This should really be something like Instant::MIN, but there is no such constant so
             // one hour in the past should be more than enough.
             last_sent_timestamp: Instant::now() - Duration::from_secs(3600),
-            connection_status: ConnectionStatus::Unknown,
+            connection_status,
             ids: vec![props.id],
         }
     }
@@ -196,6 +207,121 @@ impl Sensor {
         Ok(())
     }
 
+    async fn publish_reading(
+        &mut self,
+        homie: &HomieDevice,
+        reading: &Reading,
+        min_update_period: Duration,
+    ) -> Result<(), eyre::Report> {
+        println!("{} {} ({})", self.mac_address, reading, self.name);
+        let now = Instant::now();
+        self.last_update_timestamp = now;
+
+        if now > self.last_sent_timestamp + min_update_period {
+            let node_id = self.node_id();
+            match reading {
+                Reading::Atc(atc) => {
+                    homie
+                        .publish_value(
+                            &node_id,
+                            Self::PROPERTY_ID_TEMPERATURE,
+                            format!("{:.2}", atc.temperature()),
+                        )
+                        .await?;
+                    homie
+                        .publish_value(&node_id, Self::PROPERTY_ID_HUMIDITY, atc.humidity() as i64)
+                        .await?;
+                    homie
+                        .publish_value(&node_id, Self::PROPERTY_ID_BATTERY, atc.battery_percent())
+                        .await?;
+                }
+                Reading::BtHomeV1(elements) => {
+                    // TODO: Generate Homie properties based on elements.
+                    for element in elements {
+                        if let Element::Sensor(sensor) = element {
+                            match sensor.property {
+                                bthome::v1::Property::Temperature => {
+                                    homie
+                                        .publish_value(
+                                            &node_id,
+                                            Self::PROPERTY_ID_TEMPERATURE,
+                                            format!("{:.2}", sensor.value_float()),
+                                        )
+                                        .await?;
+                                }
+                                bthome::v1::Property::Humidity
+                                | bthome::v1::Property::HumidityShort => {
+                                    homie
+                                        .publish_value(
+                                            &node_id,
+                                            Self::PROPERTY_ID_HUMIDITY,
+                                            sensor.value_float() as i64,
+                                        )
+                                        .await?;
+                                }
+                                bthome::v1::Property::Battery => {
+                                    if let Some(value) = sensor.value_int() {
+                                        homie
+                                            .publish_value(
+                                                &node_id,
+                                                Self::PROPERTY_ID_BATTERY,
+                                                value,
+                                            )
+                                            .await?;
+                                    }
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+                }
+                Reading::BtHomeV2(bthome) => {
+                    // TODO: Generate Homie properties based on elements.
+                    for element in &bthome.elements {
+                        match element.name() {
+                            "temperature" => {
+                                homie
+                                    .publish_value(
+                                        &node_id,
+                                        Self::PROPERTY_ID_TEMPERATURE,
+                                        format!("{:.2}", element.value_float().unwrap()),
+                                    )
+                                    .await?;
+                            }
+                            "humidity" => {
+                                homie
+                                    .publish_value(
+                                        &node_id,
+                                        Self::PROPERTY_ID_HUMIDITY,
+                                        element.value_float().unwrap() as i64,
+                                    )
+                                    .await?;
+                            }
+                            "battery" => {
+                                homie
+                                    .publish_value(
+                                        &node_id,
+                                        Self::PROPERTY_ID_BATTERY,
+                                        element.value_int().unwrap(),
+                                    )
+                                    .await?;
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+            }
+            self.last_sent_timestamp = now;
+        } else {
+            log::trace!(
+                "Not sending, as last update sent {} seconds ago.",
+                (now - self.last_sent_timestamp).as_secs()
+            );
+        }
+
+        Ok(())
+    }
+
     async fn mark_connected(
         &mut self,
         homie: &mut HomieDevice,
@@ -204,6 +330,16 @@ impl Sensor {
         assert!(self.ids.contains(&id));
         homie.add_node(self.as_node()).await?;
         self.connection_status = ConnectionStatus::Connected { id };
+        Ok(())
+    }
+
+    /// Adds a Homie node for an advertisement-only sensor.
+    async fn publish_advertisement_only(
+        &mut self,
+        homie: &mut HomieDevice,
+    ) -> Result<(), eyre::Report> {
+        assert_eq!(self.connection_status, ConnectionStatus::AdvertisementOnly);
+        homie.add_node(self.as_node()).await?;
         Ok(())
     }
 }
@@ -223,8 +359,15 @@ async fn run_sensor_system(
     }));
 
     let connection_loop_handle = bluetooth_connection_loop(state.clone(), session, sensor_names);
-    let event_loop_handle = service_bluetooth_event_queue(state.clone(), session);
-    try_join!(connection_loop_handle, event_loop_handle).map(|((), ())| ())
+    let mijia_event_loop_handle = service_mijia_event_queue(state.clone(), session);
+    let advertisement_event_loop_handle =
+        service_bluetooth_event_queue(state.clone(), &session.bt_session, &sensor_names);
+    try_join!(
+        connection_loop_handle,
+        mijia_event_loop_handle,
+        advertisement_event_loop_handle
+    )
+    .map(|((), (), ())| ())
 }
 
 async fn bluetooth_connection_loop(
@@ -283,6 +426,40 @@ struct SensorState {
     min_update_period: Duration,
 }
 
+impl SensorState {
+    /// Adds the given sensor to the list of sensors, if it's in `sensor_names` but not already
+    /// present.
+    ///
+    /// If it's already present with a different ID, adds this ID.
+    ///
+    /// Returns true if the sensor was added to list of sensors, or false if it was already there or
+    /// doesn't have a name.
+    fn add_sensor_if_named(
+        &mut self,
+        sensor_names: &HashMap<MacAddress, String>,
+        props: SensorProps,
+        connection_status: ConnectionStatus,
+    ) -> bool {
+        if sensor_names.contains_key(&props.mac_address) {
+            if let Some(sensor) = self.sensors.get_mut(&props.mac_address) {
+                if !sensor.ids.contains(&props.id) {
+                    // If we already know about the sensor but on a different Bluetooth adapter, add
+                    // this one too.
+                    sensor.ids.push(props.id);
+                }
+                false
+            } else {
+                // If we don't know about the sensor on any adapter, add it.
+                let sensor = Sensor::new(props, sensor_names, connection_status);
+                self.sensors.insert(sensor.mac_address, sensor);
+                true
+            }
+        } else {
+            false
+        }
+    }
+}
+
 /// Get the sensor entry for the given id, if any.
 fn get_mut_sensor_by_id<'a>(
     sensors: &'a mut HashMap<MacAddress, Sensor>,
@@ -312,6 +489,8 @@ async fn action_sensor(
             check_for_stale_sensor(state, session, mac_address, &id).await?;
             Ok(())
         }
+        // TODO: Should we forget about these sensors if we don't see them for a while?
+        ConnectionStatus::AdvertisementOnly => Ok(()),
     }
 }
 
@@ -325,19 +504,7 @@ async fn check_for_sensors(
     let sensors = session.get_sensors().await?;
     let state = &mut *state.lock().await;
     for props in sensors {
-        if sensor_names.contains_key(&props.mac_address) {
-            if let Some(sensor) = state.sensors.get_mut(&props.mac_address) {
-                if !sensor.ids.contains(&props.id) {
-                    // If we already know about the sensor but on a different Bluetooth adapter, add
-                    // this one too.
-                    sensor.ids.push(props.id);
-                }
-            } else {
-                // If we don't know about the sensor on any adapter, add it.
-                let sensor = Sensor::new(props, sensor_names);
-                state.sensors.insert(sensor.mac_address, sensor);
-            }
-        }
+        state.add_sensor_if_named(sensor_names, props, ConnectionStatus::Unknown);
     }
     Ok(())
 }
@@ -456,7 +623,23 @@ async fn check_for_stale_sensor(
     Ok(())
 }
 
+/// Waits for and handles advertisements from sensors.
 async fn service_bluetooth_event_queue(
+    state: Arc<Mutex<SensorState>>,
+    session: &BluetoothSession,
+    sensor_names: &HashMap<MacAddress, String>,
+) -> Result<(), eyre::Report> {
+    let mut events = session.event_stream().await?;
+
+    while let Some(event) = events.next().await {
+        handle_bluetooth_event(state.clone(), event, session, sensor_names).await?;
+    }
+
+    panic!("No more events");
+}
+
+/// Waits for and handles events from the `MijiaSession`.
+async fn service_mijia_event_queue(
     state: Arc<Mutex<SensorState>>,
     session: &MijiaSession,
 ) -> Result<(), eyre::Report> {
@@ -465,7 +648,7 @@ async fn service_bluetooth_event_queue(
     println!("Processing events");
 
     while let Some(event) = events.next().await {
-        handle_bluetooth_event(state.clone(), event).await?
+        handle_mijia_event(state.clone(), event).await?
     }
 
     // This should be unreachable, because the events Stream should never end,
@@ -474,6 +657,50 @@ async fn service_bluetooth_event_queue(
 }
 
 async fn handle_bluetooth_event(
+    state: Arc<Mutex<SensorState>>,
+    event: BluetoothEvent,
+    session: &BluetoothSession,
+    sensor_names: &HashMap<MacAddress, String>,
+) -> Result<(), eyre::Report> {
+    if let BluetoothEvent::Device {
+        id,
+        event: DeviceEvent::ServiceData { service_data },
+    } = event
+    {
+        if let Some(reading) = Reading::decode(&service_data) {
+            info!("{}: {}", id, reading);
+            let mac_address = session.get_device_info(&id).await?.mac_address;
+            let state = &mut *state.lock().await;
+            let is_new = state.add_sensor_if_named(
+                sensor_names,
+                SensorProps {
+                    id: id.clone(),
+                    mac_address,
+                },
+                ConnectionStatus::AdvertisementOnly,
+            );
+            let homie = &mut state.homie;
+            let sensors = &mut state.sensors;
+            // This will only return None if the sensor doesn't have a name.
+            if let Some(sensor) = get_mut_sensor_by_id(sensors, &id) {
+                assert_eq!(
+                    sensor.connection_status,
+                    ConnectionStatus::AdvertisementOnly
+                );
+                if is_new {
+                    sensor.publish_advertisement_only(homie).await?;
+                }
+                sensor
+                    .publish_reading(homie, &reading, state.min_update_period)
+                    .await?;
+            }
+        }
+    }
+
+    Ok(())
+}
+
+async fn handle_mijia_event(
     state: Arc<Mutex<SensorState>>,
     event: MijiaEvent,
 ) -> Result<(), eyre::Report> {
