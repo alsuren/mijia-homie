@@ -16,6 +16,14 @@ use std::{
 };
 use uuid::Uuid;
 
+const BLUETOOTH_BASE_UUID: u128 = 0x00000000_0000_1000_8000_00805f9b34fb;
+
+/// Converts a 16-bit BLE short UUID to a full 128-bit UUID by filling in the standard Bluetooth
+/// Base UUID.
+const fn uuid_from_u16(short: u16) -> Uuid {
+    Uuid::from_u128(BLUETOOTH_BASE_UUID | ((short as u128) << 96))
+}
+
 /// A reading from some BLE sensor advertisement.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Reading {

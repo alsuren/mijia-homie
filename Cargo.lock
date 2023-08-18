@@ -303,9 +303,7 @@ dependencies = [
 name = "btsensor"
 version = "0.1.0"
 dependencies = [
- "backoff",
  "bluez-async",
- "chrono",
  "eyre",
  "futures",
  "log",
@@ -313,7 +311,6 @@ dependencies = [
  "pretty_env_logger",
  "thiserror",
  "tokio",
- "tokio-stream",
  "uuid",
 ]
 

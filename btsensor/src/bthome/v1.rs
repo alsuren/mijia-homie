@@ -2,7 +2,7 @@
 
 use super::events::{ButtonEventType, DimmerEventType, Event};
 use super::DecodeError;
-use bluez_async::uuid_from_u16;
+use crate::uuid_from_u16;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use std::fmt::{self, Display, Formatter};
 use uuid::Uuid;
