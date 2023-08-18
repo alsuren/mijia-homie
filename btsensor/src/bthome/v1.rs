@@ -84,7 +84,7 @@ pub struct Sensor {
 impl Sensor {
     /// Returns the value of the reading as a floating-point number, properly scaled according to
     /// the property it is for.
-    pub fn float_value(&self) -> f64 {
+    pub fn value_float(&self) -> f64 {
         f64::from(&self.value) / 10.0f64.powi(self.property.decimal_point())
     }
 
@@ -92,7 +92,7 @@ impl Sensor {
     ///
     /// Returns `None` if the property has a scaling factor meaning that the value may not be an
     /// integer.
-    pub fn int_value(&self) -> Option<i64> {
+    pub fn value_int(&self) -> Option<i64> {
         if self.property.decimal_point() == 0 {
             Some((&self.value).into())
         } else {
@@ -109,14 +109,14 @@ impl Sensor {
 impl Display for Sensor {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         // TODO: Special handling for timestamp.
-        if let Some(value) = self.int_value() {
+        if let Some(value) = self.value_int() {
             write!(f, "{}: {}{}", self.property, value, self.property.unit())
         } else {
             write!(
                 f,
                 "{}: {}{}",
                 self.property,
-                self.float_value(),
+                self.value_float(),
                 self.property.unit(),
             )
         }
