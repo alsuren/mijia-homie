@@ -100,6 +100,7 @@ macro_rules! generate_element {
 }
 
 generate_element![
+    { 0x00, PacketId, u8, read_u8, "packet ID", "" },
     { 0x51, Acceleration, u16, read_u16, "acceleration", "m/s²" },
     { 0x01, Battery, u8, read_u8, "battery", "%"},
     { 0x12, Co2, u16, read_u16, "CO2", "ppm"},
