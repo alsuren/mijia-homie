@@ -100,6 +100,19 @@ impl Sensor {
         }
     }
 
+    /// Returns the boolean value of the reading, if it is a boolean property and has a valid value.
+    pub fn value_bool(&self) -> Option<bool> {
+        if self.property.is_boolean() {
+            match &self.value {
+                Value::UnsignedInt(0) => Some(false),
+                Value::UnsignedInt(1) => Some(true),
+                _ => None,
+            }
+        } else {
+            None
+        }
+    }
+
     fn decode(format: DataType, property: Property, value: &[u8]) -> Result<Self, DecodeError> {
         let value = Value::from_bytes(value, format)?;
         Ok(Self { property, value })
@@ -109,7 +122,9 @@ impl Sensor {
 impl Display for Sensor {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         // TODO: Special handling for timestamp.
-        if let Some(value) = self.value_int() {
+        if let Some(value) = self.value_bool() {
+            write!(f, "{}: {}", self.property, value)
+        } else if let Some(value) = self.value_int() {
             write!(f, "{}: {}{}", self.property, value, self.property.unit())
         } else {
             write!(
@@ -434,6 +449,40 @@ impl Property {
             Self::Energy | Self::Voltage | Self::Acceleration | Self::Gyroscope => 3,
         }
     }
+
+    fn is_boolean(self) -> bool {
+        matches!(
+            self,
+            Self::GenericBoolean
+                | Self::PowerOn
+                | Self::Open
+                | Self::BatteryLow
+                | Self::BatteryCharging
+                | Self::CarbonMonoxideDetected
+                | Self::Cold
+                | Self::Connected
+                | Self::DoorOpen
+                | Self::GarageDoorOpen
+                | Self::GasDetected
+                | Self::HeatAbnormal
+                | Self::LightDetected
+                | Self::Unlocked
+                | Self::Wet
+                | Self::MotionDetected
+                | Self::Moving
+                | Self::OccupancyDetected
+                | Self::PluggedIn
+                | Self::Home
+                | Self::Problem
+                | Self::Running
+                | Self::Safe
+                | Self::SmokeDetected
+                | Self::Sound
+                | Self::Tamper
+                | Self::VibrationDetected
+                | Self::WindowOpen
+        )
+    }
 }
 
 /// Attempts to decode the given service data as a BTHome v1 advertisement.
@@ -567,6 +616,26 @@ mod tests {
             })
             .to_string(),
             "humidity: 42%"
+        );
+    }
+
+    #[test]
+    fn format_boolean_element() {
+        assert_eq!(
+            Element::Sensor(Sensor {
+                property: Property::BatteryLow,
+                value: Value::UnsignedInt(0),
+            })
+            .to_string(),
+            "battery low: false"
+        );
+        assert_eq!(
+            Element::Sensor(Sensor {
+                property: Property::LightDetected,
+                value: Value::UnsignedInt(1),
+            })
+            .to_string(),
+            "light detected: true"
         );
     }
 
