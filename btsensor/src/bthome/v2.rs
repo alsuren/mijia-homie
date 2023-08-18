@@ -376,21 +376,6 @@ impl Display for Element {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum Value {
-    U16(u16),
-    I16(i16),
-}
-
-impl Display for Value {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        match self {
-            Self::U16(value) => value.fmt(f),
-            Self::I16(value) => value.fmt(f),
-        }
-    }
-}
-
 impl Display for BtHomeV2 {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         f.write_str("(")?;
