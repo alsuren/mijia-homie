@@ -110,7 +110,7 @@ impl Sensor {
     /// Returns the value of the reading as a floating-point number, properly scaled according to
     /// the property it is for.
     pub fn value_float(&self) -> f64 {
-        f64::from(&self.value) / 10.0f64.powi(self.property.decimal_point())
+        f64::from(&self.value) / self.property.denominator()
     }
 
     /// Returns the integer value of the reading, if it is for a property with no scaling factor.
@@ -118,7 +118,7 @@ impl Sensor {
     /// Returns `None` if the property has a scaling factor meaning that the value may not be an
     /// integer.
     pub fn value_int(&self) -> Option<i64> {
-        if self.property.decimal_point() == 0 {
+        if self.property.denominator() == 1.0 {
             Some((&self.value).into())
         } else {
             None
@@ -416,11 +416,10 @@ impl Property {
         }
     }
 
-    /// The number of spaces to the left to move the decimal point.
+    /// The denominator for fixed-point values.
     ///
-    /// In other words, the value stored should be divided by 10 to the power of this number to get
-    /// the actual value.
-    fn decimal_point(self) -> i32 {
+    /// In other words, the value stored should be divided by this number to get the actual value.
+    fn denominator(self) -> f64 {
         match self {
             Self::PacketId
             | Self::Battery
@@ -461,7 +460,7 @@ impl Property {
             | Self::VibrationDetected
             | Self::WindowOpen
             | Self::ButtonEvent
-            | Self::DimmerEvent => 0,
+            | Self::DimmerEvent => 1.0,
             Self::Temperature
             | Self::Humidity
             | Self::Pressure
@@ -470,8 +469,8 @@ impl Property {
             | Self::MassLb
             | Self::Dewpoint
             | Self::Power
-            | Self::Moisture => 2,
-            Self::Energy | Self::Voltage | Self::Acceleration | Self::Gyroscope => 3,
+            | Self::Moisture => 100.0,
+            Self::Energy | Self::Voltage | Self::Acceleration | Self::Gyroscope => 1000.0,
         }
     }
 
