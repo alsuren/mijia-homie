@@ -1,0 +1,23 @@
+[package]
+name = "btsensor"
+version = "0.1.0"
+authors = ["Andrew Walbran <qwandor@google.com>"]
+edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "A library for decoding sensor readings from BLE advertisements, including the BTHome format."
+repository = "https://github.com/alsuren/mijia-homie/"
+keywords = ["ble", "bluetooth", "bthome"]
+categories = ["hardware-support"]
+
+[dependencies]
+log = "0.4.20"
+num_enum = "0.7.0"
+thiserror = "1.0.47"
+uuid = "1.4.1"
+
+[dev-dependencies]
+bluez-async = "0.7.1"
+futures = "0.3.27"
+eyre = "0.6.8"
+pretty_env_logger = "0.5.0"
+tokio = { version = "1.32.0", features = ["macros", "rt", "rt-multi-thread"] }

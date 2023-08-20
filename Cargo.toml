@@ -2,6 +2,7 @@
 
 members = [
     "applehat",
+    "btsensor",
     "homie-controller",
     "homie-device",
     "homie-influx",
