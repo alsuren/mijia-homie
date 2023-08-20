@@ -60,6 +60,31 @@ impl Element {
             _ => Ok(Self::Sensor(Sensor::decode(format, property, value)?)),
         }
     }
+
+    /// Attempts to decode the given service data as a BTHome v1 advertisement.
+    pub fn decode_all(mut data: &[u8]) -> Result<Vec<Self>, DecodeError> {
+        let mut elements = Vec::new();
+
+        while data.len() > 2 {
+            let length_format = data[0];
+            let length = length_format & 0x1f;
+            let element_end = usize::from(length) + 1;
+            // length includes the measurement type byte but not the length/format byte.
+            if data.len() <= length.into() {
+                return Err(DecodeError::PrematureEnd);
+            }
+            let format = ((length_format & 0xe0) >> 5).try_into()?;
+            elements.push(Self::decode(format, &data[1..element_end])?);
+
+            data = &data[element_end..];
+        }
+
+        if data.is_empty() {
+            Ok(elements)
+        } else {
+            Err(DecodeError::ExtraData(data.to_owned()))
+        }
+    }
 }
 
 impl Display for Element {
@@ -485,31 +510,6 @@ impl Property {
     }
 }
 
-/// Attempts to decode the given service data as a BTHome v1 advertisement.
-pub fn decode(mut data: &[u8]) -> Result<Vec<Element>, DecodeError> {
-    let mut elements = Vec::new();
-
-    while data.len() > 2 {
-        let length_format = data[0];
-        let length = length_format & 0x1f;
-        let element_end = usize::from(length) + 1;
-        // length includes the measurement type byte but not the length/format byte.
-        if data.len() <= length.into() {
-            return Err(DecodeError::PrematureEnd);
-        }
-        let format = ((length_format & 0xe0) >> 5).try_into()?;
-        elements.push(Element::decode(format, &data[1..element_end])?);
-
-        data = &data[element_end..];
-    }
-
-    if data.is_empty() {
-        Ok(elements)
-    } else {
-        Err(DecodeError::ExtraData(data.to_owned()))
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -517,7 +517,7 @@ mod tests {
     #[test]
     fn decode_valid() {
         assert_eq!(
-            decode(&[0x23, 0x02, 0xC4, 0x09, 0x03, 0x03, 0xBF, 0x13]).unwrap(),
+            Element::decode_all(&[0x23, 0x02, 0xC4, 0x09, 0x03, 0x03, 0xBF, 0x13]).unwrap(),
             vec![
                 Element::Sensor(Sensor {
                     property: Property::Temperature,
@@ -530,7 +530,7 @@ mod tests {
             ]
         );
         assert_eq!(
-            decode(&[2, 0, 140, 35, 2, 203, 8, 3, 3, 171, 20, 2, 1, 100]).unwrap(),
+            Element::decode_all(&[2, 0, 140, 35, 2, 203, 8, 3, 3, 171, 20, 2, 1, 100]).unwrap(),
             vec![
                 Element::Sensor(Sensor {
                     property: Property::PacketId,
@@ -551,7 +551,7 @@ mod tests {
             ]
         );
         assert_eq!(
-            decode(&[2, 0, 137, 2, 16, 0, 3, 12, 182, 11]).unwrap(),
+            Element::decode_all(&[2, 0, 137, 2, 16, 0, 3, 12, 182, 11]).unwrap(),
             vec![
                 Element::Sensor(Sensor {
                     property: Property::PacketId,
@@ -572,7 +572,7 @@ mod tests {
     #[test]
     fn decode_button_events() {
         assert_eq!(
-            decode(&[0x02, 0x3a, 0x00, 0x02, 0x3a, 0x05]).unwrap(),
+            Element::decode_all(&[0x02, 0x3a, 0x00, 0x02, 0x3a, 0x05]).unwrap(),
             vec![
                 Element::Event(Event::Button(None)),
                 Element::Event(Event::Button(Some(ButtonEventType::LongDoublePress))),
@@ -583,7 +583,7 @@ mod tests {
     #[test]
     fn decode_dimmer_events() {
         assert_eq!(
-            decode(&[0x02, 0x3c, 0x00, 0x03, 0x3c, 0x01, 0x03]).unwrap(),
+            Element::decode_all(&[0x02, 0x3c, 0x00, 0x03, 0x3c, 0x01, 0x03]).unwrap(),
             vec![
                 Element::Event(Event::Dimmer(None)),
                 Element::Event(Event::Dimmer(Some(DimmerEventType::RotateLeft(3)))),

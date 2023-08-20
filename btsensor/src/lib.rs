@@ -48,7 +48,7 @@ impl Reading {
             }
         }
         if let Some(data) = service_data.get(&bthome::v1::UNENCRYPTED_UUID) {
-            match bthome::v1::decode(data) {
+            match bthome::v1::Element::decode_all(data) {
                 Ok(elements) => return Some(Self::BtHomeV1(elements)),
                 Err(e) => {
                     warn!("Error decoding BTHome v1 data: {}", e)
@@ -56,7 +56,7 @@ impl Reading {
             }
         }
         if let Some(data) = service_data.get(&bthome::v2::UUID) {
-            match bthome::v2::BtHomeV2::decode(data) {
+            match BtHomeV2::decode(data) {
                 Ok(bthome) => return Some(Self::BtHomeV2(bthome)),
                 Err(e) => warn!("Error decoding BTHome v2 data: {}", e),
             }
