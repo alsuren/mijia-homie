@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### New features
+
+- Added support for sensors with third-party firmware advertising in atc1441 format, pvvx custom
+  format, or BTHome (v1 or v2, unencrypted).
+
 ## 0.2.6
 
 ### Other changes
