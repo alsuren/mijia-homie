@@ -12,7 +12,7 @@ use futures::stream::StreamExt;
 use futures::TryFutureExt;
 use homie_device::{HomieDevice, Node, Property};
 use itertools::Itertools;
-use log::info;
+use log::{debug, info};
 use mijia::bluetooth::{
     BluetoothError, BluetoothEvent, BluetoothSession, DeviceEvent, DeviceId, MacAddress,
 };
@@ -270,7 +270,12 @@ impl Sensor {
                                             .await?;
                                     }
                                 }
-                                _ => {}
+                                _ => {
+                                    debug!(
+                                        "Skipping unexpected BTHome v1 element {} on {} ({})",
+                                        element, self.mac_address, self.name
+                                    );
+                                }
                             }
                         }
                     }
@@ -306,7 +311,12 @@ impl Sensor {
                                     )
                                     .await?;
                             }
-                            _ => {}
+                            _ => {
+                                debug!(
+                                    "Skipping unexpected BTHome v2 element {} on {} ({})",
+                                    element, self.mac_address, self.name
+                                );
+                            }
                         }
                     }
                 }
