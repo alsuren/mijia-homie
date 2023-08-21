@@ -369,15 +369,9 @@ async fn run_sensor_system(
     }));
 
     let connection_loop_handle = bluetooth_connection_loop(state.clone(), session, sensor_names);
-    let mijia_event_loop_handle = service_mijia_event_queue(state.clone(), session);
-    let advertisement_event_loop_handle =
+    let bluetooth_event_loop_handle =
         service_bluetooth_event_queue(state.clone(), &session.bt_session, &sensor_names);
-    try_join!(
-        connection_loop_handle,
-        mijia_event_loop_handle,
-        advertisement_event_loop_handle
-    )
-    .map(|((), (), ())| ())
+    try_join!(connection_loop_handle, bluetooth_event_loop_handle).map(|((), ())| ())
 }
 
 async fn bluetooth_connection_loop(
@@ -633,37 +627,23 @@ async fn check_for_stale_sensor(
     Ok(())
 }
 
-/// Waits for and handles advertisements from sensors.
+/// Waits for and handles events from the `BluetoothSession`.
 async fn service_bluetooth_event_queue(
     state: Arc<Mutex<SensorState>>,
     session: &BluetoothSession,
     sensor_names: &HashMap<MacAddress, String>,
 ) -> Result<(), eyre::Report> {
+    debug!("Subscribing to events");
     let mut events = session.event_stream().await?;
+    debug!("Processing events");
 
     while let Some(event) = events.next().await {
         handle_bluetooth_event(state.clone(), event, session, sensor_names).await?;
     }
 
-    panic!("No more events");
-}
-
-/// Waits for and handles events from the `MijiaSession`.
-async fn service_mijia_event_queue(
-    state: Arc<Mutex<SensorState>>,
-    session: &MijiaSession,
-) -> Result<(), eyre::Report> {
-    println!("Subscribing to events");
-    let mut events = session.event_stream().await?;
-    println!("Processing events");
-
-    while let Some(event) = events.next().await {
-        handle_mijia_event(state.clone(), event).await?
-    }
-
     // This should be unreachable, because the events Stream should never end,
     // unless something has gone horribly wrong.
-    panic!("no more events");
+    panic!("No more events");
 }
 
 async fn handle_bluetooth_event(
@@ -672,6 +652,10 @@ async fn handle_bluetooth_event(
     session: &BluetoothSession,
     sensor_names: &HashMap<MacAddress, String>,
 ) -> Result<(), eyre::Report> {
+    if let Some(mijia_event) = MijiaEvent::from(event.clone(), session.clone()).await {
+        handle_mijia_event(state.clone(), mijia_event).await?;
+    }
+
     if let BluetoothEvent::Device {
         id,
         event: DeviceEvent::ServiceData { service_data },
