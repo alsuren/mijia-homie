@@ -270,6 +270,7 @@ impl Sensor {
                                             .await?;
                                     }
                                 }
+                                bthome::v1::Property::PacketId => {}
                                 _ => {
                                     debug!(
                                         "Skipping unexpected BTHome v1 element {} on {} ({})",
