@@ -216,10 +216,8 @@ fn spawn_mqtt_broker(port: u16) {
             next_connection_delay_ms: 1,
             connections: ConnectionSettings {
                 connection_timeout_ms: 100,
-                throttle_delay_ms: 0,
                 max_payload_size: 2048,
                 max_inflight_count: 500,
-                max_inflight_size: 1024,
                 auth: None,
                 dynamic_filters: false,
             },
@@ -230,12 +228,11 @@ fn spawn_mqtt_broker(port: u16) {
     let broker_config = Config {
         id: 0,
         router: RouterConfig {
-            instant_ack: false,
             max_segment_size: 2000,
             max_segment_count: 10,
-            max_read_len: 2000,
             max_connections: 20,
-            initialized_filters: None,
+            max_outgoing_packet_count: 10,
+            ..Default::default()
         },
         v4,
         console,
