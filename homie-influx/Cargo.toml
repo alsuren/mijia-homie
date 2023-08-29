@@ -25,7 +25,7 @@ serde = "1.0.185"
 stable-eyre = "0.2.2"
 tokio = { version = "1.32.0", features = ["macros", "rt-multi-thread"] }
 toml = "0.7.6"
-url = { version = "2.4.0", features = ["serde"] }
+url = { version = "2.4.1", features = ["serde"] }
 
 [package.metadata.deb]
 # $auto doesn't work because we don't build packages in the same container as we build the binaries.
