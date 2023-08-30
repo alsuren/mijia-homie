@@ -96,7 +96,7 @@ pub enum MijiaEvent {
 }
 
 impl MijiaEvent {
-    async fn from(event: BluetoothEvent, session: BluetoothSession) -> Option<Self> {
+    pub async fn from(event: BluetoothEvent, session: BluetoothSession) -> Option<Self> {
         match event {
             BluetoothEvent::Characteristic {
                 id: characteristic,
