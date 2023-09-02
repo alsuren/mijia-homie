@@ -1,11 +1,11 @@
 # Changelog
 
-## Unreleased
+## 0.7.1
 
 ### New features
 
 - Exposed `MijiaEvent::from`, for converting a `bluez-async` `BluetoothEvent` into a `MijiaEvent`.
-  This can be useful if you want to handle other bluetooth events directly as well as Mijia events.
+  This can be useful if you want to handle other Bluetooth events directly as well as Mijia events.
 
 ## 0.7.0
 

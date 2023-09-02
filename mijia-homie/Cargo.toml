@@ -1,7 +1,10 @@
 [package]
 name = "mijia-homie"
-version = "0.2.6"
-authors = ["David Laban <alsuren@gmail.com>", "Andrew Walbran <qwandor@google.com>"]
+version = "0.2.7"
+authors = [
+	"David Laban <alsuren@gmail.com>",
+	"Andrew Walbran <qwandor@google.com>",
+]
 edition = "2018"
 license = "MIT OR Apache-2.0"
 description = "Service to connect to Xiaomi Mijia 2 temperature/humidity sensors over Bluetooth and report their readings to an MQTT broker following the Homie convention."
@@ -29,11 +32,13 @@ color-backtrace = "0.6.0"
 eyre = "0.6.8"
 futures = "0.3.27"
 futures-channel = "0.3.28"
-homie-device = { version = "0.8.0", path = "../homie-device" }
-influx_db_client = { version = "0.5.1", default-features = false, features = ["rustls-tls"] }
+homie-device = { version = "0.9.0", path = "../homie-device" }
+influx_db_client = { version = "0.5.1", default-features = false, features = [
+	"rustls-tls",
+] }
 itertools = "0.11.0"
 log = "0.4.20"
-mijia = { version = "0.7.0", path = "../mijia" }
+mijia = { version = "0.7.1", path = "../mijia" }
 pretty_env_logger = "0.5.0"
 rumqttc = "0.22.0"
 rustls = "0.21.7"
@@ -52,12 +57,36 @@ section = "net"
 maintainer-scripts = "debian-scripts"
 conf-files = ["/etc/mijia-homie/mijia-homie.toml"]
 assets = [
-	["target/release/mijia-history-influx", "usr/bin/", "755"],
-	["target/release/mijia-homie", "usr/bin/", "755"],
-	["target/release/mijia-names", "usr/bin/", "755"],
-	["mijia-homie.example.toml", "etc/mijia-homie/mijia-homie.toml", "640"],
-	["mijia-history-influx.example.toml", "etc/mijia-homie/mijia-history-influx.toml", "640"],
-	["README.md", "usr/share/doc/mijia-homie/", "644"],
+	[
+		"target/release/mijia-history-influx",
+		"usr/bin/",
+		"755",
+	],
+	[
+		"target/release/mijia-homie",
+		"usr/bin/",
+		"755",
+	],
+	[
+		"target/release/mijia-names",
+		"usr/bin/",
+		"755",
+	],
+	[
+		"mijia-homie.example.toml",
+		"etc/mijia-homie/mijia-homie.toml",
+		"640",
+	],
+	[
+		"mijia-history-influx.example.toml",
+		"etc/mijia-homie/mijia-history-influx.toml",
+		"640",
+	],
+	[
+		"README.md",
+		"usr/share/doc/mijia-homie/",
+		"644",
+	],
 ]
 
 # This section needs to be here even if it's empty, for the systemd integration to work.

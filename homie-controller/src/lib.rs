@@ -541,7 +541,7 @@ impl HomieController {
                     node_id,
                     property_id,
                 ) {
-                    Ok(mut property) => {
+                    Ok(property) => {
                         property.value = Some(payload.to_owned());
                         vec![Event::property_value(
                             device_id,
