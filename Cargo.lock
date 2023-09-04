@@ -666,6 +666,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "flume"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "55ac459de2512911e4b674ce33cf20befaba382d05b62b008afc1c8b57cbf181"
+dependencies = [
+ "futures-core",
+ "futures-sink",
+ "nanorand",
+ "spin 0.9.8",
+]
+
+[[package]]
 name = "fnv"
 version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -854,7 +866,7 @@ checksum = "fed44880c466736ef9a5c5b5facefb5ed0785676d0c02d612db14e54f0d84286"
 name = "homie-controller"
 version = "0.9.0"
 dependencies = [
- "flume",
+ "flume 0.11.0",
  "futures",
  "homie-device",
  "log",
@@ -870,7 +882,7 @@ dependencies = [
 name = "homie-device"
 version = "0.9.0"
 dependencies = [
- "flume",
+ "flume 0.11.0",
  "futures",
  "local_ipaddress",
  "log",
@@ -1978,7 +1990,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f2433b134712bc17a6f85a35e06b901e6e8d0bb20b5367e1121e6fedc140c0ac"
 dependencies = [
  "bytes",
- "flume",
+ "flume 0.10.14",
  "futures",
  "log",
  "rustls-native-certs",
@@ -1999,7 +2011,7 @@ dependencies = [
  "bytes",
  "clap",
  "config",
- "flume",
+ "flume 0.10.14",
  "metrics",
  "metrics-exporter-prometheus",
  "parking_lot 0.11.2",
