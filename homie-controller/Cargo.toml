@@ -14,11 +14,11 @@ categories = ["network-programming"]
 
 [dependencies]
 log = "0.4.20"
-rumqttc = "0.22.0"
+rumqttc = "0.23.0"
 thiserror = "1.0.49"
 
 [dev-dependencies]
-flume = "0.10.14"
+flume = "0.11.0"
 futures = "0.3.27"
 homie-device = { version = "0.9.0", path = "../homie-device" }
 pretty_env_logger = "0.5.0"
