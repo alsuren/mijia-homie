@@ -28,7 +28,7 @@ path = "src/mijia-names.rs"
 [dependencies]
 backoff = { version = "0.4.0", features = ["tokio"] }
 btsensor = { version = "0.1.0", path = "../btsensor" }
-color-backtrace = "0.6.0"
+color-backtrace = "0.6.1"
 eyre = "0.6.8"
 futures = "0.3.27"
 futures-channel = "0.3.28"
