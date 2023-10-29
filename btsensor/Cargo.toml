@@ -17,7 +17,7 @@ uuid = "1.5.0"
 
 [dev-dependencies]
 bluez-async = "0.7.1"
-futures = "0.3.27"
+futures = "0.3.29"
 eyre = "0.6.8"
 pretty_env_logger = "0.5.0"
 tokio = { version = "1.33.0", features = ["macros", "rt", "rt-multi-thread"] }
