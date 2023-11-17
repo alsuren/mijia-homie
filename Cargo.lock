@@ -114,7 +114,7 @@ dependencies = [
  "pretty_env_logger",
  "rainbow-hat-rs",
  "rumqttc",
- "rustls 0.21.8",
+ "rustls 0.21.9",
  "rustls-native-certs",
  "serde",
  "serde_derive",
@@ -905,7 +905,7 @@ dependencies = [
  "log",
  "pretty_env_logger",
  "rumqttc",
- "rustls 0.21.8",
+ "rustls 0.21.9",
  "rustls-native-certs",
  "serde",
  "serde_derive",
@@ -987,7 +987,7 @@ checksum = "0646026eb1b3eea4cd9ba47912ea5ce9cc07713d105b1a14698f4e6433d348b7"
 dependencies = [
  "http",
  "hyper",
- "rustls 0.21.8",
+ "rustls 0.21.9",
  "tokio",
  "tokio-rustls 0.24.1",
 ]
@@ -1373,7 +1373,7 @@ dependencies = [
  "mijia",
  "pretty_env_logger",
  "rumqttc",
- "rustls 0.21.8",
+ "rustls 0.21.9",
  "rustls-native-certs",
  "serde",
  "serde_derive",
@@ -1930,7 +1930,7 @@ dependencies = [
  "once_cell",
  "percent-encoding",
  "pin-project-lite",
- "rustls 0.21.8",
+ "rustls 0.21.9",
  "rustls-pemfile",
  "serde",
  "serde_json",
@@ -2110,9 +2110,9 @@ dependencies = [
 
 [[package]]
 name = "rustls"
-version = "0.21.8"
+version = "0.21.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "446e14c5cda4f3f30fe71863c34ec70f5ac79d6087097ad0bb433e1be5edf04c"
+checksum = "629648aced5775d558af50b2b4c7b02983a04b312126d45eeead26e7caa498b9"
 dependencies = [
  "log",
  "ring 0.17.3",
@@ -2529,7 +2529,7 @@ version = "0.24.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c28327cf380ac148141087fbfb9de9d7bd4e84ab5d2c28fbc911d753de8a7081"
 dependencies = [
- "rustls 0.21.8",
+ "rustls 0.21.9",
  "tokio",
 ]
 
