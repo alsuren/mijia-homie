@@ -84,7 +84,7 @@ jobs:
       - name: Upload packages
         uses: actions/upload-artifact@v4
         with:
-          name: debian-packages
+          name: debian-packages-${{ matrix.target }}
           path: target/${{ matrix.target }}/debian/
 
   release:
@@ -95,8 +95,6 @@ jobs:
     steps:
       - name: Download packages
         uses: actions/download-artifact@v4
-        with:
-          name: debian-packages
       - name: Parse tag for package and version
         id: parse_tag
         uses: actions-ecosystem/action-regex-match@v2
@@ -117,5 +115,5 @@ jobs:
         uses: shogo82148/actions-upload-release-asset@v1
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: "${{ steps.parse_tag.outputs.group1 }}_*.deb"
+          asset_path: "debian-packages-*/${{ steps.parse_tag.outputs.group1 }}_*.deb"
           asset_content_type: application/vnd.debian.binary-package
