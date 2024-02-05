@@ -106,7 +106,7 @@ fn point_for_record(
                 .unwrap()
                 .as_millis() as i64,
         )
-        .add_tag("node_id", mac_address.to_string().replace(":", ""))
+        .add_tag("node_id", mac_address.to_string().replace(':', ""))
         .add_tag("node_name", name)
         .add_field("temperature_min", record.temperature_min as f64)
         .add_field("temperature_max", record.temperature_max as f64)

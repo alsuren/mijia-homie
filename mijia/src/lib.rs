@@ -286,10 +286,9 @@ impl MijiaSession {
                 TEMPERATURE_UNIT_CHARACTERISTIC_UUID,
             )
             .await?;
-        Ok(self
-            .bt_session
+        self.bt_session
             .write_characteristic_value(&characteristic.id, unit.encode())
-            .await?)
+            .await
     }
 
     /// Get the comfort level configuration which determines when the sensor displays a happy face.
@@ -344,10 +343,9 @@ impl MijiaSession {
                 HISTORY_DELETE_CHARACTERISTIC_UUID,
             )
             .await?;
-        Ok(self
-            .bt_session
+        self.bt_session
             .write_characteristic_value(&characteristic.id, HISTORY_DELETE_VALUE)
-            .await?)
+            .await
     }
 
     /// Get the last historical record stored on the sensor.
@@ -401,10 +399,9 @@ impl MijiaSession {
                 )
                 .await?
         }
-        Ok(self
-            .bt_session
+        self.bt_session
             .start_notify(&history_records_characteristic.id)
-            .await?)
+            .await
     }
 
     /// Stop receiving historical records from the sensor.
@@ -417,7 +414,7 @@ impl MijiaSession {
                 HISTORY_RECORDS_CHARACTERISTIC_UUID,
             )
             .await?;
-        Ok(self.bt_session.stop_notify(&characteristic.id).await?)
+        self.bt_session.stop_notify(&characteristic.id).await
     }
 
     /// Try to get all historical records for the sensor.

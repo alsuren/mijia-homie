@@ -91,7 +91,7 @@ fn write_name(sensor_names_filename: &str, mac: &MacAddress, name: &str) -> Resu
     let mut file = OpenOptions::new()
         .create(true)
         .append(true)
-        .open(&sensor_names_filename)?;
+        .open(sensor_names_filename)?;
     writeln!(file, r#""{mac}" = "{name}""#, mac = mac, name = name)?;
     Ok(())
 }
