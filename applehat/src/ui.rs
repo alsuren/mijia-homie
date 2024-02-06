@@ -65,7 +65,7 @@ impl UiState {
                 (0, 0, 0)
             };
             // TODO: Fix set_pixel brightness to work.
-            self.pixels.pixels[NUM_PIXELS - 1 - i] = [r, g, b, self.selected_brightness as u8];
+            self.pixels.pixels[NUM_PIXELS - 1 - i] = [r, g, b, self.selected_brightness];
             //self.pixels.set_pixel(i, r, g, b, PIXEL_BRIGHTNESS);
         }
         if let Err(e) = self.pixels.show() {
@@ -93,7 +93,7 @@ impl UiState {
             ) {
                 print_str_decimal(
                     &mut self.alphanum,
-                    &value,
+                    value,
                     if self.selected_property_id == HUMIDITY_PROPERTY_ID {
                         Some('%')
                     } else {
@@ -158,8 +158,8 @@ impl UiState {
     }
 
     fn update_button_state(&mut self, new_state: [bool; 3]) {
-        for i in 0..3 {
-            if new_state[i] && !self.button_state[i] {
+        for (i, &new_state) in new_state.iter().enumerate() {
+            if new_state && !self.button_state[i] {
                 self.button_pressed(i);
             }
         }

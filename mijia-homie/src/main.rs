@@ -130,7 +130,7 @@ impl Sensor {
     }
 
     pub fn node_id(&self) -> String {
-        self.mac_address.to_string().replace(":", "")
+        self.mac_address.to_string().replace(':', "")
     }
 
     fn as_node(&self) -> Node {
@@ -371,7 +371,7 @@ async fn run_sensor_system(
 
     let connection_loop_handle = bluetooth_connection_loop(state.clone(), session, sensor_names);
     let bluetooth_event_loop_handle =
-        service_bluetooth_event_queue(state.clone(), &session.bt_session, &sensor_names);
+        service_bluetooth_event_queue(state.clone(), &session.bt_session, sensor_names);
     try_join!(connection_loop_handle, bluetooth_event_loop_handle).map(|((), ())| ())
 }
 
