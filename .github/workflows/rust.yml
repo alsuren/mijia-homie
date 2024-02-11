@@ -32,23 +32,15 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install libdbus-1-dev
-      - name: Install grcov
-        run: curl -L https://github.com/mozilla/grcov/releases/download/v0.8.6/grcov-v0.8.6-x86_64-unknown-linux-gnu.tar.gz | tar zxf -
-      - name: Install llvm-tools
-        run: rustup component add llvm-tools-preview
-      - name: Build for coverage
-        run: cargo build --all-features
-        env:
-          RUSTFLAGS: "-Cinstrument-coverage"
-      - name: Run tests with coverage
-        run: cargo test --all-features
-        env:
-          RUSTFLAGS: "-Cinstrument-coverage"
-          LLVM_PROFILE_FILE: "test-coverage-%p-%m.profraw"
-      - name: Convert coverage
-        run: ./grcov . -s . --binary-path target/debug/ -t lcov --branch --ignore-not-existing -o target/debug/lcov.info
-      - name: Upload coverage to codecov.io
-        uses: codecov/codecov-action@v3.1.5
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@v2
         with:
-          directory: ./target/debug
+          tool: cargo-llvm-cov
+      - name: Run tests with coverage
+        run: cargo llvm-cov test --all-features --codecov --output-path codecov-report.json
+      - name: Upload coverage to codecov.io
+        uses: codecov/codecov-action@v4.0.1
+        with:
           fail_ci_if_error: true
+          files: codecov-report.json
+          token: ${{ secrets.CODECOV_TOKEN }}
