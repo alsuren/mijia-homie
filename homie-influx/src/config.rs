@@ -154,13 +154,11 @@ pub fn get_influxdb_client(config: &InfluxDbConfig, database: &str) -> Result<Cl
 pub fn get_tls_client_config(config: &MqttConfig) -> Option<Arc<ClientConfig>> {
     if config.use_tls {
         let mut root_store = RootCertStore::empty();
-        for cert in
-            rustls_native_certs::load_native_certs().expect("Failed to load platform certificates.")
-        {
-            root_store.add(&rustls::Certificate(cert.0)).unwrap();
-        }
+        root_store.add_parsable_certificates(
+            rustls_native_certs::load_native_certs()
+                .expect("Failed to load platform certificates."),
+        );
         let client_config = ClientConfig::builder()
-            .with_safe_defaults()
             .with_root_certificates(root_store)
             .with_no_client_auth();
         Some(Arc::new(client_config))
