@@ -93,13 +93,11 @@ pub fn get_mqtt_options(config: MqttConfig) -> MqttOptions {
 
     if config.use_tls {
         let mut root_store = RootCertStore::empty();
-        for cert in
-            rustls_native_certs::load_native_certs().expect("Failed to load platform certificates.")
-        {
-            root_store.add(&rustls::Certificate(cert.0)).unwrap();
-        }
+        root_store.add_parsable_certificates(
+            rustls_native_certs::load_native_certs()
+                .expect("Failed to load platform certificates."),
+        );
         let client_config = ClientConfig::builder()
-            .with_safe_defaults()
             .with_root_certificates(root_store)
             .with_no_client_auth();
         mqtt_options.set_transport(Transport::tls_with_config(client_config.into()));

@@ -125,8 +125,8 @@ dependencies = [
  "pretty_env_logger",
  "rainbow-hat-rs",
  "rumqttc",
- "rustls 0.21.9",
- "rustls-native-certs 0.6.3",
+ "rustls 0.22.2",
+ "rustls-native-certs",
  "serde",
  "serde_derive",
  "stable-eyre",
@@ -961,8 +961,8 @@ dependencies = [
  "log",
  "pretty_env_logger",
  "rumqttc",
- "rustls 0.21.9",
- "rustls-native-certs 0.6.3",
+ "rustls 0.22.2",
+ "rustls-native-certs",
  "serde",
  "serde_derive",
  "stable-eyre",
@@ -1413,8 +1413,8 @@ dependencies = [
  "mijia",
  "pretty_env_logger",
  "rumqttc",
- "rustls 0.21.9",
- "rustls-native-certs 0.6.3",
+ "rustls 0.22.2",
+ "rustls-native-certs",
  "serde",
  "serde_derive",
  "stable-eyre",
@@ -2000,7 +2000,7 @@ dependencies = [
  "flume",
  "futures-util",
  "log",
- "rustls-native-certs 0.7.0",
+ "rustls-native-certs",
  "rustls-pemfile 2.1.0",
  "rustls-webpki 0.102.2",
  "thiserror",
@@ -2129,18 +2129,6 @@ dependencies = [
  "rustls-webpki 0.102.2",
  "subtle",
  "zeroize",
-]
-
-[[package]]
-name = "rustls-native-certs"
-version = "0.6.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a9aace74cb666635c918e9c12bc0d348266037aa8eb599b5cba565709a8dff00"
-dependencies = [
- "openssl-probe",
- "rustls-pemfile 1.0.3",
- "schannel",
- "security-framework",
 ]
 
 [[package]]
