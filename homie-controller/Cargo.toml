@@ -14,7 +14,7 @@ categories = ["network-programming"]
 
 [dependencies]
 log = "0.4.20"
-rumqttc = "0.23.0"
+rumqttc = "0.24.0"
 thiserror = "1.0.57"
 
 [dev-dependencies]
