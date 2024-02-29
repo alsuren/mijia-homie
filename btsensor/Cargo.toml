@@ -10,7 +10,7 @@ keywords = ["ble", "bluetooth", "bthome"]
 categories = ["hardware-support"]
 
 [dependencies]
-log = "0.4.20"
+log = "0.4.21"
 num_enum = "0.7.2"
 thiserror = "1.0.57"
 uuid = "1.7.0"
