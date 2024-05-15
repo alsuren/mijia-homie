@@ -215,6 +215,7 @@ impl Element {
     /// Returns `None` if it is an event, floating-point or boolean property.
     pub fn value_int(&self) -> Option<i64> {
         match *self {
+            Self::PacketId(value) => Some(value.into()),
             Self::Battery(value) => Some(value.into()),
             Self::Co2(value) => Some(value.into()),
             Self::Count8(value) => Some(value.into()),
@@ -472,6 +473,23 @@ mod tests {
     }
 
     #[test]
+    fn decode_mho() {
+        assert_eq!(
+            BtHomeV2::decode(&[64, 0, 168, 1, 100, 2, 203, 9, 3, 38, 17]).unwrap(),
+            BtHomeV2 {
+                encrypted: false,
+                trigger_based: false,
+                elements: vec![
+                    Element::PacketId(168),
+                    Element::Battery(100),
+                    Element::TemperatureSmall(2507),
+                    Element::Humidity(4390)
+                ]
+            }
+        );
+    }
+
+    #[test]
     fn format() {
         assert_eq!(
             BtHomeV2 {
@@ -488,6 +506,20 @@ mod tests {
             }
             .to_string(),
             "(unencrypted) acceleration: 22.151m/s², temperature: 25.06°C, battery charging: true, button: none, button: long double press, dimmer: rotate left 3 steps"
+        );
+        assert_eq!(
+            BtHomeV2 {
+                encrypted: false,
+                trigger_based: false,
+                elements: vec![
+                    Element::PacketId(168),
+                    Element::Battery(100),
+                    Element::TemperatureSmall(2507),
+                    Element::Humidity(4390),
+                ],
+            }
+            .to_string(),
+            "(unencrypted) packet ID: 168, battery: 100%, temperature: 25.07°C, humidity: 43.9%"
         );
     }
 }
