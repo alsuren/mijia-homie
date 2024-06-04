@@ -25,7 +25,7 @@ serde_derive = "1.0.152"
 serde = { version = "1.0.203", features = ["derive"] }
 stable-eyre = "0.2.2"
 tokio = { version = "1.38.0", features = ["macros", "rt-multi-thread"] }
-toml = "0.8.13"
+toml = "0.8.14"
 
 [package.metadata.deb]
 # $auto doesn't work because we don't build packages in the same container as we build the binaries.
