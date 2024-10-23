@@ -15,7 +15,7 @@ categories = ["network-programming"]
 [dependencies]
 log = "0.4.22"
 rumqttc = "0.24.0"
-thiserror = "1.0.64"
+thiserror = "1.0.65"
 
 [dev-dependencies]
 flume = "0.11.1"
