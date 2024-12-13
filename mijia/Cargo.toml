@@ -14,7 +14,7 @@ keywords = ["ble", "bluetooth", "humidity", "temperature"]
 categories = ["hardware-support"]
 
 [dependencies]
-bluez-async = "0.7.1"
+bluez-async = "0.8.0"
 futures = "0.3.31"
 log = "0.4.22"
 thiserror = "2.0.6"
