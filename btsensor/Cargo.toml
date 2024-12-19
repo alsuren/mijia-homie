@@ -12,7 +12,7 @@ categories = ["hardware-support"]
 [dependencies]
 log = "0.4.22"
 num_enum = "0.7.3"
-thiserror = "2.0.7"
+thiserror = "2.0.8"
 uuid = "1.11.0"
 
 [dev-dependencies]

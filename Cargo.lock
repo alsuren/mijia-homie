@@ -349,7 +349,7 @@ dependencies = [
  "log",
  "serde",
  "serde-xml-rs",
- "thiserror 2.0.7",
+ "thiserror 2.0.8",
  "tokio",
  "uuid",
 ]
@@ -373,7 +373,7 @@ dependencies = [
  "log",
  "num_enum",
  "pretty_env_logger",
- "thiserror 2.0.7",
+ "thiserror 2.0.8",
  "tokio",
  "uuid",
 ]
@@ -923,7 +923,7 @@ dependencies = [
  "rumqttc",
  "rumqttd",
  "rumqttlog",
- "thiserror 2.0.7",
+ "thiserror 2.0.8",
  "tokio",
 ]
 
@@ -939,7 +939,7 @@ dependencies = [
  "pretty_env_logger",
  "rand",
  "rumqttc",
- "thiserror 2.0.7",
+ "thiserror 2.0.8",
  "tokio",
 ]
 
@@ -1502,7 +1502,7 @@ dependencies = [
  "futures",
  "log",
  "pretty_env_logger",
- "thiserror 2.0.7",
+ "thiserror 2.0.8",
  "tokio",
  "tokio-stream",
  "uuid",
@@ -2667,11 +2667,11 @@ dependencies = [
 
 [[package]]
 name = "thiserror"
-version = "2.0.7"
+version = "2.0.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "93605438cbd668185516ab499d589afb7ee1859ea3d5fc8f6b0755e1c7443767"
+checksum = "08f5383f3e0071702bf93ab5ee99b52d26936be9dedd9413067cbdcddcb6141a"
 dependencies = [
- "thiserror-impl 2.0.7",
+ "thiserror-impl 2.0.8",
 ]
 
 [[package]]
@@ -2687,9 +2687,9 @@ dependencies = [
 
 [[package]]
 name = "thiserror-impl"
-version = "2.0.7"
+version = "2.0.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e1d8749b4531af2117677a5fcd12b1348a3fe2b81e36e61ffeac5c4aa3273e36"
+checksum = "f2f357fcec90b3caef6623a099691be676d033b40a058ac95d2a6ade6fa0c943"
 dependencies = [
  "proc-macro2",
  "quote",
