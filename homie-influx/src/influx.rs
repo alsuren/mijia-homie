@@ -33,7 +33,7 @@ pub async fn send_property_value(
 /// Convert the value of the given Homie property to an InfluxDB value of the appropriate type, if
 /// possible. Returns None if the datatype of the property is unknown, or there was an error parsing
 /// the value.
-fn influx_value_for_homie_property(property: &Property) -> Option<Value> {
+fn influx_value_for_homie_property(property: &Property) -> Option<Value<'static>> {
     let datatype = property.datatype?;
     Some(match datatype {
         Datatype::Integer => Value::Integer(property.value().ok()?),
@@ -49,7 +49,7 @@ fn point_for_property_value(
     node: &Node,
     property: &Property,
     timestamp: SystemTime,
-) -> Option<Point> {
+) -> Option<Point<'static>> {
     let datatype = property.datatype?;
     let value = influx_value_for_homie_property(property)?;
 

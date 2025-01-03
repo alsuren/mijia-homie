@@ -92,12 +92,12 @@ async fn write_history(
     Ok(())
 }
 
-fn point_for_record(
+fn point_for_record<'a>(
     measurement: &str,
     mac_address: &MacAddress,
-    name: &str,
+    name: &'a str,
     record: &HistoryRecord,
-) -> Point {
+) -> Point<'a> {
     Point::new(measurement)
         .add_timestamp(
             record
