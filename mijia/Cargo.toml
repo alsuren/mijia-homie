@@ -18,7 +18,7 @@ bluez-async = "0.8.0"
 futures = "0.3.31"
 log = "0.4.22"
 thiserror = "2.0.9"
-tokio = "1.42.0"
+tokio = "1.43.0"
 tokio-stream = "0.1.17"
 uuid = "1.11.0"
 
@@ -27,7 +27,7 @@ backoff = { version = "0.4.0", features = ["tokio"] }
 chrono = "0.4.39"
 eyre = "0.6.12"
 pretty_env_logger = "0.5.0"
-tokio = { version = "1.42.0", features = [
+tokio = { version = "1.43.0", features = [
     "macros",
     "rt",
     "rt-multi-thread",
