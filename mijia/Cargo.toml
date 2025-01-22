@@ -20,7 +20,7 @@ log = "0.4.25"
 thiserror = "2.0.11"
 tokio = "1.43.0"
 tokio-stream = "0.1.17"
-uuid = "1.12.0"
+uuid = "1.12.1"
 
 [dev-dependencies]
 backoff = { version = "0.4.0", features = ["tokio"] }
