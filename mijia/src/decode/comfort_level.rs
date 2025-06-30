@@ -1,5 +1,5 @@
 use crate::decode::{
-    check_length, decode_temperature, encode_temperature, DecodeError, EncodeError,
+    DecodeError, EncodeError, check_length, decode_temperature, encode_temperature,
 };
 use std::convert::TryInto;
 use std::fmt::{self, Display, Formatter};

@@ -2,7 +2,7 @@ mod config;
 mod influx;
 
 use crate::config::{
-    get_influxdb_client, get_mqtt_options, get_tls_client_config, read_mappings, Config,
+    Config, get_influxdb_client, get_mqtt_options, get_tls_client_config, read_mappings,
 };
 use crate::influx::send_property_value;
 use futures::future::try_join_all;
@@ -110,7 +110,7 @@ async fn handle_event(controller: &HomieController, influx_db_client: &Client, e
                 )
                 .await
                 {
-                    log::error!("{:?}", e);
+                    log::error!("{e:?}");
                 }
             }
         }

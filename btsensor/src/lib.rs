@@ -51,14 +51,14 @@ impl Reading {
             match bthome::v1::Element::decode_all(data) {
                 Ok(elements) => return Some(Self::BtHomeV1(elements)),
                 Err(e) => {
-                    warn!("Error decoding BTHome v1 data: {}", e)
+                    warn!("Error decoding BTHome v1 data: {e}")
                 }
             }
         }
         if let Some(data) = service_data.get(&bthome::v2::UUID) {
             match BtHomeV2::decode(data) {
                 Ok(bthome) => return Some(Self::BtHomeV2(bthome)),
-                Err(e) => warn!("Error decoding BTHome v2 data: {}", e),
+                Err(e) => warn!("Error decoding BTHome v2 data: {e}"),
             }
         }
         None

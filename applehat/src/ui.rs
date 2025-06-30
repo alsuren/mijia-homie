@@ -59,7 +59,7 @@ impl UiState {
             let (r, g, b) = if let Some((device_id, node_id, node)) = nodes.get(i) {
                 let selected = Some(*device_id) == self.selected_device_id.as_deref()
                     && Some(*node_id) == self.selected_node_id.as_deref();
-                trace!("Showing node {:?}", node);
+                trace!("Showing node {node:?}");
                 colour_for_node(node, selected)
             } else {
                 (0, 0, 0)
@@ -69,11 +69,11 @@ impl UiState {
             //self.pixels.set_pixel(i, r, g, b, PIXEL_BRIGHTNESS);
         }
         if let Err(e) = self.pixels.show() {
-            error!("Error setting RGB LEDs: {}", e);
+            error!("Error setting RGB LEDs: {e}");
         }
 
         if self.selected_device_id.is_none() || self.selected_node_id.is_none() {
-            if let Some((device_id, node_id, _)) = nodes.get(0) {
+            if let Some((device_id, node_id, _)) = nodes.first() {
                 self.selected_device_id = Some(device_id.to_string());
                 self.selected_node_id = Some(node_id.to_string());
             }
@@ -107,12 +107,12 @@ impl UiState {
             self.alphanum.print_str("    ", false);
         }
         if let Err(e) = self.alphanum.show() {
-            error!("Error displaying: {}", e);
+            error!("Error displaying: {e}");
         }
     }
 
     fn button_pressed(&mut self, button_index: usize) {
-        debug!("Button {} pressed.", button_index);
+        debug!("Button {button_index} pressed.");
         match button_index {
             0 => {
                 // Select next node.

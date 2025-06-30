@@ -5,7 +5,7 @@ authors = [
 	"David Laban <alsuren@gmail.com>",
 	"Andrew Walbran <qwandor@google.com>",
 ]
-edition = "2018"
+edition = "2024"
 license = "MIT OR Apache-2.0"
 description = "Service to connect to Xiaomi Mijia 2 temperature/humidity sensors over Bluetooth and report their readings to an MQTT broker following the Homie convention."
 repository = "https://github.com/alsuren/mijia-homie/"

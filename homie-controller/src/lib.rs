@@ -169,7 +169,7 @@ impl HomieController {
     /// Poll the `EventLoop`, and maybe return a Homie event.
     pub async fn poll(&self, event_loop: &mut HomieEventLoop) -> Result<Vec<Event>, PollError> {
         let notification = event_loop.event_loop.poll().await?;
-        log::trace!("Notification = {:?}", notification);
+        log::trace!("Notification = {notification:?}");
 
         if let rumqttc::Event::Incoming(incoming) = notification {
             self.handle_event(incoming).await
@@ -185,7 +185,7 @@ impl HomieController {
                     // These error strings indicate some issue with parsing the publish
                     // event from the network, perhaps due to a malfunctioning device,
                     // so should just be logged and ignored.
-                    log::warn!("{}", err);
+                    log::warn!("{err}");
                     Ok(vec![])
                 }
                 Err(HandleError::Fatal(e)) => Err(e.into()),
@@ -212,11 +212,11 @@ impl HomieController {
         } = self.handle_publish_sync(publish)?;
 
         for topic in topics_to_subscribe {
-            log::trace!("Subscribe to {}", topic);
+            log::trace!("Subscribe to {topic}");
             self.mqtt_client.subscribe(topic, QoS::AtLeastOnce).await?;
         }
         for topic in topics_to_unsubscribe {
-            log::trace!("Unsubscribe from {}", topic);
+            log::trace!("Unsubscribe from {topic}");
             self.mqtt_client.unsubscribe(topic).await?;
         }
 
@@ -231,11 +231,11 @@ impl HomieController {
     fn handle_publish_sync(&self, publish: Publish) -> Result<PublishResponse, HandleError> {
         let base_topic = format!("{}/", self.base_topic);
         let payload = str::from_utf8(&publish.payload)
-            .map_err(|e| format!("Payload not valid UTF-8: {}", e))?;
+            .map_err(|e| format!("Payload not valid UTF-8: {e}"))?;
         let subtopic = publish
             .topic
             .strip_prefix(&base_topic)
-            .ok_or_else(|| format!("Publish with unexpected topic: {:?}", publish))?;
+            .ok_or_else(|| format!("Publish with unexpected topic: {publish:?}"))?;
 
         // If there are no other references to the devices this will give us a mutable reference
         // directly. If there are other references it will clone the underlying HashMap and update
@@ -254,7 +254,7 @@ impl HomieController {
         let events = match parts.as_slice() {
             [device_id, "$homie"] => {
                 if !devices.contains_key(*device_id) {
-                    log::trace!("Homie device '{}' version '{}'", device_id, payload);
+                    log::trace!("Homie device '{device_id}' version '{payload}'");
                     devices.insert((*device_id).to_owned(), Device::new(device_id, payload));
                     topics_to_subscribe.push(format!("{}/{}/+", self.base_topic, device_id));
                     topics_to_subscribe.push(format!("{}/{}/$fw/+", self.base_topic, device_id));
@@ -432,7 +432,7 @@ impl HomieController {
                     if !node.properties.contains_key(property_id) {
                         let mut new_prop = Property::new(property_id);
 
-                        let key = format!("{}/{}/{}", device_id, node_id, property_id);
+                        let key = format!("{device_id}/{node_id}/{property_id}");
                         new_prop.value = early_property_values.remove(&key);
 
                         if let Some(value) = new_prop.value.clone() {
@@ -504,7 +504,7 @@ impl HomieController {
             [device_id, node_id, property_id, "$settable"] => {
                 let settable = payload
                     .parse()
-                    .map_err(|_| format!("Invalid boolean '{}' for $settable.", payload))?;
+                    .map_err(|_| format!("Invalid boolean '{payload}' for $settable."))?;
                 let property = get_mut_property_for(
                     devices,
                     "Got property settable for",
@@ -518,7 +518,7 @@ impl HomieController {
             [device_id, node_id, property_id, "$retained"] => {
                 let retained = payload
                     .parse()
-                    .map_err(|_| format!("Invalid boolean '{}' for $retained.", payload))?;
+                    .map_err(|_| format!("Invalid boolean '{payload}' for $retained."))?;
                 let property = get_mut_property_for(
                     devices,
                     "Got property retained for",
@@ -569,7 +569,7 @@ impl HomieController {
                 vec![]
             }
             _ => {
-                log::warn!("Unexpected subtopic {} = {}", subtopic, payload);
+                log::warn!("Unexpected subtopic {subtopic} = {payload}");
                 vec![]
             }
         };
@@ -587,7 +587,7 @@ impl HomieController {
         *self.devices.lock().unwrap() = Arc::new(HashMap::new());
 
         let topic = format!("{}/+/$homie", self.base_topic);
-        log::trace!("Subscribe to {}", topic);
+        log::trace!("Subscribe to {topic}");
         self.mqtt_client.subscribe(topic, QoS::AtLeastOnce).await
     }
 
@@ -622,7 +622,7 @@ fn get_mut_device_for<'a>(
 ) -> Result<&'a mut Device, String> {
     devices
         .get_mut(device_id)
-        .ok_or_else(|| format!("{} unknown device '{}'", err_prefix, device_id))
+        .ok_or_else(|| format!("{err_prefix} unknown device '{device_id}'"))
 }
 
 fn get_mut_node_for<'a>(
@@ -635,7 +635,7 @@ fn get_mut_node_for<'a>(
     device
         .nodes
         .get_mut(node_id)
-        .ok_or_else(|| format!("{} unknown node '{}/{}'", err_prefix, device_id, node_id))
+        .ok_or_else(|| format!("{err_prefix} unknown node '{device_id}/{node_id}'"))
 }
 
 fn get_mut_property_for<'a>(
@@ -647,10 +647,7 @@ fn get_mut_property_for<'a>(
 ) -> Result<&'a mut Property, String> {
     let node = get_mut_node_for(devices, err_prefix, device_id, node_id)?;
     node.properties.get_mut(property_id).ok_or_else(|| {
-        format!(
-            "{} unknown property '{}/{}/{}'",
-            err_prefix, device_id, node_id, property_id
-        )
+        format!("{err_prefix} unknown property '{device_id}/{node_id}/{property_id}'")
     })
 }
 
@@ -688,13 +685,13 @@ impl From<ParseExtensionError> for HandleError {
 
 impl From<ParseIntError> for HandleError {
     fn from(e: ParseIntError) -> Self {
-        HandleError::Warning(format!("Invalid integer: {}", e))
+        HandleError::Warning(format!("Invalid integer: {e}"))
     }
 }
 
 impl From<ParseFloatError> for HandleError {
     fn from(e: ParseFloatError) -> Self {
-        HandleError::Warning(format!("Invalid float: {}", e))
+        HandleError::Warning(format!("Invalid float: {e}"))
     }
 }
 

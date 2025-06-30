@@ -8,8 +8,8 @@ use mijia::bluetooth::MacAddress;
 use mijia::{MijiaSession, SensorProps};
 use std::collections::HashMap;
 use std::fs::OpenOptions;
-use std::io::stdin;
 use std::io::Write;
+use std::io::stdin;
 use std::time::Duration;
 use tokio::time;
 
@@ -28,7 +28,7 @@ async fn main() -> Result<(), Report> {
     let names = read_sensor_names(&sensor_names_filename)?;
     println!("ignoring sensors:");
     for (mac, name) in names.iter() {
-        println!("{}: {:?}", mac, name);
+        println!("{mac}: {name:?}");
     }
 
     let (_, session) = MijiaSession::new().await?;
@@ -47,7 +47,7 @@ async fn main() -> Result<(), Report> {
         println!("Connecting to {}", sensor.mac_address);
         if let Err(e) = session.bt_session.connect(&sensor.id).await {
             println!("Failed to connect to {}", sensor.mac_address);
-            log::debug!("error was: {:?}", e);
+            log::debug!("error was: {e:?}");
 
             write_name(&sensor_names_filename, &sensor.mac_address, "failed")?;
             continue;
@@ -74,7 +74,7 @@ async fn main() -> Result<(), Report> {
         }
 
         if let Err(e) = session.bt_session.disconnect(&sensor.id).await {
-            log::error!("Disconnecting failed: {:?}", e);
+            log::error!("Disconnecting failed: {e:?}");
         }
     }
 
@@ -92,7 +92,7 @@ fn write_name(sensor_names_filename: &str, mac: &MacAddress, name: &str) -> Resu
         .create(true)
         .append(true)
         .open(sensor_names_filename)?;
-    writeln!(file, r#""{mac}" = "{name}""#, mac = mac, name = name)?;
+    writeln!(file, r#""{mac}" = "{name}""#)?;
     Ok(())
 }
 

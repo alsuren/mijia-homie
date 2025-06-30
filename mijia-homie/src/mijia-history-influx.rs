@@ -5,10 +5,10 @@ mod config;
 mod mijia_history_config;
 
 use crate::config::read_sensor_names;
-use crate::mijia_history_config::{get_influxdb_client, Config};
+use crate::mijia_history_config::{Config, get_influxdb_client};
 use eyre::Report;
 use influx_db_client::{Client, Point, Precision};
-use mijia::{bluetooth::MacAddress, HistoryRecord, MijiaSession, SignedDuration};
+use mijia::{HistoryRecord, MijiaSession, SignedDuration, bluetooth::MacAddress};
 use std::time::{Duration, SystemTime};
 use tokio::time;
 
@@ -39,7 +39,7 @@ async fn main() -> Result<(), Report> {
         if let Some(name) = names.get(&sensor.mac_address) {
             println!("Connecting to {} ({})...", name, sensor.mac_address);
             if let Err(e) = session.bt_session.connect(&sensor.id).await {
-                log::error!("Failed to connect to {}: {:?}", name, e);
+                log::error!("Failed to connect to {name}: {e:?}");
                 continue;
             }
 
@@ -53,7 +53,7 @@ async fn main() -> Result<(), Report> {
                     offset, config.max_clock_offset
                 );
             } else {
-                println!("Sensor time offset {:?}, reading history...", offset);
+                println!("Sensor time offset {offset:?}, reading history...");
                 let history = session.get_all_history(&sensor.id).await?;
                 write_history(
                     &influxdb_client,
@@ -67,7 +67,7 @@ async fn main() -> Result<(), Report> {
             }
 
             if let Err(e) = session.bt_session.disconnect(&sensor.id).await {
-                log::error!("Disconnecting failed: {:?}", e);
+                log::error!("Disconnecting failed: {e:?}");
             }
         }
     }

@@ -1,7 +1,7 @@
 mod config;
 mod ui;
 
-use config::{get_mqtt_options, Config};
+use config::{Config, get_mqtt_options};
 use eyre::Report;
 use futures::future::try_join;
 use homie_controller::{Event, HomieController, HomieEventLoop, PollError};
@@ -16,7 +16,7 @@ use tokio::{
     task::{self, JoinHandle},
     time::sleep,
 };
-use ui::{spawn_button_poll_loop, UiState};
+use ui::{UiState, spawn_button_poll_loop};
 
 #[tokio::main]
 async fn main() -> Result<(), Report> {
@@ -105,10 +105,7 @@ fn handle_event(controller: &HomieController, ui_state: &Mutex<UiState>, event: 
                 fresh
             );
             if fresh {
-                println!(
-                    "Fresh property value {}/{}/{}={}",
-                    device_id, node_id, property_id, value
-                );
+                println!("Fresh property value {device_id}/{node_id}/{property_id}={value}");
                 ui_state.lock().unwrap().update_display();
             }
         }

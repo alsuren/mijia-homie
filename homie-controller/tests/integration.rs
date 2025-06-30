@@ -62,7 +62,7 @@ async fn test_device() {
     // Wait until the controller knows about all required attributes of the device.
     'outer0: loop {
         for event in controller.poll(&mut event_loop).await.unwrap() {
-            log::trace!("Event: {:?}", event);
+            log::trace!("Event: {event:?}");
             let devices = controller.devices();
             if let Some(device) = devices.get("device_id") {
                 // For some reason we get the ready state before all the attributes of the property
@@ -91,7 +91,7 @@ async fn test_device() {
     {
         let devices = controller.devices();
         let device = devices.get("device_id").unwrap();
-        log::info!("Device: {:?}", device);
+        log::info!("Device: {device:?}");
         assert_eq!(device.name, Some("Device name".to_string()));
         assert_eq!(device.homie_version, "4.0");
         assert_eq!(device.state, State::Ready);
@@ -102,7 +102,7 @@ async fn test_device() {
         assert_eq!(node.properties.len(), 1);
         let property = node.properties.get("property_id").unwrap();
         assert_eq!(property.name, Some("Property name".to_string()));
-        assert_eq!(property.settable, true);
+        assert!(property.settable);
         assert_eq!(property.unit, Some("unit".to_string()));
         assert_eq!(property.value, None);
     }
@@ -116,7 +116,7 @@ async fn test_device() {
     // Wait until the controller receives the value.
     'outer1: loop {
         for event in controller.poll(&mut event_loop).await.unwrap() {
-            log::trace!("Event: {:?}", event);
+            log::trace!("Event: {event:?}");
             if let Event::PropertyValueChanged {
                 device_id,
                 node_id,
@@ -129,7 +129,7 @@ async fn test_device() {
                 assert_eq!(node_id, "node_id");
                 assert_eq!(property_id, "property_id");
                 assert_eq!(value, "42");
-                assert_eq!(fresh, true);
+                assert!(fresh);
                 break 'outer1;
             }
         }
@@ -141,7 +141,7 @@ async fn test_device() {
         let device = devices.get("device_id").unwrap();
         let node = device.nodes.get("node_id").unwrap();
         let property = node.properties.get("property_id").unwrap();
-        log::info!("Property: {:?}", property);
+        log::info!("Property: {property:?}");
         assert_eq!(property.value(), Ok(42));
     }
 
@@ -154,7 +154,7 @@ async fn test_device() {
     // Wait for the device to receive the value and send it back to the controller.
     'outer2: loop {
         for event in controller.poll(&mut event_loop).await.unwrap() {
-            log::trace!("Event: {:?}", event);
+            log::trace!("Event: {event:?}");
             if let Event::PropertyValueChanged {
                 device_id,
                 node_id,
@@ -167,7 +167,7 @@ async fn test_device() {
                 assert_eq!(node_id, "node_id");
                 assert_eq!(property_id, "property_id");
                 assert_eq!(value, "13");
-                assert_eq!(fresh, true);
+                assert!(fresh);
                 break 'outer2;
             }
         }
@@ -180,7 +180,7 @@ async fn test_device() {
         let device = devices.get("device_id").unwrap();
         let node = device.nodes.get("node_id").unwrap();
         let property = node.properties.get("property_id").unwrap();
-        log::info!("Property: {:?}", property);
+        log::info!("Property: {property:?}");
         assert_eq!(property.value(), Ok(13));
     }
 
@@ -191,7 +191,7 @@ async fn test_device() {
         if let SpawnError::Connection(ConnectionError::MqttState(StateError::Io(e))) = err {
             assert_eq!(e.kind(), ErrorKind::ConnectionAborted);
         } else {
-            panic!("Unexpected error {:?}", err);
+            panic!("Unexpected error {err:?}");
         }
     }
 
@@ -199,7 +199,7 @@ async fn test_device() {
     controller.disconnect().await.unwrap();
     while let Ok(events) = controller.poll(&mut event_loop).await {
         for event in events {
-            log::trace!("Event: {:?}", event);
+            log::trace!("Event: {event:?}");
         }
     }
 }
@@ -240,9 +240,8 @@ fn spawn_mqtt_broker(port: u16) {
     };
     let mut broker = Broker::new(broker_config);
     thread::spawn(move || {
-        broker.start().expect(&format!(
-            "Failed to start MQTT broker. This may be because port {} is already in use",
-            port,
-        ));
+        broker.start().unwrap_or_else(|_| {
+            panic!("Failed to start MQTT broker. This may be because port {port} is already in use")
+        });
     });
 }

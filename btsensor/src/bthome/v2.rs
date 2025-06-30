@@ -1,7 +1,7 @@
 //! Support for the [BTHome](https://bthome.io/) v2 format.
 
-use super::events::{ButtonEventType, DimmerEventType, Event};
 use super::DecodeError;
+use super::events::{ButtonEventType, DimmerEventType, Event};
 use crate::uuid_from_u16;
 use std::fmt::{self, Display, Formatter};
 use uuid::Uuid;

@@ -23,8 +23,8 @@ use uuid::Uuid;
 mod decode;
 mod signed_duration;
 pub use decode::comfort_level::ComfortLevel;
-use decode::history::decode_range;
 pub use decode::history::HistoryRecord;
+use decode::history::decode_range;
 pub use decode::readings::Readings;
 pub use decode::temperature_unit::TemperatureUnit;
 use decode::time::{decode_time, encode_time};
@@ -105,7 +105,7 @@ impl MijiaEvent {
                 let info = session
                     .get_characteristic_info(&characteristic)
                     .await
-                    .map_err(|e| log::error!("Error getting characteristic UUID: {:?}", e))
+                    .map_err(|e| log::error!("Error getting characteristic UUID: {e:?}"))
                     .ok()?;
                 match info.uuid {
                     SENSOR_READING_CHARACTERISTIC_UUID => match Readings::decode(&value) {
@@ -114,7 +114,7 @@ impl MijiaEvent {
                             readings,
                         }),
                         Err(e) => {
-                            log::error!("Error decoding readings: {:?}", e);
+                            log::error!("Error decoding readings: {e:?}");
                             None
                         }
                     },
@@ -124,15 +124,13 @@ impl MijiaEvent {
                             record,
                         }),
                         Err(e) => {
-                            log::error!("Error decoding historical record: {:?}", e);
+                            log::error!("Error decoding historical record: {e:?}");
                             None
                         }
                     },
                     _ => {
                         log::trace!(
-                            "Got BluetoothEvent::Value for characteristic {:?} with value {:?}",
-                            characteristic,
-                            value
+                            "Got BluetoothEvent::Value for characteristic {characteristic:?} with value {value:?}"
                         );
                         None
                     }
@@ -150,7 +148,7 @@ impl MijiaEvent {
                 let device = session
                     .get_device_info(&id)
                     .await
-                    .map_err(|e| log::error!("Error getting device info: {:?}", e))
+                    .map_err(|e| log::error!("Error getting device info: {e:?}"))
                     .ok()?;
                 if is_mijia_sensor(&device) {
                     Some(MijiaEvent::Discovered { id })
@@ -197,8 +195,8 @@ impl MijiaSession {
     /// Returns a tuple of (join handle, Self).
     /// If the join handle ever completes then you're in trouble and should
     /// probably restart the process.
-    pub async fn new(
-    ) -> Result<(impl Future<Output = Result<(), SpawnError>>, Self), BluetoothError> {
+    pub async fn new()
+    -> Result<(impl Future<Output = Result<(), SpawnError>>, Self), BluetoothError> {
         let (handle, bt_session) = BluetoothSession::new().await?;
         Ok((handle, MijiaSession { bt_session }))
     }
@@ -448,24 +446,21 @@ impl MijiaSession {
             } = event
             {
                 let record = HistoryRecord::decode(&value)?;
-                log::trace!("{:?}: {}", record_id, record);
+                log::trace!("{record_id:?}: {record}");
                 if record_id == history_record_characteristic.id {
                     if history_range.contains(&record.index) {
                         let offset = record.index - history_range.start;
                         history[offset as usize] = Some(record);
                     } else {
                         log::error!(
-                            "Got record {:?} for sensor {:?} out of bounds {:?}",
-                            record,
-                            id,
-                            history_range
+                            "Got record {record:?} for sensor {id:?} out of bounds {history_range:?}"
                         );
                     }
                 } else {
-                    log::warn!("Got record for wrong characteristic {:?}", record_id);
+                    log::warn!("Got record for wrong characteristic {record_id:?}");
                 }
             } else {
-                log::warn!("Unexpected event: {:?}", event);
+                log::warn!("Unexpected event: {event:?}");
             }
         }
 
@@ -505,7 +500,9 @@ impl MijiaSession {
     }
 
     /// Get a stream of reading/history/disconnected events for all sensors.
-    pub async fn event_stream(&self) -> Result<impl Stream<Item = MijiaEvent>, BluetoothError> {
+    pub async fn event_stream(
+        &self,
+    ) -> Result<impl Stream<Item = MijiaEvent> + use<>, BluetoothError> {
         let events = self.bt_session.event_stream().await?;
         let session = self.bt_session.clone();
         Ok(Box::pin(futures::stream::StreamExt::filter_map(

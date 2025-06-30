@@ -2,7 +2,7 @@
 name = "btsensor"
 version = "0.1.1"
 authors = ["Andrew Walbran <qwandor@google.com>"]
-edition = "2021"
+edition = "2024"
 license = "MIT OR Apache-2.0"
 description = "A library for decoding sensor readings from BLE advertisements, including the BTHome format."
 repository = "https://github.com/alsuren/mijia-homie/"

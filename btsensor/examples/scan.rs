@@ -19,9 +19,9 @@ async fn main() -> Result<(), eyre::Report> {
             event: DeviceEvent::ServiceData { service_data },
         } = event
         {
-            println!("{}: {:?}", id, service_data);
+            println!("{id}: {service_data:?}");
             if let Some(reading) = Reading::decode(&service_data) {
-                println!("  {}", reading);
+                println!("  {reading}");
             } else {
                 println!("  (Failed to decode.)");
             }

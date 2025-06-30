@@ -1,6 +1,6 @@
 use crate::config::de_duration_seconds;
 use eyre::Report;
-use influx_db_client::{reqwest::Url, Client};
+use influx_db_client::{Client, reqwest::Url};
 use serde_derive::Deserialize;
 use stable_eyre::eyre::WrapErr;
 use std::fs::read_to_string;
@@ -32,7 +32,7 @@ impl Config {
 
     fn read(filename: &str) -> Result<Config, Report> {
         let config_file =
-            read_to_string(filename).wrap_err_with(|| format!("Reading {}", filename))?;
+            read_to_string(filename).wrap_err_with(|| format!("Reading {filename}"))?;
         Ok(toml::from_str(&config_file)?)
     }
 }

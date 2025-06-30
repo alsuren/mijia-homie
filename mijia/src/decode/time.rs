@@ -1,4 +1,4 @@
-use crate::decode::{check_length, DecodeError, EncodeError};
+use crate::decode::{DecodeError, EncodeError, check_length};
 use std::convert::TryInto;
 use std::time::{Duration, SystemTime};
 

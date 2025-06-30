@@ -1,6 +1,6 @@
 //! Types related to BTHome events, shared between both v1 and v2.
 
-use super::{v1::Property, DecodeError};
+use super::{DecodeError, v1::Property};
 use num_enum::IntoPrimitive;
 use std::fmt::{self, Display, Formatter};
 
@@ -74,8 +74,8 @@ impl DimmerEventType {
 impl Display for DimmerEventType {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
-            Self::RotateLeft(steps) => write!(f, "rotate left {} steps", steps),
-            Self::RotateRight(steps) => write!(f, "rotate right {} steps", steps),
+            Self::RotateLeft(steps) => write!(f, "rotate left {steps} steps"),
+            Self::RotateRight(steps) => write!(f, "rotate right {steps} steps"),
         }
     }
 }
@@ -101,9 +101,9 @@ impl Display for Event {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
             Self::Button(None) => f.write_str("button: none"),
-            Self::Button(Some(event_type)) => write!(f, "button: {}", event_type),
+            Self::Button(Some(event_type)) => write!(f, "button: {event_type}"),
             Self::Dimmer(None) => f.write_str("dimmer: none"),
-            Self::Dimmer(Some(event_type)) => write!(f, "dimmer: {}", event_type),
+            Self::Dimmer(Some(event_type)) => write!(f, "dimmer: {event_type}"),
         }
     }
 }

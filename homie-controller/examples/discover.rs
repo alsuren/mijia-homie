@@ -24,16 +24,13 @@ async fn main() -> Result<(), PollError> {
                         fresh,
                     } = event
                     {
-                        println!(
-                            "{}/{}/{} = {} ({})",
-                            device_id, node_id, property_id, value, fresh
-                        );
+                        println!("{device_id}/{node_id}/{property_id} = {value} ({fresh})");
                     } else {
-                        println!("Event: {:?}", event);
+                        println!("Event: {event:?}");
                         println!("Devices:");
                         for device in controller.devices().values() {
                             if device.has_required_attributes() {
-                                println!(" * {:?}", device);
+                                println!(" * {device:?}");
                             } else {
                                 println!(" * {} not ready.", device.id);
                             }
@@ -41,7 +38,7 @@ async fn main() -> Result<(), PollError> {
                     }
                 }
             }
-            Err(e) => log::error!("Error: {:?}", e),
+            Err(e) => log::error!("Error: {e:?}"),
         }
     }
 }

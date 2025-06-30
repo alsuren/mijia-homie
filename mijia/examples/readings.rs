@@ -42,9 +42,9 @@ async fn main() -> Result<(), Report> {
     while let Some(event) = events.next().await {
         match event {
             MijiaEvent::Readings { id, readings } => {
-                println!("{}: {}", id, readings);
+                println!("{id}: {readings}");
             }
-            _ => println!("Event: {:?}", event),
+            _ => println!("Event: {event:?}"),
         }
     }
 
@@ -64,16 +64,16 @@ fn parse_args() -> Result<Vec<String>, Report> {
         .iter()
         .any(|f| f.contains(|c: char| !(c.is_ascii_hexdigit() || c == ':')))
     {
-        eprintln!("Invalid MAC addresses {:?}", filters);
+        eprintln!("Invalid MAC addresses {filters:?}");
         eprintln!("Usage:");
-        eprintln!("  {} [MAC address]...", binary_name);
+        eprintln!("  {binary_name} [MAC address]...");
         exit(1);
     }
 
     Ok(filters)
 }
 
-fn should_include_sensor(sensor: &SensorProps, filters: &Vec<String>) -> bool {
+fn should_include_sensor(sensor: &SensorProps, filters: &[String]) -> bool {
     let mac = sensor.mac_address.to_string();
     filters.is_empty() || filters.iter().any(|filter| mac.contains(filter))
 }

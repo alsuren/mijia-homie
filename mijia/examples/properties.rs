@@ -37,11 +37,10 @@ async fn main() -> Result<(), Report> {
             let history_range = session.get_history_range(&sensor.id).await?;
             let last_record = session.get_last_history_record(&sensor.id).await?;
             println!(
-                "Time: {}, Unit: {}, Comfort level: {}, Range: {:?} Last value: {}",
-                sensor_time, temperature_unit, comfort_level, history_range, last_record
+                "Time: {sensor_time}, Unit: {temperature_unit}, Comfort level: {comfort_level}, Range: {history_range:?} Last value: {last_record}"
             );
             let history = session.get_all_history(&sensor.id).await?;
-            println!("History: {:?}", history);
+            println!("History: {history:?}");
         }
     }
 
@@ -61,16 +60,16 @@ fn parse_args() -> Result<Vec<String>, Report> {
         .iter()
         .any(|f| f.contains(|c: char| !(c.is_ascii_hexdigit() || c == ':')))
     {
-        eprintln!("Invalid MAC addresses {:?}", filters);
+        eprintln!("Invalid MAC addresses {filters:?}");
         eprintln!("Usage:");
-        eprintln!("  {} [MAC address]...", binary_name);
+        eprintln!("  {binary_name} [MAC address]...");
         exit(1);
     }
 
     Ok(filters)
 }
 
-fn should_include_sensor(sensor: &SensorProps, filters: &Vec<String>) -> bool {
+fn should_include_sensor(sensor: &SensorProps, filters: &[String]) -> bool {
     let mac = sensor.mac_address.to_string();
     filters.is_empty() || filters.iter().any(|filter| mac.contains(filter))
 }

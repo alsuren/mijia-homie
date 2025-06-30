@@ -32,7 +32,7 @@ impl Config {
 
     fn read(filename: &str) -> Result<Config, Report> {
         let config_file =
-            read_to_string(filename).wrap_err_with(|| format!("Reading {}", filename))?;
+            read_to_string(filename).wrap_err_with(|| format!("Reading {filename}"))?;
         Ok(toml::from_str(&config_file)?)
     }
 }
@@ -121,7 +121,7 @@ pub fn get_mqtt_options(config: MqttConfig, device_id: &str) -> MqttOptions {
 
 pub fn read_sensor_names(filename: &str) -> Result<HashMap<MacAddress, String>, Report> {
     let sensor_names_file =
-        read_to_string(filename).wrap_err_with(|| format!("Reading {}", filename))?;
+        read_to_string(filename).wrap_err_with(|| format!("Reading {filename}"))?;
     let names = toml::from_str::<HashMap<String, String>>(&sensor_names_file)?
         .into_iter()
         .map(|(mac_address, name)| Ok::<_, ParseMacAddressError>((mac_address.parse()?, name)))

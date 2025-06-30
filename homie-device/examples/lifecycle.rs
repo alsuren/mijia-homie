@@ -52,7 +52,7 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     // Poll everything to completion, until the first one bombs out.
     let res: Result<_, Box<dyn Error + Send + Sync>> = try_join! {
         homie_handle.err_into(),
-        handle.map(|res| Ok(res??)),
+        handle.map(|res| res?),
     };
     res?;
     Ok(())

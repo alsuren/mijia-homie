@@ -1,4 +1,4 @@
-use crate::decode::{check_length, DecodeError};
+use crate::decode::{DecodeError, check_length};
 use std::fmt::{self, Display, Formatter};
 
 /// The temperature unit which a Mijia sensor uses for its display.
@@ -18,8 +18,7 @@ impl TemperatureUnit {
             0x00 => Ok(TemperatureUnit::Celcius),
             0x01 => Ok(TemperatureUnit::Fahrenheit),
             byte => Err(DecodeError::InvalidValue(format!(
-                "Invalid temperature unit value 0x{:x}",
-                byte
+                "Invalid temperature unit value 0x{byte:x}"
             ))),
         }
     }

@@ -1,6 +1,6 @@
 use eyre::Report;
-use influx_db_client::reqwest::Url;
 use influx_db_client::Client;
+use influx_db_client::reqwest::Url;
 use rumqttc::{MqttOptions, TlsConfiguration, Transport};
 use rustls::{ClientConfig, RootCertStore};
 use serde::{Deserialize as _, Deserializer};
@@ -35,7 +35,7 @@ impl Config {
 
     fn read(filename: &str) -> Result<Config, Report> {
         let config_file =
-            read_to_string(filename).wrap_err_with(|| format!("Reading {}", filename))?;
+            read_to_string(filename).wrap_err_with(|| format!("Reading {filename}"))?;
         Ok(toml::from_str(&config_file)?)
     }
 }
@@ -131,8 +131,7 @@ pub fn read_mappings(config: &HomieConfig) -> Result<Vec<Mapping>, Report> {
 /// Read mappings of the form "homie_prefix:influxdb_database" from the given file, ignoring any
 /// lines starting with '#'.
 fn mappings_from_file(filename: &str) -> Result<Vec<Mapping>, Report> {
-    let mappings_file =
-        read_to_string(filename).wrap_err_with(|| format!("Reading {}", filename))?;
+    let mappings_file = read_to_string(filename).wrap_err_with(|| format!("Reading {filename}"))?;
     let mappings = toml::from_str::<MappingsConfig>(&mappings_file)?;
     if mappings.mappings.is_empty() {
         eyre::bail!("At least one mapping must be configured in {}.", filename);
