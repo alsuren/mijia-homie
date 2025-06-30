@@ -5,10 +5,10 @@ mod config;
 mod mijia_history_config;
 
 use crate::config::read_sensor_names;
-use crate::mijia_history_config::{get_influxdb_client, Config};
+use crate::mijia_history_config::{Config, get_influxdb_client};
 use eyre::Report;
 use influx_db_client::{Client, Point, Precision};
-use mijia::{bluetooth::MacAddress, HistoryRecord, MijiaSession, SignedDuration};
+use mijia::{HistoryRecord, MijiaSession, SignedDuration, bluetooth::MacAddress};
 use std::time::{Duration, SystemTime};
 use tokio::time;
 

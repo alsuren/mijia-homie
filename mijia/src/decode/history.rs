@@ -1,5 +1,5 @@
 use crate::decode::time::decode_time;
-use crate::decode::{check_length, DecodeError};
+use crate::decode::{DecodeError, check_length};
 use std::convert::TryInto;
 use std::fmt::{self, Display, Formatter};
 use std::ops::Range;

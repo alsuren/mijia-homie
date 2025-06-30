@@ -3,8 +3,8 @@
 //!
 //! See the examples directory for examples of how to use it.
 
-use futures::future::try_join;
 use futures::FutureExt;
+use futures::future::try_join;
 
 use mac_address::get_mac_address;
 use rumqttc::{
@@ -276,7 +276,7 @@ impl HomieDevice {
         &self,
         mut event_loop: EventLoop,
         mut update_callback: Option<UpdateCallback>,
-    ) -> impl Future<Output = Result<(), SpawnError>> {
+    ) -> impl Future<Output = Result<(), SpawnError>> + use<> {
         let device_base = format!("{}/", self.publisher.device_base);
         let (incoming_tx, incoming_rx) = flume::unbounded();
 

@@ -23,8 +23,8 @@ use uuid::Uuid;
 mod decode;
 mod signed_duration;
 pub use decode::comfort_level::ComfortLevel;
-use decode::history::decode_range;
 pub use decode::history::HistoryRecord;
+use decode::history::decode_range;
 pub use decode::readings::Readings;
 pub use decode::temperature_unit::TemperatureUnit;
 use decode::time::{decode_time, encode_time};
@@ -195,8 +195,8 @@ impl MijiaSession {
     /// Returns a tuple of (join handle, Self).
     /// If the join handle ever completes then you're in trouble and should
     /// probably restart the process.
-    pub async fn new(
-    ) -> Result<(impl Future<Output = Result<(), SpawnError>>, Self), BluetoothError> {
+    pub async fn new()
+    -> Result<(impl Future<Output = Result<(), SpawnError>>, Self), BluetoothError> {
         let (handle, bt_session) = BluetoothSession::new().await?;
         Ok((handle, MijiaSession { bt_session }))
     }
@@ -500,7 +500,9 @@ impl MijiaSession {
     }
 
     /// Get a stream of reading/history/disconnected events for all sensors.
-    pub async fn event_stream(&self) -> Result<impl Stream<Item = MijiaEvent>, BluetoothError> {
+    pub async fn event_stream(
+        &self,
+    ) -> Result<impl Stream<Item = MijiaEvent> + use<>, BluetoothError> {
         let events = self.bt_session.event_stream().await?;
         let session = self.bt_session.clone();
         Ok(Box::pin(futures::stream::StreamExt::filter_map(

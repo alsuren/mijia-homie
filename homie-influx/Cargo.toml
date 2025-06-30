@@ -2,7 +2,7 @@
 name = "homie-influx"
 version = "0.2.9"
 authors = ["Andrew Walbran <qwandor@google.com>"]
-edition = "2021"
+edition = "2024"
 license = "MIT OR Apache-2.0"
 description = "Service to connect to an MQTT broker and log properties of devices following the Homie convention to an InfluxDB database."
 repository = "https://github.com/alsuren/mijia-homie/"

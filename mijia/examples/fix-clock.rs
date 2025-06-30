@@ -1,7 +1,7 @@
 //! Example to scan for sensors, connect to each one in turn, and correct its clock if necessary.
 
-use backoff::future::retry;
 use backoff::ExponentialBackoff;
+use backoff::future::retry;
 use chrono::{DateTime, Utc};
 use eyre::Report;
 use futures::TryFutureExt;

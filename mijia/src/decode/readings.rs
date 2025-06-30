@@ -1,4 +1,4 @@
-use crate::decode::{check_length, decode_temperature, DecodeError};
+use crate::decode::{DecodeError, check_length, decode_temperature};
 use std::cmp::max;
 use std::convert::TryInto;
 use std::fmt::{self, Display, Formatter};

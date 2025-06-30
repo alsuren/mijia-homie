@@ -1,6 +1,6 @@
 //! Types related to BTHome events, shared between both v1 and v2.
 
-use super::{v1::Property, DecodeError};
+use super::{DecodeError, v1::Property};
 use num_enum::IntoPrimitive;
 use std::fmt::{self, Display, Formatter};
 

@@ -2,14 +2,14 @@
 
 mod config;
 
-use crate::config::{get_mqtt_options, read_sensor_names, Config};
-use backoff::future::retry;
+use crate::config::{Config, get_mqtt_options, read_sensor_names};
 use backoff::ExponentialBackoff;
-use btsensor::bthome::{self, v1::Element};
+use backoff::future::retry;
 use btsensor::Reading;
-use eyre::{eyre, Report};
-use futures::stream::StreamExt;
+use btsensor::bthome::{self, v1::Element};
+use eyre::{Report, eyre};
 use futures::TryFutureExt;
+use futures::stream::StreamExt;
 use homie_device::{HomieDevice, Node, Property};
 use itertools::Itertools;
 use log::{debug, info};

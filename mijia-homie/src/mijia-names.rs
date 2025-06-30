@@ -8,8 +8,8 @@ use mijia::bluetooth::MacAddress;
 use mijia::{MijiaSession, SensorProps};
 use std::collections::HashMap;
 use std::fs::OpenOptions;
-use std::io::stdin;
 use std::io::Write;
+use std::io::stdin;
 use std::time::Duration;
 use tokio::time;
 

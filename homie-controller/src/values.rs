@@ -57,7 +57,7 @@ pub trait Value: ToString + FromStr {
             }
         }
 
-        if let Some(ref format) = format {
+        if let Some(format) = format {
             Self::valid_for_format(format)
         } else {
             Ok(())

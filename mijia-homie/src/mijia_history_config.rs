@@ -1,6 +1,6 @@
 use crate::config::de_duration_seconds;
 use eyre::Report;
-use influx_db_client::{reqwest::Url, Client};
+use influx_db_client::{Client, reqwest::Url};
 use serde_derive::Deserialize;
 use stable_eyre::eyre::WrapErr;
 use std::fs::read_to_string;

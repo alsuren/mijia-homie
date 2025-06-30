@@ -1,6 +1,6 @@
 use eyre::Report;
-use influx_db_client::reqwest::Url;
 use influx_db_client::Client;
+use influx_db_client::reqwest::Url;
 use rumqttc::{MqttOptions, TlsConfiguration, Transport};
 use rustls::{ClientConfig, RootCertStore};
 use serde::{Deserialize as _, Deserializer};

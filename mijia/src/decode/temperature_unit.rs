@@ -1,4 +1,4 @@
-use crate::decode::{check_length, DecodeError};
+use crate::decode::{DecodeError, check_length};
 use std::fmt::{self, Display, Formatter};
 
 /// The temperature unit which a Mijia sensor uses for its display.
