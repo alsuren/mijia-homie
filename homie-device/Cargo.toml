@@ -5,7 +5,7 @@ authors = [
     "Andrew Walbran <qwandor@google.com>",
     "David Laban <alsuren@gmail.com>",
 ]
-edition = "2018"
+edition = "2021"
 license = "MIT OR Apache-2.0"
 description = "A library for creating devices implementing the Homie convention for MQTT."
 repository = "https://github.com/alsuren/mijia-homie/"
