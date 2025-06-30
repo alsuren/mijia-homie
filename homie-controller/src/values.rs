@@ -294,9 +294,9 @@ impl FromStr for EnumValue {
     }
 }
 
-impl ToString for EnumValue {
-    fn to_string(&self) -> String {
-        self.0.to_string()
+impl Display for EnumValue {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        f.write_str(&self.0)
     }
 }
 

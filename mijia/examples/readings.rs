@@ -73,7 +73,7 @@ fn parse_args() -> Result<Vec<String>, Report> {
     Ok(filters)
 }
 
-fn should_include_sensor(sensor: &SensorProps, filters: &Vec<String>) -> bool {
+fn should_include_sensor(sensor: &SensorProps, filters: &[String]) -> bool {
     let mac = sensor.mac_address.to_string();
     filters.is_empty() || filters.iter().any(|filter| mac.contains(filter))
 }
