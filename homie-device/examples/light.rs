@@ -39,19 +39,16 @@ async fn update_callback(node_id: String, property_id: String, value: String) ->
             set_colour(value.parse().unwrap());
         }
         _ => {
-            println!(
-                "Unexpected property {}/{} is now {}",
-                node_id, property_id, value
-            );
+            println!("Unexpected property {node_id}/{property_id} is now {value}");
         }
     }
     Some(value)
 }
 
 fn set_power(power: bool) {
-    println!("Power {}", power)
+    println!("Power {power}")
 }
 
 fn set_colour(colour: ColorRgb) {
-    println!("Colour {}", colour);
+    println!("Colour {colour}");
 }

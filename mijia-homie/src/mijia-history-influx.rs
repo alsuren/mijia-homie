@@ -39,7 +39,7 @@ async fn main() -> Result<(), Report> {
         if let Some(name) = names.get(&sensor.mac_address) {
             println!("Connecting to {} ({})...", name, sensor.mac_address);
             if let Err(e) = session.bt_session.connect(&sensor.id).await {
-                log::error!("Failed to connect to {}: {:?}", name, e);
+                log::error!("Failed to connect to {name}: {e:?}");
                 continue;
             }
 
@@ -53,7 +53,7 @@ async fn main() -> Result<(), Report> {
                     offset, config.max_clock_offset
                 );
             } else {
-                println!("Sensor time offset {:?}, reading history...", offset);
+                println!("Sensor time offset {offset:?}, reading history...");
                 let history = session.get_all_history(&sensor.id).await?;
                 write_history(
                     &influxdb_client,
@@ -67,7 +67,7 @@ async fn main() -> Result<(), Report> {
             }
 
             if let Err(e) = session.bt_session.disconnect(&sensor.id).await {
-                log::error!("Disconnecting failed: {:?}", e);
+                log::error!("Disconnecting failed: {e:?}");
             }
         }
     }

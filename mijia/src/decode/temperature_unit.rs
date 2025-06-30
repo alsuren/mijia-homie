@@ -18,8 +18,7 @@ impl TemperatureUnit {
             0x00 => Ok(TemperatureUnit::Celcius),
             0x01 => Ok(TemperatureUnit::Fahrenheit),
             byte => Err(DecodeError::InvalidValue(format!(
-                "Invalid temperature unit value 0x{:x}",
-                byte
+                "Invalid temperature unit value 0x{byte:x}"
             ))),
         }
     }

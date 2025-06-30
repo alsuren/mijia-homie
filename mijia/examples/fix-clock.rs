@@ -57,8 +57,7 @@ async fn main() -> Result<(), Report> {
         let offset: SignedDuration = now.duration_since(sensor_time).into();
         let last_record_offset: SignedDuration = now.duration_since(last_record_time).into();
         println!(
-            "Time: {} (should be {}, offset {:?}), Last stored value: {} ({:?} ago)",
-            sensor_time_utc, now_utc, offset, last_record_utc, last_record_offset
+            "Time: {sensor_time_utc} (should be {now_utc}, offset {offset:?}), Last stored value: {last_record_utc} ({last_record_offset:?} ago)"
         );
         if offset.duration > MINIMUM_OFFSET {
             println!("Correcting clock.");
@@ -87,9 +86,9 @@ fn parse_args() -> Result<Vec<String>, Report> {
         .iter()
         .any(|f| f.contains(|c: char| !(c.is_ascii_hexdigit() || c == ':')))
     {
-        eprintln!("Invalid MAC addresses {:?}", filters);
+        eprintln!("Invalid MAC addresses {filters:?}");
         eprintln!("Usage:");
-        eprintln!("  {} [MAC address]...", binary_name);
+        eprintln!("  {binary_name} [MAC address]...");
         exit(1);
     }
 

@@ -590,8 +590,8 @@ async fn connect_and_subscribe_sensor_or_disconnect(
             .bt_session
             .disconnect(&id)
             .await
-            .wrap_err_with(|| format!("Disconnecting from {} ({})", name, id))?;
-        Err(Report::new(e).wrap_err(format!("Starting notifications on {} ({})", name, id)))
+            .wrap_err_with(|| format!("Disconnecting from {name} ({id})"))?;
+        Err(Report::new(e).wrap_err(format!("Starting notifications on {name} ({id})")))
     })
     .await?;
 
@@ -623,7 +623,7 @@ async fn check_for_stale_sensor(
             .bt_session
             .disconnect(id)
             .await
-            .wrap_err_with(|| format!("disconnecting from {}", id))?;
+            .wrap_err_with(|| format!("disconnecting from {id}"))?;
     }
     Ok(())
 }
@@ -663,7 +663,7 @@ async fn handle_bluetooth_event(
     } = event
     {
         if let Some(reading) = Reading::decode(&service_data) {
-            info!("{}: {}", id, reading);
+            info!("{id}: {reading}");
             let mac_address = session.get_device_info(&id).await?.mac_address;
             let state = &mut *state.lock().await;
             let is_new = state.add_sensor_if_named(
@@ -712,21 +712,19 @@ async fn handle_mijia_event(
                     ConnectionStatus::Connected { id: connected_id } => {
                         if id != *connected_id {
                             log::info!(
-                                "Got update from device on unexpected id {} (expected {})",
-                                id,
-                                connected_id,
+                                "Got update from device on unexpected id {id} (expected {connected_id})",
                             );
                         }
                     }
                     ConnectionStatus::Connecting { .. } => {}
                     _ => {
-                        println!("Got update from disconnected device {}. Connecting.", id);
+                        println!("Got update from disconnected device {id}. Connecting.");
                         sensor.mark_connected(homie, id).await?;
                         // TODO: Make sure the connection interval is set.
                     }
                 }
             } else {
-                println!("Got update from unknown device {}.", id);
+                println!("Got update from unknown device {id}.");
             }
         }
         MijiaEvent::Disconnected { id } => {
@@ -750,7 +748,7 @@ async fn handle_mijia_event(
                     );
                 }
             } else {
-                println!("Unknown device {} disconnected.", id);
+                println!("Unknown device {id} disconnected.");
             }
         }
         _ => {}

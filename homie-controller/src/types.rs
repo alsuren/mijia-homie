@@ -865,13 +865,13 @@ mod tests {
     #[test]
     fn property_has_required_attributes() {
         let mut property = Property::new("property_id");
-        assert_eq!(property.has_required_attributes(), false);
+        assert!(!property.has_required_attributes());
 
         property.name = Some("Property name".to_owned());
-        assert_eq!(property.has_required_attributes(), false);
+        assert!(!property.has_required_attributes());
 
         property.datatype = Some(Datatype::Integer);
-        assert_eq!(property.has_required_attributes(), true);
+        assert!(property.has_required_attributes());
     }
 
     /// Construct a minimal `Property` with all the required attributes.
@@ -885,19 +885,19 @@ mod tests {
     #[test]
     fn node_has_required_attributes() {
         let mut node = Node::new("node_id");
-        assert_eq!(node.has_required_attributes(), false);
+        assert!(!node.has_required_attributes());
 
         node.name = Some("Node name".to_owned());
-        assert_eq!(node.has_required_attributes(), false);
+        assert!(!node.has_required_attributes());
 
         node.node_type = Some("Node type".to_owned());
-        assert_eq!(node.has_required_attributes(), false);
+        assert!(!node.has_required_attributes());
 
         node.add_property(property_with_required_attributes());
-        assert_eq!(node.has_required_attributes(), true);
+        assert!(node.has_required_attributes());
 
         node.add_property(Property::new("property_without_required_attributes"));
-        assert_eq!(node.has_required_attributes(), false);
+        assert!(!node.has_required_attributes());
     }
 
     /// Construct a minimal `Node` with all the required attributes.
@@ -912,18 +912,18 @@ mod tests {
     #[test]
     fn device_has_required_attributes() {
         let mut device = Device::new("device_id", "123");
-        assert_eq!(device.has_required_attributes(), false);
+        assert!(!device.has_required_attributes());
 
         device.name = Some("Device name".to_owned());
-        assert_eq!(device.has_required_attributes(), false);
+        assert!(!device.has_required_attributes());
 
         device.state = State::Init;
-        assert_eq!(device.has_required_attributes(), true);
+        assert!(device.has_required_attributes());
 
         device.add_node(node_with_required_attributes());
-        assert_eq!(device.has_required_attributes(), true);
+        assert!(device.has_required_attributes());
 
         device.add_node(Node::new("node_without_required_attributes"));
-        assert_eq!(device.has_required_attributes(), false);
+        assert!(!device.has_required_attributes());
     }
 }

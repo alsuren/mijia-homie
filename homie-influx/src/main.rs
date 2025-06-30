@@ -110,7 +110,7 @@ async fn handle_event(controller: &HomieController, influx_db_client: &Client, e
                 )
                 .await
                 {
-                    log::error!("{:?}", e);
+                    log::error!("{e:?}");
                 }
             }
         }

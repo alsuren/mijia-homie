@@ -24,12 +24,9 @@ fn spawn_poll_loop(
                     fresh,
                 } = event
                 {
-                    println!(
-                        "{}/{}/{} = {} ({})",
-                        device_id, node_id, property_id, value, fresh
-                    );
+                    println!("{device_id}/{node_id}/{property_id} = {value} ({fresh})");
                 } else {
-                    log::info!("Event: {:?}", event);
+                    log::info!("Event: {event:?}");
                 }
             }
         }

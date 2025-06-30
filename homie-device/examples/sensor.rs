@@ -37,7 +37,7 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
         loop {
             let temperature: f32 = random::<f32>() * 40.0;
             let humidity: u8 = (random::<f32>() * 100.0) as u8;
-            println!("Update: {}ºC {}%", temperature, humidity);
+            println!("Update: {temperature}ºC {humidity}%");
             homie
                 .publish_value("sensor", "temperature", temperature)
                 .await?;
@@ -50,7 +50,7 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     // Poll everything to completion, until the first one bombs out.
     let res: Result<_, Box<dyn Error + Send + Sync>> = try_join! {
         homie_handle.err_into(),
-        handle.map(|res| Ok(res??)),
+        handle.map(|res| res?),
     };
     res?;
     Ok(())

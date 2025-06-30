@@ -105,10 +105,7 @@ fn handle_event(controller: &HomieController, ui_state: &Mutex<UiState>, event: 
                 fresh
             );
             if fresh {
-                println!(
-                    "Fresh property value {}/{}/{}={}",
-                    device_id, node_id, property_id, value
-                );
+                println!("Fresh property value {device_id}/{node_id}/{property_id}={value}");
                 ui_state.lock().unwrap().update_display();
             }
         }

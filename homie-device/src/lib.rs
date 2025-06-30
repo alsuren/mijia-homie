@@ -283,7 +283,7 @@ impl HomieDevice {
         let mqtt_task = task::spawn(async move {
             loop {
                 let notification = event_loop.poll().await?;
-                log::trace!("Notification = {:?}", notification);
+                log::trace!("Notification = {notification:?}");
 
                 if let Event::Incoming(incoming) = notification {
                     incoming_tx.send_async(incoming).await.map_err(|_| {
@@ -307,10 +307,7 @@ impl HomieDevice {
                             str::from_utf8(&publish.payload),
                         ) {
                             log::trace!(
-                                "set node {:?} property {:?} to {:?}",
-                                node_id,
-                                property_id,
-                                payload
+                                "set node {node_id:?} property {property_id:?} to {payload:?}"
                             );
                             if let Some(callback) = update_callback.as_mut() {
                                 if let Some(value) = callback(
@@ -322,7 +319,7 @@ impl HomieDevice {
                                 {
                                     publisher
                                         .publish_retained(
-                                            &format!("{}/{}", node_id, property_id),
+                                            &format!("{node_id}/{property_id}"),
                                             value,
                                         )
                                         .await?;
@@ -330,7 +327,7 @@ impl HomieDevice {
                             }
                         }
                     } else {
-                        log::warn!("Unexpected publish: {:?}", publish);
+                        log::warn!("Unexpected publish: {publish:?}");
                     }
                 }
             }
@@ -350,7 +347,7 @@ impl HomieDevice {
     pub async fn add_node(&mut self, node: Node) -> Result<(), ClientError> {
         // First check that there isn't already a node with the same ID.
         if self.has_node(&node.id) {
-            panic!("Tried to add node with duplicate ID: {:?}", node);
+            panic!("Tried to add node with duplicate ID: {node:?}");
         }
         self.nodes.push(node);
         // `node` was moved into the `nodes` vector, but we can safely get a reference to it because
@@ -494,7 +491,7 @@ impl HomieDevice {
         value: impl ToString,
     ) -> Result<(), ClientError> {
         self.publisher
-            .publish_retained(&format!("{}/{}", node_id, property_id), value.to_string())
+            .publish_retained(&format!("{node_id}/{property_id}"), value.to_string())
             .await
     }
 
@@ -507,7 +504,7 @@ impl HomieDevice {
         value: impl ToString,
     ) -> Result<(), ClientError> {
         self.publisher
-            .publish_nonretained(&format!("{}/{}", node_id, property_id), value.to_string())
+            .publish_nonretained(&format!("{node_id}/{property_id}"), value.to_string())
             .await
     }
 }
@@ -854,15 +851,15 @@ mod tests {
     async fn has_node() -> Result<(), ClientError> {
         let (mut device, rx) = make_test_device();
 
-        assert_eq!(device.has_node("id"), false);
+        assert!(!device.has_node("id"));
 
         device
             .add_node(Node::new("id", "Name", "type", vec![]))
             .await?;
-        assert_eq!(device.has_node("id"), true);
+        assert!(device.has_node("id"));
 
         device.remove_node("id").await?;
-        assert_eq!(device.has_node("id"), false);
+        assert!(!device.has_node("id"));
 
         // Need to keep rx alive until here so that the channel isn't closed.
         drop(rx);
