@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.8
+
+### Other changes
+
+- Updated dependencies.
+
 ## 0.2.7
 
 ### New features

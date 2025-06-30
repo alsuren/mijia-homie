@@ -1,6 +1,6 @@
 [package]
 name = "mijia-homie"
-version = "0.2.7"
+version = "0.2.8"
 authors = [
 	"David Laban <alsuren@gmail.com>",
 	"Andrew Walbran <qwandor@google.com>",

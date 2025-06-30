@@ -1564,7 +1564,7 @@ dependencies = [
 
 [[package]]
 name = "mijia-homie"
-version = "0.2.7"
+version = "0.2.8"
 dependencies = [
  "backoff",
  "btsensor",
