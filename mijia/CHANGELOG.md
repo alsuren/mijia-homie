@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.0
+
+### Breaking changes
+
+- Updated to `bluez-async` 0.8.1.
+
 ## 0.7.1
 
 ### New features

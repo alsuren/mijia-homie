@@ -1,6 +1,6 @@
 [package]
 name = "mijia"
-version = "0.7.1"
+version = "0.8.0"
 authors = [
     "Luis Félix <lcs.felix@gmail.com>",
     "Andrew Walbran <qwandor@google.com>",
