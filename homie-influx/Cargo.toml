@@ -1,6 +1,6 @@
 [package]
 name = "homie-influx"
-version = "0.2.9"
+version = "0.2.10"
 authors = ["Andrew Walbran <qwandor@google.com>"]
 edition = "2024"
 license = "MIT OR Apache-2.0"
