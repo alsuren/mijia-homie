@@ -122,7 +122,6 @@ dependencies = [
  "eyre",
  "futures",
  "homie-controller",
- "homie-device",
  "log",
  "pretty_env_logger",
  "rainbow-hat-rs",
