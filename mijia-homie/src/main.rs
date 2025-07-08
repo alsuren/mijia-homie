@@ -519,7 +519,14 @@ async fn action_sensor(
 async fn bluetooth_powercycle(session: &BluetoothSession) -> Result<(), eyre::Report> {
     for adapter in session.get_adapters().await? {
         let devices = session.get_devices_on_adapter(&adapter.id).await?;
-        if !devices.is_empty() && devices.iter().all(|device| device.connected) {
+        let connected_count = devices.iter().filter(|device| device.connected).count();
+        debug!(
+            "{}/{} devices connected on adapter {}",
+            connected_count,
+            devices.len(),
+            adapter.id
+        );
+        if !devices.is_empty() && connected_count == devices.len() {
             info!(
                 "Scanning seems to have broken, powering off adapter {}",
                 adapter.id
