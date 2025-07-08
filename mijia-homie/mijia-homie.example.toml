@@ -12,6 +12,9 @@ sensor_names_filename="sensor-names.toml"
 # multiple of 6 will give the most consistent results. 0 means that all sensor updates will be sent
 # to the MQTT broker.
 min_update_period_seconds=0
+# Whether to automatically power the Bluetooth adapter off and on again if scanning seems to have
+# stopped working.
+auto_restart_bluetooth=false
 
 [mqtt]
 # The hostname of the MQTT broker to use.

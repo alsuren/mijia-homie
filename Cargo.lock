@@ -336,9 +336,9 @@ dependencies = [
 
 [[package]]
 name = "bluez-async"
-version = "0.8.1"
+version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "50ce74d1f22603b879c3a99bd30eddc423460fb73a802655ca615b623ff3a838"
+checksum = "84ae4213cc2a8dc663acecac67bbdad05142be4d8ef372b6903abf878b0c690a"
 dependencies = [
  "bitflags 2.9.1",
  "bluez-generated",

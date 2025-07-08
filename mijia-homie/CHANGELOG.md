@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### New features
+
+- Added `auto_restart_bluetooth` config option, to power cycle the Bluetooth adapter if scanning
+  seems to have stopped working.
+
+### Other changes
+
+- Changed scan interval from 15 seconds to 20 seconds.
+
 ## 0.2.8
 
 ### Other changes

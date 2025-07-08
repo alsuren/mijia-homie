@@ -74,6 +74,9 @@ pub struct HomieConfig {
         rename = "min_update_period_seconds"
     )]
     pub min_update_period: Duration,
+    /// Whether to automatically power the Bluetooth adapter off and on again if scanning seems to
+    /// have stopped working.
+    pub auto_restart_bluetooth: bool,
 }
 
 pub fn de_duration_seconds<'de, D: Deserializer<'de>>(d: D) -> Result<Duration, D::Error> {
@@ -89,6 +92,7 @@ impl Default for HomieConfig {
             prefix: DEFAULT_MQTT_PREFIX.to_owned(),
             sensor_names_filename: DEFAULT_SENSOR_NAMES_FILENAME.to_owned(),
             min_update_period: Duration::from_secs(0),
+            auto_restart_bluetooth: false,
         }
     }
 }
