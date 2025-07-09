@@ -38,6 +38,8 @@ const SENSOR_CONNECT_RESERVATION_TIMEOUT: Duration = Duration::from_secs(5 * 60)
 const SENSOR_CONNECT_RETRY_TIMEOUT: Duration = Duration::from_secs(60);
 const BLUETOOTH_RESTART_DELAY: Duration = Duration::from_secs(5);
 
+const MIJIA_NAME: &str = "LYWSD03MMC";
+
 #[tokio::main]
 async fn main() -> Result<(), eyre::Report> {
     stable_eyre::install()?;
@@ -526,7 +528,11 @@ async fn bluetooth_powercycle(session: &BluetoothSession) -> Result<(), eyre::Re
             devices.len(),
             adapter.id
         );
-        if !devices.is_empty() && connected_count == devices.len() {
+        if !devices.is_empty()
+            && devices
+                .iter()
+                .all(|device| device.name.as_deref() == Some(MIJIA_NAME))
+        {
             info!(
                 "Scanning seems to have broken, powering off adapter {}",
                 adapter.id
