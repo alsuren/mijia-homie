@@ -22,10 +22,13 @@ use stable_eyre::eyre::WrapErr;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use tokio::sync::Mutex;
-use tokio::{time, try_join};
+use tokio::{
+    sync::Mutex,
+    time::{self, sleep},
+    try_join,
+};
 
-const SCAN_INTERVAL: Duration = Duration::from_secs(15);
+const SCAN_INTERVAL: Duration = Duration::from_secs(20);
 const CONNECT_INTERVAL: Duration = Duration::from_secs(1);
 const UPDATE_TIMEOUT: Duration = Duration::from_secs(60);
 // SENSOR_CONNECT_RETRY_TIMEOUT must be smaller than
@@ -33,6 +36,9 @@ const UPDATE_TIMEOUT: Duration = Duration::from_secs(60);
 // order to avoid races.
 const SENSOR_CONNECT_RESERVATION_TIMEOUT: Duration = Duration::from_secs(5 * 60);
 const SENSOR_CONNECT_RETRY_TIMEOUT: Duration = Duration::from_secs(60);
+const BLUETOOTH_RESTART_DELAY: Duration = Duration::from_secs(5);
+
+const MIJIA_NAME: &str = "LYWSD03MMC";
 
 #[tokio::main]
 async fn main() -> Result<(), eyre::Report> {
@@ -54,7 +60,13 @@ async fn main() -> Result<(), eyre::Report> {
     let (dbus_handle, session) = MijiaSession::new().await?;
 
     let min_update_period = config.homie.min_update_period;
-    let sensor_handle = run_sensor_system(homie, &session, &sensor_names, min_update_period);
+    let sensor_handle = run_sensor_system(
+        homie,
+        &session,
+        &sensor_names,
+        min_update_period,
+        config.homie.auto_restart_bluetooth,
+    );
 
     // Poll everything to completion, until the first one bombs out.
     let res: Result<_, eyre::Report> = try_join! {
@@ -360,6 +372,7 @@ async fn run_sensor_system(
     session: &MijiaSession,
     sensor_names: &HashMap<MacAddress, String>,
     min_update_period: Duration,
+    auto_restart_bluetooth: bool,
 ) -> Result<(), eyre::Report> {
     homie.ready().await?;
 
@@ -369,7 +382,8 @@ async fn run_sensor_system(
         min_update_period,
     }));
 
-    let connection_loop_handle = bluetooth_connection_loop(state.clone(), session, sensor_names);
+    let connection_loop_handle =
+        bluetooth_connection_loop(state.clone(), session, sensor_names, auto_restart_bluetooth);
     let bluetooth_event_loop_handle =
         service_bluetooth_event_queue(state.clone(), &session.bt_session, sensor_names);
     try_join!(connection_loop_handle, bluetooth_event_loop_handle).map(|((), ())| ())
@@ -379,6 +393,7 @@ async fn bluetooth_connection_loop(
     state: Arc<Mutex<SensorState>>,
     session: &MijiaSession,
     sensor_names: &HashMap<MacAddress, String>,
+    auto_restart_bluetooth: bool,
 ) -> Result<(), eyre::Report> {
     let mut next_scan_due = Instant::now();
     loop {
@@ -399,7 +414,7 @@ async fn bluetooth_connection_loop(
         let now = Instant::now();
         if now > next_scan_due && state.lock().await.sensors.len() < sensor_names.len() {
             next_scan_due = now + SCAN_INTERVAL;
-            check_for_sensors(state.clone(), session, sensor_names).await?;
+            check_for_sensors(state.clone(), session, sensor_names, auto_restart_bluetooth).await?;
         }
 
         // Check the state of each sensor and act on it if appropriate.
@@ -499,11 +514,48 @@ async fn action_sensor(
     }
 }
 
+/// If an adapter seems not to be scanning properly, because it doesn't see any devices other than
+/// those which are connected, then try powering it off and back on again.
+///
+/// This is supposed to work around a bug on Raspberry Pi devices.
+async fn bluetooth_powercycle(session: &BluetoothSession) -> Result<(), eyre::Report> {
+    for adapter in session.get_adapters().await? {
+        let devices = session.get_devices_on_adapter(&adapter.id).await?;
+        let connected_count = devices.iter().filter(|device| device.connected).count();
+        debug!(
+            "{}/{} devices connected on adapter {}",
+            connected_count,
+            devices.len(),
+            adapter.id
+        );
+        if !devices.is_empty()
+            && devices
+                .iter()
+                .all(|device| device.name.as_deref() == Some(MIJIA_NAME))
+        {
+            info!(
+                "Scanning seems to have broken, powering off adapter {}",
+                adapter.id
+            );
+            session.set_powered(&adapter.id, false).await?;
+            sleep(BLUETOOTH_RESTART_DELAY).await;
+            info!("Powering adapter {} on again", adapter.id);
+            session.set_powered(&adapter.id, true).await?;
+        }
+    }
+    Ok(())
+}
+
 async fn check_for_sensors(
     state: Arc<Mutex<SensorState>>,
     session: &MijiaSession,
     sensor_names: &HashMap<MacAddress, String>,
+    auto_restart_bluetooth: bool,
 ) -> Result<(), eyre::Report> {
+    if auto_restart_bluetooth {
+        bluetooth_powercycle(&session.bt_session).await?;
+    }
+
     session.bt_session.start_discovery().await?;
 
     let sensors = session.get_sensors().await?;
