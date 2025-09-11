@@ -9,7 +9,6 @@ use rumqttc::{ConnectionError, MqttOptions, StateError};
 use rumqttd::{Broker, Config, ConnectionSettings, RouterConfig, ServerSettings};
 use std::collections::HashMap;
 use std::env;
-use std::io::ErrorKind;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::mpsc;
 use std::thread;
@@ -188,11 +187,10 @@ async fn test_device() {
     {
         homie.disconnect().await.unwrap();
         let err = homie_handle.await.unwrap_err();
-        if let SpawnError::Connection(ConnectionError::MqttState(StateError::Io(e))) = err {
-            assert_eq!(e.kind(), ErrorKind::ConnectionAborted);
-        } else {
-            panic!("Unexpected error {err:?}");
-        }
+        assert!(matches!(
+            err,
+            SpawnError::Connection(ConnectionError::MqttState(StateError::ConnectionAborted))
+        ));
     }
 
     // Disconnect the controller.
