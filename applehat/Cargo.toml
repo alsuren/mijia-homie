@@ -1,6 +1,6 @@
 [package]
 name = "applehat"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["Andrew Walbran <qwandor@google.com>"]
 edition = "2024"
 license = "MIT OR Apache-2.0"
@@ -13,7 +13,7 @@ categories = ["network-programming"]
 color-backtrace = "0.7.1"
 eyre = "0.6.12"
 futures = "0.3.31"
-homie-controller = { version = "0.10.0", path = "../homie-controller" }
+homie-controller = { version = "0.11.0", path = "../homie-controller" }
 log = "0.4.28"
 pretty_env_logger = "0.5.0"
 rainbow-hat-rs = "0.2.1"

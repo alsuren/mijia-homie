@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.11.0
+
+### Breaking changes
+
+- Updated to `rumqttc` 0.25.
+
 ## 0.10.0
 
 ### Breaking changes
