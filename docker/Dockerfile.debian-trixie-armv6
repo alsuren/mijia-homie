@@ -5,7 +5,7 @@ FROM ghcr.io/qwandor/cross-context:0.2.1 as context
 # Raspberry Pi 1 (A, B, A+, B+, Zero, Zero W) is supported by armel for Debian
 # More details here https://wiki.debian.org/RaspberryPi#Raspberry_Pi_1_.28A.2C_B.2C_A.2B-.2C_B.2B-.2C_Zero.2C_Zero_W.29
 
-FROM debian:buster
+FROM debian:trixie
 
 COPY --from=context common.sh lib.sh /
 RUN /common.sh
@@ -13,16 +13,18 @@ RUN /common.sh
 COPY --from=context cmake.sh /
 RUN /cmake.sh
 
-COPY --from=context xargo.sh /
-RUN /xargo.sh
-
-RUN apt-get install --assume-yes --no-install-recommends \
+RUN apt-get update && apt-get install --assume-yes --no-install-recommends \
 	g++-arm-linux-gnueabi \
-	libc6-dev-armel-cross
+	libc6-dev-armel-cross \
+	libclang-dev
 
 RUN dpkg --add-architecture armel && \
 	apt-get update && \
 	apt-get install -y libdbus-1-dev:armel
+
+RUN curl --retry 3 -sSfL https://sh.rustup.rs | sh -s -- -y --profile minimal
+
+RUN $HOME/.cargo/bin/cargo install --force --locked bindgen-cli --version 0.72.1 --root /usr/local
 
 ENV CARGO_TARGET_ARM_UNKNOWN_LINUX_GNUEABI_LINKER=arm-linux-gnueabi-gcc \
 	CC_arm_unknown_linux_gnueabi=arm-linux-gnueabi-gcc \
