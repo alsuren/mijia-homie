@@ -1,7 +1,7 @@
 # Built from https://github.com/qwandor/cross/blob/context/docker/Dockerfile.context
 FROM ghcr.io/qwandor/cross-context:0.2.1 as context
 
-FROM debian:buster
+FROM debian:trixie
 
 COPY --from=context common.sh lib.sh /
 RUN /common.sh
@@ -9,12 +9,10 @@ RUN /common.sh
 COPY --from=context cmake.sh /
 RUN /cmake.sh
 
-COPY --from=context xargo.sh /
-RUN /xargo.sh
-
-RUN apt-get install --assume-yes --no-install-recommends \
+RUN apt-get update && apt-get install --assume-yes --no-install-recommends \
 	g++-aarch64-linux-gnu \
-	libc6-dev-arm64-cross
+	libc6-dev-arm64-cross \
+	libclang-dev
 
 RUN dpkg --add-architecture arm64 && \
 	apt-get update && \
