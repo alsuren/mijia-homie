@@ -13,7 +13,7 @@ keywords = ["homie", "mqtt"]
 categories = ["network-programming"]
 
 [dependencies]
-log = "0.4.28"
+log = "0.4.29"
 rumqttc = "0.25.1"
 thiserror = "2.0.17"
 
