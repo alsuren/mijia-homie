@@ -19,7 +19,7 @@ futures = "0.3.31"
 log = "0.4.29"
 thiserror = "2.0.17"
 tokio = "1.48.0"
-tokio-stream = "0.1.17"
+tokio-stream = "0.1.18"
 uuid = "1.19.0"
 
 [dev-dependencies]
