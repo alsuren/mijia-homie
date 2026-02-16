@@ -12,7 +12,7 @@ categories = ["network-programming"]
 [dependencies]
 color-backtrace = "0.7.2"
 eyre = "0.6.12"
-futures = "0.3.31"
+futures = "0.3.32"
 homie-controller = { version = "0.11.0", path = "../homie-controller" }
 influx_db_client = { version = "0.6.1", default-features = false, features = [
 	"rustls-tls",
