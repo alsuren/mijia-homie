@@ -13,7 +13,7 @@ categories = ["hardware-support"]
 log = "0.4.29"
 num_enum = "0.7.5"
 thiserror = "2.0.18"
-uuid = "1.20.0"
+uuid = "1.21.0"
 
 [dev-dependencies]
 bluez-async = "0.8.1"
