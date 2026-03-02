@@ -82,7 +82,7 @@ jobs:
           args: --target ${{ matrix.target }} --no-build --package mijia-homie
 
       - name: Upload packages
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: debian-packages-${{ matrix.target }}
           path: target/${{ matrix.target }}/debian/
