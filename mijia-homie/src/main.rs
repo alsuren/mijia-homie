@@ -726,34 +726,33 @@ async fn handle_bluetooth_event(
         id,
         event: DeviceEvent::ServiceData { service_data },
     } = event
+        && let Some(reading) = Reading::decode(&service_data)
     {
-        if let Some(reading) = Reading::decode(&service_data) {
-            info!("{id}: {reading}");
-            let mac_address = session.get_device_info(&id).await?.mac_address;
-            let state = &mut *state.lock().await;
-            let is_new = state.add_sensor_if_named(
-                sensor_names,
-                SensorProps {
-                    id: id.clone(),
-                    mac_address,
-                },
-                ConnectionStatus::AdvertisementOnly,
+        info!("{id}: {reading}");
+        let mac_address = session.get_device_info(&id).await?.mac_address;
+        let state = &mut *state.lock().await;
+        let is_new = state.add_sensor_if_named(
+            sensor_names,
+            SensorProps {
+                id: id.clone(),
+                mac_address,
+            },
+            ConnectionStatus::AdvertisementOnly,
+        );
+        let homie = &mut state.homie;
+        let sensors = &mut state.sensors;
+        // This will only return None if the sensor doesn't have a name.
+        if let Some(sensor) = get_mut_sensor_by_id(sensors, &id) {
+            assert_eq!(
+                sensor.connection_status,
+                ConnectionStatus::AdvertisementOnly
             );
-            let homie = &mut state.homie;
-            let sensors = &mut state.sensors;
-            // This will only return None if the sensor doesn't have a name.
-            if let Some(sensor) = get_mut_sensor_by_id(sensors, &id) {
-                assert_eq!(
-                    sensor.connection_status,
-                    ConnectionStatus::AdvertisementOnly
-                );
-                if is_new {
-                    sensor.publish_advertisement_only(homie).await?;
-                }
-                sensor
-                    .publish_reading(homie, &reading, state.min_update_period)
-                    .await?;
+            if is_new {
+                sensor.publish_advertisement_only(homie).await?;
             }
+            sensor
+                .publish_reading(homie, &reading, state.min_update_period)
+                .await?;
         }
     }
 

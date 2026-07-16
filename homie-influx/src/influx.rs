@@ -12,20 +12,16 @@ pub async fn send_property_value(
     node_id: String,
     property_id: String,
 ) -> Result<(), eyre::Report> {
-    if let Some(device) = controller.devices().get(&device_id) {
-        if let Some(node) = device.nodes.get(&node_id) {
-            if let Some(property) = node.properties.get(&property_id) {
-                if let Some(point) =
-                    point_for_property_value(device, node, property, SystemTime::now())
-                {
-                    // Passing None for rp should use the default retention policy for the database.
-                    influx_db_client
-                        .write_point(point, INFLUXDB_PRECISION, None)
-                        .await
-                        .wrap_err("Failed to send property value update to InfluxDB")?;
-                }
-            }
-        }
+    if let Some(device) = controller.devices().get(&device_id)
+        && let Some(node) = device.nodes.get(&node_id)
+        && let Some(property) = node.properties.get(&property_id)
+        && let Some(point) = point_for_property_value(device, node, property, SystemTime::now())
+    {
+        // Passing None for rp should use the default retention policy for the database.
+        influx_db_client
+            .write_point(point, INFLUXDB_PRECISION, None)
+            .await
+            .wrap_err("Failed to send property value update to InfluxDB")?;
     }
     Ok(())
 }

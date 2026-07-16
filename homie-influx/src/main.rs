@@ -105,8 +105,8 @@ async fn handle_event(controller: &HomieController, influx_db_client: &Client, e
                 value,
                 fresh
             );
-            if fresh {
-                if let Err(e) = send_property_value(
+            if fresh
+                && let Err(e) = send_property_value(
                     controller,
                     influx_db_client,
                     device_id,
@@ -114,9 +114,8 @@ async fn handle_event(controller: &HomieController, influx_db_client: &Client, e
                     property_id,
                 )
                 .await
-                {
-                    log::error!("{e:?}");
-                }
+            {
+                log::error!("{e:?}");
             }
         }
         _ => {

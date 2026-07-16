@@ -72,11 +72,11 @@ impl UiState {
             error!("Error setting RGB LEDs: {e}");
         }
 
-        if self.selected_device_id.is_none() || self.selected_node_id.is_none() {
-            if let Some((device_id, node_id, _)) = nodes.first() {
-                self.selected_device_id = Some(device_id.to_string());
-                self.selected_node_id = Some(node_id.to_string());
-            }
+        if (self.selected_device_id.is_none() || self.selected_node_id.is_none())
+            && let Some((device_id, node_id, _)) = nodes.first()
+        {
+            self.selected_device_id = Some(device_id.to_string());
+            self.selected_node_id = Some(node_id.to_string());
         }
 
         if self.selected_brightness == 0 {
@@ -243,12 +243,10 @@ fn find_nodes(devices: &HashMap<String, Device>) -> Vec<(&str, &str, &Node)> {
                 if let (Some(temperature_node), Some(humidity_node)) = (
                     node.properties.get(TEMPERATURE_PROPERTY_ID),
                     node.properties.get(HUMIDITY_PROPERTY_ID),
-                ) {
-                    if temperature_node.datatype == Some(Datatype::Float)
-                        && humidity_node.datatype == Some(Datatype::Integer)
-                    {
-                        nodes.push((device_id, node_id, node));
-                    }
+                ) && temperature_node.datatype == Some(Datatype::Float)
+                    && humidity_node.datatype == Some(Datatype::Integer)
+                {
+                    nodes.push((device_id, node_id, node));
                 }
             }
         }

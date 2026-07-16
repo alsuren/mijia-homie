@@ -224,13 +224,13 @@ impl Property {
     pub fn color_format(&self) -> Result<ColorFormat, ValueError> {
         // If the datatype is known and it isn't color, that's an error. If it's not known, maybe
         // parsing the format will succeed, so try anyway.
-        if let Some(actual) = self.datatype {
-            if actual != Datatype::Color {
-                return Err(ValueError::WrongDatatype {
-                    expected: Datatype::Color,
-                    actual,
-                });
-            }
+        if let Some(actual) = self.datatype
+            && actual != Datatype::Color
+        {
+            return Err(ValueError::WrongDatatype {
+                expected: Datatype::Color,
+                actual,
+            });
         }
 
         match self.format {
@@ -360,16 +360,15 @@ impl FromStr for Extension {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let parts: Vec<_> = s.split(':').collect();
-        if let [id, version, homie_versions] = parts.as_slice() {
-            if let Some(homie_versions) = homie_versions.strip_prefix('[') {
-                if let Some(homie_versions) = homie_versions.strip_suffix(']') {
-                    return Ok(Extension {
-                        id: (*id).to_owned(),
-                        version: (*version).to_owned(),
-                        homie_versions: homie_versions.split(';').map(|p| p.to_owned()).collect(),
-                    });
-                }
-            }
+        if let [id, version, homie_versions] = parts.as_slice()
+            && let Some(homie_versions) = homie_versions.strip_prefix('[')
+            && let Some(homie_versions) = homie_versions.strip_suffix(']')
+        {
+            return Ok(Extension {
+                id: (*id).to_owned(),
+                version: (*version).to_owned(),
+                homie_versions: homie_versions.split(';').map(|p| p.to_owned()).collect(),
+            });
         }
         Err(ParseExtensionError(s.to_owned()))
     }

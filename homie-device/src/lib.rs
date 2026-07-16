@@ -309,21 +309,17 @@ impl HomieDevice {
                             log::trace!(
                                 "set node {node_id:?} property {property_id:?} to {payload:?}"
                             );
-                            if let Some(callback) = update_callback.as_mut() {
-                                if let Some(value) = callback(
+                            if let Some(callback) = update_callback.as_mut()
+                                && let Some(value) = callback(
                                     node_id.to_string(),
                                     property_id.to_string(),
                                     payload.to_string(),
                                 )
                                 .await
-                                {
-                                    publisher
-                                        .publish_retained(
-                                            &format!("{node_id}/{property_id}"),
-                                            value,
-                                        )
-                                        .await?;
-                                }
+                            {
+                                publisher
+                                    .publish_retained(&format!("{node_id}/{property_id}"), value)
+                                    .await?;
                             }
                         }
                     } else {

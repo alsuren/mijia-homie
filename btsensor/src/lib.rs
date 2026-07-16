@@ -42,10 +42,10 @@ impl Reading {
     /// Returns `None` if none of the UUIDs for the above formats are present, or there is an error
     /// decoding them.
     pub fn decode(service_data: &HashMap<Uuid, Vec<u8>>) -> Option<Self> {
-        if let Some(data) = service_data.get(&atc::UUID) {
-            if let Some(reading) = atc::SensorReading::decode(data) {
-                return Some(Self::Atc(reading));
-            }
+        if let Some(data) = service_data.get(&atc::UUID)
+            && let Some(reading) = atc::SensorReading::decode(data)
+        {
+            return Some(Self::Atc(reading));
         }
         if let Some(data) = service_data.get(&bthome::v1::UNENCRYPTED_UUID) {
             match bthome::v1::Element::decode_all(data) {
