@@ -544,10 +544,16 @@ async fn bluetooth_powercycle(session: &BluetoothSession) -> Result<(), eyre::Re
                 "Scanning seems to have broken, powering off adapter {}",
                 adapter.id
             );
-            session.set_powered(&adapter.id, false).await?;
+            session
+                .set_powered(&adapter.id, false)
+                .await
+                .with_context(|| format!("Error powering off adapter {}", adapter.id))?;
             sleep(BLUETOOTH_RESTART_DELAY).await;
             info!("Powering adapter {} on again", adapter.id);
-            session.set_powered(&adapter.id, true).await?;
+            session
+                .set_powered(&adapter.id, true)
+                .await
+                .with_context(|| format!("Error powering on adapter {}", adapter.id))?;
         }
     }
     Ok(())
