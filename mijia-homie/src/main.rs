@@ -378,7 +378,10 @@ async fn run_sensor_system(
     min_update_period: Duration,
     auto_restart_bluetooth: bool,
 ) -> Result<(), eyre::Report> {
-    homie.ready().await?;
+    homie
+        .ready()
+        .await
+        .context("Failed to set homie state to ready")?;
 
     let state = Arc::new(Mutex::new(SensorState {
         sensors: HashMap::new(),
