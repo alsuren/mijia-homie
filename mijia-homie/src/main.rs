@@ -76,10 +76,10 @@ async fn main() -> Result<(), eyre::Report> {
     let res: Result<_, eyre::Report> = try_join! {
         // If this ever finishes, we lost connection to D-Bus.
         dbus_handle.err_into(),
-        // Bluetooth finished first. Convert error and get on with your life.
-        sensor_handle.err_into(),
         // MQTT event loop finished first.
         homie_handle.err_into(),
+        // Bluetooth finished first. Convert error and get on with your life.
+        sensor_handle.err_into(),
     };
     res?;
     Ok(())
