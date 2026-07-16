@@ -17,6 +17,7 @@ use mijia::bluetooth::{
     BluetoothError, BluetoothEvent, BluetoothSession, DeviceEvent, DeviceId, MacAddress,
 };
 use mijia::{MijiaEvent, MijiaSession, Readings, SensorProps};
+use rustls::crypto::aws_lc_rs::default_provider;
 use stable_eyre::eyre;
 use stable_eyre::eyre::WrapErr;
 use std::collections::HashMap;
@@ -45,6 +46,9 @@ async fn main() -> Result<(), eyre::Report> {
     stable_eyre::install()?;
     pretty_env_logger::init();
     color_backtrace::install();
+    default_provider()
+        .install_default()
+        .map_err(|_| eyre!("Failed to install default cryptography provider"))?;
 
     let config = Config::from_file()?;
     let sensor_names = read_sensor_names(&config.homie.sensor_names_filename)?;
@@ -72,10 +76,10 @@ async fn main() -> Result<(), eyre::Report> {
     let res: Result<_, eyre::Report> = try_join! {
         // If this ever finishes, we lost connection to D-Bus.
         dbus_handle.err_into(),
-        // Bluetooth finished first. Convert error and get on with your life.
-        sensor_handle.err_into(),
         // MQTT event loop finished first.
         homie_handle.err_into(),
+        // Bluetooth finished first. Convert error and get on with your life.
+        sensor_handle.err_into(),
     };
     res?;
     Ok(())
@@ -374,7 +378,10 @@ async fn run_sensor_system(
     min_update_period: Duration,
     auto_restart_bluetooth: bool,
 ) -> Result<(), eyre::Report> {
-    homie.ready().await?;
+    homie
+        .ready()
+        .await
+        .context("Failed to set homie state to ready")?;
 
     let state = Arc::new(Mutex::new(SensorState {
         sensors: HashMap::new(),
@@ -537,10 +544,16 @@ async fn bluetooth_powercycle(session: &BluetoothSession) -> Result<(), eyre::Re
                 "Scanning seems to have broken, powering off adapter {}",
                 adapter.id
             );
-            session.set_powered(&adapter.id, false).await?;
+            session
+                .set_powered(&adapter.id, false)
+                .await
+                .with_context(|| format!("Error powering off adapter {}", adapter.id))?;
             sleep(BLUETOOTH_RESTART_DELAY).await;
             info!("Powering adapter {} on again", adapter.id);
-            session.set_powered(&adapter.id, true).await?;
+            session
+                .set_powered(&adapter.id, true)
+                .await
+                .with_context(|| format!("Error powering on adapter {}", adapter.id))?;
         }
     }
     Ok(())

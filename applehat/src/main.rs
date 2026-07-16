@@ -2,12 +2,13 @@ mod config;
 mod ui;
 
 use config::{Config, get_mqtt_options};
-use eyre::Report;
+use eyre::{Report, eyre};
 use futures::future::try_join;
 use homie_controller::{Event, HomieController, HomieEventLoop, PollError};
 use log::{error, info, trace};
 use rainbow_hat_rs::{alphanum4::Alphanum4, apa102::APA102, touch::Buttons};
 use rumqttc::ConnectionError;
+use rustls::crypto::aws_lc_rs::default_provider;
 use std::{
     sync::{Arc, Mutex},
     time::Duration,
@@ -23,6 +24,9 @@ async fn main() -> Result<(), Report> {
     stable_eyre::install()?;
     pretty_env_logger::init();
     color_backtrace::install();
+    default_provider()
+        .install_default()
+        .map_err(|_| eyre!("Failed to install default cryptography provider"))?;
 
     let config = Config::from_file()?;
 

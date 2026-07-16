@@ -5,10 +5,12 @@ use crate::config::{
     Config, get_influxdb_client, get_mqtt_options, get_tls_client_config, read_mappings,
 };
 use crate::influx::send_property_value;
+use eyre::{Report, eyre};
 use futures::future::try_join_all;
 use homie_controller::{Event, HomieController, HomieEventLoop, PollError};
 use influx_db_client::Client;
 use rumqttc::ConnectionError;
+use rustls::crypto::aws_lc_rs::default_provider;
 use stable_eyre::eyre;
 use std::sync::Arc;
 use std::time::Duration;
@@ -16,10 +18,13 @@ use tokio::task::{self, JoinHandle};
 use tokio::time::sleep;
 
 #[tokio::main]
-async fn main() -> Result<(), eyre::Report> {
+async fn main() -> Result<(), Report> {
     stable_eyre::install()?;
     pretty_env_logger::init();
     color_backtrace::install();
+    default_provider()
+        .install_default()
+        .map_err(|_| eyre!("Failed to install default cryptography provider"))?;
 
     let config = Config::from_file()?;
     let mappings = read_mappings(&config.homie)?;
