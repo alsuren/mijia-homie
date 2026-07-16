@@ -17,6 +17,7 @@ use mijia::bluetooth::{
     BluetoothError, BluetoothEvent, BluetoothSession, DeviceEvent, DeviceId, MacAddress,
 };
 use mijia::{MijiaEvent, MijiaSession, Readings, SensorProps};
+use rustls::crypto::aws_lc_rs::default_provider;
 use stable_eyre::eyre;
 use stable_eyre::eyre::WrapErr;
 use std::collections::HashMap;
@@ -45,6 +46,9 @@ async fn main() -> Result<(), eyre::Report> {
     stable_eyre::install()?;
     pretty_env_logger::init();
     color_backtrace::install();
+    default_provider()
+        .install_default()
+        .map_err(|_| eyre!("Failed to install default cryptography provider"))?;
 
     let config = Config::from_file()?;
     let sensor_names = read_sensor_names(&config.homie.sensor_names_filename)?;
