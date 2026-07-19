@@ -157,10 +157,9 @@ if [[ "$STEP" == 7 ]]; then
 fi
 
 if [[ "$STEP" == 8 ]]; then
-    curl -L https://homiers.jfrog.io/artifactory/api/security/keypair/public/repositories/homie-rs | ssh "${FINAL_SSH}" sudo apt-key add -
-    echo "deb https://homiers.jfrog.io/artifactory/homie-rs stable main" | ssh "${FINAL_SSH}" sudo tee /etc/apt/sources.list.d/homie-rs.list
+    # TODO: Set up a repository and install mijia-homie somehow.
     ssh "${FINAL_SSH}" sudo apt update
-    ssh "${FINAL_SSH}" sudo apt install mijia-homie
+    #ssh "${FINAL_SSH}" sudo apt install mijia-homie
 
     inc_step
 fi
