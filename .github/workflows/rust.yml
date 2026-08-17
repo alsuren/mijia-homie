@@ -33,7 +33,7 @@ jobs:
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install libdbus-1-dev
       - name: Install cargo-llvm-cov
-        uses: taiki-e/install-action@v2.85.10
+        uses: taiki-e/install-action@v2.85.13
         with:
           tool: cargo-llvm-cov@0.6.19
       - name: Run tests with coverage
